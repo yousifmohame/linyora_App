@@ -1,0 +1,11 @@
+{
+    "@@locale": "en",
+    "appTitle": "Linyora",
+    "login": "Login",
+    "email": "Email",
+    "password": "Password",
+    "welcome": "Welcome back, {name}",
+    "roleMerchant": "Merchant Dashboard",
+    "roleModel": "Model Dashboard",
+    "roleSupplier": "Supplier Dashboard"
+}

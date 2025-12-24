@@ -1,0 +1,40 @@
+name: linyora_project
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.7.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # 👇 أضفنا مكتبة الترجمة هنا داخل الـ dependencies
+  flutter_localizations:
+    sdk: flutter
+
+  # الأيقونات والمكتبات الأخرى
+  cupertino_icons: ^1.0.8
+  dio: ^5.9.0
+  flutter_secure_storage: ^10.0.0
+  shared_preferences: ^2.5.3
+  intl: ^0.19.0
+  cached_network_image: ^3.4.1
+  carousel_slider: ^5.1.1
+  video_player: ^2.10.1
+  flutter_cache_manager: ^3.4.1
+  story_view: ^0.16.6
+  percent_indicator: ^4.2.5
+  curved_navigation_bar: ^1.0.6
+  marquee: ^2.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  generate: true # 👈 هذا السطر ضروري جداً لتوليد ملفات الترجمة
