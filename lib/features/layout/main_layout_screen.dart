@@ -5,6 +5,7 @@ import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import '../home/screens/home_screen.dart';
 import '../reels/screens/reels_screen.dart';
 import '../profile/screens/profile_screen.dart';
+import '../shared/widgets/app_drawer.dart';
 
 class MainLayoutScreen extends StatefulWidget {
   const MainLayoutScreen({super.key});
@@ -16,12 +17,16 @@ class MainLayoutScreen extends StatefulWidget {
 class _MainLayoutScreenState extends State<MainLayoutScreen> {
   int _currentIndex = 0;
   final GlobalKey<CurvedNavigationBarState> _bottomNavigationKey = GlobalKey();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       extendBody: true,
       backgroundColor: Colors.grey[100],
+
+      drawer: const AppDrawer(),
       // نستخدم IndexedStack للحفاظ على حالة الصفحات
       body: IndexedStack(
         index: _currentIndex,

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:linyora_project/features/home/services/home_service.dart'; // تأكد من المسار الصحيح
+import 'package:marquee/marquee.dart'; // 1. استيراد المكتبة
+import 'package:linyora_project/features/home/services/home_service.dart';
 
 class MarqueeWidget extends StatefulWidget {
   const MarqueeWidget({Key? key}) : super(key: key);
@@ -10,13 +11,11 @@ class MarqueeWidget extends StatefulWidget {
 }
 
 class _MarqueeWidgetState extends State<MarqueeWidget> {
-  // تعريف السيرفس
   final HomeService _homeService = HomeService();
 
-  List<String> messages = [];
-  int currentIndex = 0;
-  Timer? _timer;
-  bool _isLoading = true; // لمعرفة حالة التحميل
+  // بدلاً من قائمة ورقم حالي، سنستخدم نصاً واحداً طويلاً
+  String combinedMessage = "";
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -24,28 +23,21 @@ class _MarqueeWidgetState extends State<MarqueeWidget> {
     _loadMessages();
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
+  // لا نحتاج لـ dispose للتايمر لأنه تم حذفه
 
-  // دالة جلب الرسائل الحقيقية
   Future<void> _loadMessages() async {
     try {
-      // استدعاء الدالة الحقيقية من السيرفس
       final fetchedMessages = await _homeService.getMarqueeMessages();
 
       if (mounted) {
         setState(() {
-          messages = fetchedMessages;
+          // 2. دمج جميع الرسائل في نص واحد مع فواصل
+          if (fetchedMessages.isNotEmpty) {
+            // نضع مسافات ونقطة بين كل رسالة والأخرى
+            combinedMessage = fetchedMessages.join("       •       ");
+          }
           _isLoading = false;
         });
-
-        // تشغيل المؤقت فقط إذا كان هناك أكثر من رسالة
-        if (messages.length > 1) {
-          _startTimer();
-        }
       }
     } catch (e) {
       debugPrint("Error in MarqueeWidget: $e");
@@ -53,30 +45,20 @@ class _MarqueeWidgetState extends State<MarqueeWidget> {
     }
   }
 
-  void _startTimer() {
-    _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (mounted) {
-        setState(() {
-          currentIndex = (currentIndex + 1) % messages.length;
-        });
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    // 1. إذا كان لا يزال يحمل أو القائمة فارغة، قم بإخفاء الويجت
-    if (_isLoading || messages.isEmpty) {
+    if (_isLoading || combinedMessage.isEmpty) {
       return const SizedBox.shrink();
     }
 
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      height: 40, // 3. ضروري تحديد ارتفاع ثابت للشريط المتحرك
+      margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 0),
+      // إزالة الـ padding العمودي الداخلي لأن Marquee يحتاج مساحة للحركة
       decoration: BoxDecoration(
-        color: Colors.blueAccent, // يمكنك تغيير اللون هنا
-        borderRadius: BorderRadius.circular(25),
+        color: Colors.blueAccent,
+
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
@@ -85,21 +67,26 @@ class _MarqueeWidgetState extends State<MarqueeWidget> {
           ),
         ],
       ),
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 500),
-        transitionBuilder: (Widget child, Animation<double> animation) {
-          return FadeTransition(opacity: animation, child: child);
-        },
-        child: Text(
-          messages[currentIndex],
-          // المفتاح ضروري لعمل الأنيميشن عند تغيير النص
-          key: ValueKey<String>(messages[currentIndex]),
-          textAlign: TextAlign.center,
+      // 4. قص المحتوى لضمان عدم خروج النص عن الحواف الدائرية
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(25),
+        child: Marquee(
+          text: combinedMessage,
           style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
             fontSize: 14,
           ),
+          scrollAxis: Axis.horizontal, // اتجاه الحركة
+          crossAxisAlignment: CrossAxisAlignment.center,
+          blankSpace: 50.0, // مسافة فارغة بعد انتهاء النص وقبل بدايته مجدداً
+          velocity: 30.0, // سرعة الحركة (كلما زاد الرقم زادت السرعة)
+          pauseAfterRound: const Duration(seconds: 1), // توقف لحظي بعد كل دورة
+          startPadding: 10.0,
+          accelerationDuration: const Duration(seconds: 1),
+          accelerationCurve: Curves.linear,
+          decelerationDuration: const Duration(milliseconds: 500),
+          decelerationCurve: Curves.easeOut,
         ),
       ),
     );

@@ -11,7 +11,7 @@ class ProfileScreen extends StatelessWidget {
       body: Center(
         child: ElevatedButton(
           onPressed: () async {
-            await AuthService().logout();
+            await AuthService.instance.logout();
             Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(builder: (_) => const LoginScreen()),

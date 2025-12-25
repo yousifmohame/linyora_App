@@ -1,10 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:linyora_project/features/layout/main_layout_screen.dart';
-import 'features/auth/screens/login_screen.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
-void main() {
+// استيراد الشاشات والخدمات
+import 'features/layout/main_layout_screen.dart';
+import 'features/auth/screens/login_screen.dart';
+import 'features/auth/services/auth_service.dart'; // تأكد من المسار
+
+void main() async {
+  // 1. تهيئة الـ Flutter Engine للعمليات غير المتزامنة
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // 2. محاولة تسجيل الدخول التلقائي (قراءة التوكن وجلب البيانات)
+  await AuthService.instance.tryAutoLogin();
+
+  // 3. تشغيل التطبيق
   runApp(const LinyoraApp());
 }
 
@@ -15,6 +25,8 @@ class LinyoraApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Linyora',
+
+      // إعدادات اللغة
       localizationsDelegates: const [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
@@ -25,19 +37,37 @@ class LinyoraApp extends StatelessWidget {
         Locale('ar'), // العربية
         Locale('en'), // الإنجليزية
       ],
-      locale: const Locale('ar'),
+      locale: const Locale('ar'), // اللغة الافتراضية
+
       debugShowCheckedModeBanner: false,
+
+      // الثيم والتصميم
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.black),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFFF105C6), // لون Linyora الوردي
+          primary: const Color(0xFFF105C6),
+        ),
         useMaterial3: true,
-        fontFamily: 'Cairo', // يفضل إضافة خط عربي لاحقاً
+        fontFamily: 'Cairo', // تأكد من إضافة الخط في pubspec.yaml
+        scaffoldBackgroundColor: Colors.white,
       ),
-      // جعل الاتجاه من اليمين لليسار (RTL) لأن التطبيق يستهدف العرب
+
+      // إجبار الاتجاه من اليمين لليسار
       builder: (context, child) {
         return Directionality(textDirection: TextDirection.rtl, child: child!);
       },
-      // home: const LoginScreen(),
-      home: const MainLayoutScreen(),
+
+      // تحديد الصفحة الأولى بناءً على حالة تسجيل الدخول
+      home:
+          AuthService.instance.isLoggedIn
+              ? const MainLayoutScreen()
+              : const LoginScreen(),
+
+      // تعريف المسارات (مفيد للـ Drawer وزر تسجيل الخروج)
+      routes: {
+        '/login': (context) => const LoginScreen(),
+        '/home': (context) => const MainLayoutScreen(),
+      },
     );
   }
 }

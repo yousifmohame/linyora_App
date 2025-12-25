@@ -13,7 +13,7 @@ class VerifyLoginScreen extends StatefulWidget {
 
 class _VerifyLoginScreenState extends State<VerifyLoginScreen> {
   final _codeController = TextEditingController();
-  final _authService = AuthService();
+  final _authService = AuthService.instance;
   bool _isLoading = false;
 
   Future<void> _handleVerification() async {

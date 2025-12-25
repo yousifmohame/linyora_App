@@ -24,8 +24,8 @@ class SectionDisplay extends StatelessWidget {
       children: [
         // 1. رأس القسم (Banner)
         Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          height: 130, // ارتفاع البانر
+          margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+          height: 110, // ارتفاع البانر
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
             gradient: LinearGradient(
@@ -63,7 +63,7 @@ class SectionDisplay extends StatelessWidget {
 
               // المحتوى النصي
               Padding(
-                padding: const EdgeInsets.all(20.0),
+                padding: const EdgeInsets.all(10.0),
                 child: Row(
                   children: [
                     // الأيقونة
@@ -125,7 +125,7 @@ class SectionDisplay extends StatelessWidget {
         // 2. المحتوى المميز (منتج أو سلايدر)
         Container(
           height: 250,
-          margin: const EdgeInsets.symmetric(horizontal: 16),
+          margin: const EdgeInsets.symmetric(horizontal: 5),
           child:
               section.featuredProductId != null
                   ? _buildFeaturedProduct(context, themeColor)
@@ -135,65 +135,98 @@ class SectionDisplay extends StatelessWidget {
         // 3. شبكة التصنيفات (Categories Grid)
         if (section.categories.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: GridView.builder(
-              physics:
-                  const NeverScrollableScrollPhysics(), // لمنع السكرول داخل السكرول
-              shrinkWrap: true,
-              itemCount: section.categories.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3, // 3 تصنيفات في الصف
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-                childAspectRatio: 0.85,
+            padding: const EdgeInsets.symmetric(
+              vertical: 10.0,
+            ), // مسافة رأسية فقط
+            child: SizedBox(
+              height: 120, // تحديد ارتفاع الشريط
+              child: CarouselSlider.builder(
+                itemCount: section.categories.length,
+                options: CarouselOptions(
+                  height: 130,
+
+                  // 1. تفعيل الحركة التلقائية
+                  autoPlay: true,
+                  autoPlayInterval: const Duration(seconds: 3), // سرعة التقليب
+                  autoPlayAnimationDuration: const Duration(milliseconds: 800),
+                  autoPlayCurve: Curves.fastOutSlowIn,
+
+                  // 2. أهم إعداد: عرض عدة عناصر في وقت واحد
+                  // القيمة 0.28 تعني ظهور حوالي 3.5 عنصر في الشاشة (شريط)
+                  viewportFraction: 0.28,
+
+                  // 3. التكرار اللانهائي
+                  enableInfiniteScroll: true,
+                  padEnds: false, // البدء من اليسار
+                ),
+                itemBuilder: (context, index, realIndex) {
+                  final category = section.categories[index];
+
+                  // نستخدم Container لإضافة هوامش جانبية بين العناصر
+                  return Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 5.0),
+                    child: GestureDetector(
+                      onTap: () {
+                        // أكشن عند الضغط على التصنيف
+                        print("Open Category: ${category.name}");
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // حاوية الصورة
+                          Container(
+                            height: 80,
+                            width: 80, // جعلناها مربعة لتناسب الشريط
+                            decoration: BoxDecoration(
+                              color: themeColor.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(
+                                16,
+                              ), // حواف دائرية
+                              border: Border.all(
+                                color: themeColor.withOpacity(0.2),
+                              ),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: CachedNetworkImage(
+                                imageUrl: category.imageUrl,
+                                fit: BoxFit.cover,
+                                placeholder:
+                                    (_, __) => const Center(
+                                      child: Icon(
+                                        Icons.category,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                errorWidget:
+                                    (_, __, ___) => const Icon(Icons.error),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          // اسم التصنيف
+                          SizedBox(
+                            width: 80, // نفس عرض الصورة لضمان توسيط النص
+                            child: Text(
+                              category.name,
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[800],
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
-              itemBuilder: (context, index) {
-                final category = section.categories[index];
-                return Column(
-                  children: [
-                    RepaintBoundary(
-                      child: Container(
-                        height: 80,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: themeColor.withOpacity(
-                            0.05,
-                          ), // خلفية شفافة بلون الثيم
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: themeColor.withOpacity(0.2),
-                          ),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: CachedNetworkImage(
-                            imageUrl: category.imageUrl,
-                            fit: BoxFit.cover,
-                            placeholder:
-                                (_, __) => const Center(
-                                  child: Icon(
-                                    Icons.category,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      category.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[800],
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                );
-              },
             ),
           ),
       ],

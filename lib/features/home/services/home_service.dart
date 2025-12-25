@@ -1,19 +1,19 @@
+import 'package:flutter/material.dart';
+import 'package:linyora_project/core/api/api_client.dart'; // تأكد من المسار
+import 'package:linyora_project/models/notification_model.dart';
 import 'package:linyora_project/models/product_model.dart';
 import 'package:linyora_project/models/top_user_model.dart';
-
-import '../../../core/api/api_client.dart';
-import '../../../models/banner_model.dart';
-import '../../../models/category_model.dart';
+import 'package:linyora_project/models/banner_model.dart';
+import 'package:linyora_project/models/category_model.dart';
 
 class HomeService {
+  // استخدام الكلاس المخصص الذي يحتوي على Interceptor للتوكن
   final ApiClient _apiClient = ApiClient();
 
-  // جلب البانرات النشطة
+  // 1. جلب البانرات
   Future<List<BannerModel>> getBanners() async {
     try {
-      final response = await _apiClient.get(
-        '/browse/main-banners',
-      ); // حسب ملف mainBannerController.js
+      final response = await _apiClient.get('/browse/main-banners');
       if (response.statusCode == 200) {
         return (response.data as List)
             .map((e) => BannerModel.fromJson(e))
@@ -21,17 +21,15 @@ class HomeService {
       }
       return [];
     } catch (e) {
-      print("Error fetching banners: $e");
+      debugPrint("Error fetching banners: $e");
       return [];
     }
   }
 
-  // جلب الأقسام
+  // 2. جلب الأقسام
   Future<List<CategoryModel>> getCategories() async {
     try {
-      final response = await _apiClient.get(
-        '/categories',
-      ); // حسب ملف categoryController.js
+      final response = await _apiClient.get('/categories');
       if (response.statusCode == 200) {
         return (response.data as List)
             .map((e) => CategoryModel.fromJson(e))
@@ -39,14 +37,14 @@ class HomeService {
       }
       return [];
     } catch (e) {
-      print("Error fetching categories: $e");
+      debugPrint("Error fetching categories: $e");
       return [];
     }
   }
 
+  // 3. جلب أشهر العارضات
   Future<List<TopUserModel>> getTopModels() async {
     try {
-      // - getTopModels
       final response = await _apiClient.get('/browse/top-models');
       if (response.statusCode == 200) {
         return (response.data as List)
@@ -55,15 +53,14 @@ class HomeService {
       }
       return [];
     } catch (e) {
-      print("Error fetching top models: $e");
+      debugPrint("Error fetching top models: $e");
       return [];
     }
   }
 
-  // جلب أشهر التاجرات
+  // 4. جلب أشهر التاجرات
   Future<List<TopUserModel>> getTopMerchants() async {
     try {
-      // - getTopMerchants
       final response = await _apiClient.get('/browse/top-merchants');
       if (response.statusCode == 200) {
         return (response.data as List)
@@ -72,23 +69,24 @@ class HomeService {
       }
       return [];
     } catch (e) {
-      print("Error fetching top merchants: $e");
+      debugPrint("Error fetching top merchants: $e");
       return [];
     }
   }
 
-  // دالة المتابعة/إلغاء المتابعة
+  // 5. المتابعة/إلغاء المتابعة
+  // ملاحظة: الـ ApiClient سيقوم بإرفاق التوكن تلقائياً وهذا ضروري هنا
   Future<bool> toggleFollow(int userId) async {
     try {
-      await _apiClient.post(
-        '/users/$userId/follow',
-      ); // تأكد من المسار في routes/userRoutes.js
+      await _apiClient.post('/users/$userId/follow');
       return true;
     } catch (e) {
+      debugPrint("Error toggling follow: $e");
       return false;
     }
   }
 
+  // 6. جلب المنتجات حسب النوع
   Future<List<ProductModel>> getProductsByType(String type) async {
     try {
       String endpoint = '';
@@ -114,29 +112,72 @@ class HomeService {
       }
       return [];
     } catch (e) {
-      print("Error fetching $type products: $e");
+      debugPrint("Error fetching $type products: $e");
       return [];
     }
   }
 
-  // جلب رسائل الشريط الإعلاني
+  // 7. جلب رسائل الشريط الإعلاني
   Future<List<String>> getMarqueeMessages() async {
     try {
-      // استبدل هذا بالمسار الصحيح بناءً على الـ BaseURL الخاص بك
-      // endpoint: /api/marquee/active
       final response = await _apiClient.get('/marquee/active');
 
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data;
-
-        // تحويل مصفوفة الكائنات إلى مصفوفة نصوص
-        // مثال: من [{text: "Hello"}, {text: "World"}] إلى ["Hello", "World"]
         return data.map((item) => item['message_text'].toString()).toList();
       }
       return [];
     } catch (e) {
-      print("Error fetching marquee messages: $e");
+      debugPrint("Error fetching marquee messages: $e");
       return [];
+    }
+  }
+
+  // 8. البحث عن المنتجات
+  Future<List<ProductModel>> searchProducts(String query) async {
+    try {
+      // استخدام queryParameters مع ApiClient
+      final response = await _apiClient.get(
+        '/products/search',
+        queryParameters: {'term': query},
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data;
+        return data.map((json) => ProductModel.fromJson(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint("Search error: $e");
+      return [];
+    }
+  }
+
+  // 9. جلب الإشعارات (محمية بالتوكن)
+  Future<List<NotificationModel>> getNotifications() async {
+    try {
+      // الـ ApiClient سيضيف التوكن تلقائياً في الهيدر
+      final response = await _apiClient.get('/notifications');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data;
+        return data.map((json) => NotificationModel.fromJson(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint("Error fetching notifications: $e");
+      return [];
+    }
+  }
+
+  // 10. تحديد كل الإشعارات كمقروءة (محمية بالتوكن)
+  Future<bool> markAllNotificationsAsRead() async {
+    try {
+      final response = await _apiClient.post('/notifications/read');
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint("Error marking all as read: $e");
+      return false;
     }
   }
 }

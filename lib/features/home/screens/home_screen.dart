@@ -2,10 +2,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:linyora_project/features/home/screens/notifications_screen.dart';
 // --- Services & Models ---
 import 'package:linyora_project/features/home/services/section_service.dart';
 import 'package:linyora_project/features/home/services/home_service.dart';
 import 'package:linyora_project/features/home/widgets/marquee_widget.dart';
+import 'package:linyora_project/features/home/widgets/search_screen.dart';
 import 'package:linyora_project/models/product_model.dart';
 import 'package:linyora_project/models/section_model.dart';
 import 'package:linyora_project/models/banner_model.dart';
@@ -49,10 +51,27 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentBannerIndex = 0;
   Timer? _sliderTimer;
 
+  // متغير لحفظ عدد الإشعارات غير المقروءة
+  int _unreadNotificationsCount = 0;
+
+  // دالة لحساب الإشعارات غير المقروءة
+  Future<void> _updateUnreadCount() async {
+    // نجلب الإشعارات (التي أضفناها للسيرفس سابقاً)
+    final notifications = await _homeService.getNotifications();
+    if (mounted) {
+      setState(() {
+        // نحسب فقط العناصر التي فيها isRead == false
+        _unreadNotificationsCount =
+            notifications.where((n) => !n.isRead).length;
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _fetchData();
+    _updateUnreadCount();
   }
 
   @override
@@ -124,7 +143,8 @@ class _HomeScreenState extends State<HomeScreen> {
       leading: IconButton(
         icon: const Icon(Icons.menu, color: Colors.black),
         onPressed: () {
-          // فتح الـ Drawer
+          // سيقوم بالبحث عن أقرب Scaffold (الموجود في MainLayout) ويفتحه
+          Scaffold.of(context).openDrawer();
         },
       ),
 
@@ -186,21 +206,50 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Colors.black,
                 size: 28,
               ),
-              onPressed: () {},
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const NotificationsScreen(),
+                  ),
+                );
+                _updateUnreadCount();
+              },
             ),
-            Positioned(
-              top: 10,
-              right: 10,
-              child: Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1.5),
+            // يظهر فقط إذا كان هناك إشعارات غير مقروءة
+            if (_unreadNotificationsCount > 0)
+              Positioned(
+                top: 8, // تعديل بسيط للموقع ليكون فوق الأيقونة
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(4), // مساحة داخلية للنص
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
+                  // تحديد حد أدنى للعرض ليكون دائرياً حتى مع الأرقام الصغيرة
+                  constraints: const BoxConstraints(
+                    minWidth: 18,
+                    minHeight: 18,
+                  ),
+                  child: Center(
+                    child: Text(
+                      // إذا كان العدد أكبر من 9 نعرض 9+
+                      _unreadNotificationsCount > 9
+                          ? "9+"
+                          : "$_unreadNotificationsCount",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        height: 1, // لضبط توسيط النص عمودياً
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                 ),
               ),
-            ),
           ],
         ),
 
@@ -249,7 +298,13 @@ class _HomeScreenState extends State<HomeScreen> {
           alignment: Alignment.center,
           child: GestureDetector(
             onTap: () {
-              // الانتقال لصفحة البحث
+              // ==========================================
+              // التعديل هنا: الانتقال لشاشة البحث
+              // ==========================================
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SearchScreen()),
+              );
             },
             child: Container(
               height: 45,

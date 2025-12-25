@@ -36,14 +36,14 @@ class _StoriesSectionState extends State<StoriesSection> {
   Widget build(BuildContext context) {
     if (_isLoading)
       return const SizedBox(
-        height: 110,
+        height: 100,
         child: Center(child: CircularProgressIndicator()),
       );
     if (_feedItems.isEmpty) return const SizedBox.shrink();
 
     return Container(
-      height: 110,
-      margin: const EdgeInsets.only(top: 10, bottom: 10),
+      height: 90,
+      margin: const EdgeInsets.only(top: 5, bottom: 0),
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         scrollDirection: Axis.horizontal,
@@ -97,8 +97,8 @@ class _StoriesSectionState extends State<StoriesSection> {
                       : Border.all(color: Colors.grey, width: 1.5),
             ),
             child: Container(
-              width: 65,
-              height: 65,
+              width: 50,
+              height: 50,
               decoration: BoxDecoration(
                 shape:
                     item.isAdminSection ? BoxShape.rectangle : BoxShape.circle,
@@ -111,7 +111,7 @@ class _StoriesSectionState extends State<StoriesSection> {
               ),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 3),
           SizedBox(
             width: 70,
             child: Text(
