@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:linyora_project/features/categories/screens/category_products_screen.dart';
 import 'package:linyora_project/features/home/screens/notifications_screen.dart';
 // --- Services & Models ---
 import 'package:linyora_project/features/home/services/section_service.dart';
@@ -391,7 +392,17 @@ class _HomeScreenState extends State<HomeScreen> {
               ), // مسافة بين العناصر
               child: GestureDetector(
                 onTap: () {
-                  print("Open Category: ${category.name}");
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder:
+                          (context) => CategoryProductsScreen(
+                            slug: category.slug, // نمرر الـ slug للباك إند
+                            categoryName:
+                                category.name, // نمرر الاسم للعرض في العنوان
+                          ),
+                    ),
+                  );
                 },
                 child: Column(
                   mainAxisSize: MainAxisSize.min,

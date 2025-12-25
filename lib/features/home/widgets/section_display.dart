@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:carousel_slider/carousel_slider.dart';
+import 'package:linyora_project/features/categories/screens/category_products_screen.dart';
 import '../../../core/utils/color_helper.dart';
 import '../../../models/section_model.dart';
 import '../widgets/banner_video_player.dart'; // سنعيد استخدام مشغل الفيديو
@@ -168,7 +169,19 @@ class SectionDisplay extends StatelessWidget {
                     child: GestureDetector(
                       onTap: () {
                         // أكشن عند الضغط على التصنيف
-                        print("Open Category: ${category.name}");
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (context) => CategoryProductsScreen(
+                                  slug:
+                                      category.slug, // نمرر الـ slug للباك إند
+                                  categoryName:
+                                      category
+                                          .name, // نمرر الاسم للعرض في العنوان
+                                ),
+                          ),
+                        );
                       },
                       child: Column(
                         mainAxisSize: MainAxisSize.min,

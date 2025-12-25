@@ -32,14 +32,16 @@ class SectionSlide {
 class SectionCategory {
   final int id;
   final String name;
+  final String slug;
   final String imageUrl;
 
-  SectionCategory({required this.id, required this.name, required this.imageUrl});
+  SectionCategory({required this.id, required this.name, required this.slug, required this.imageUrl});
 
   factory SectionCategory.fromJson(Map<String, dynamic> json) {
     return SectionCategory(
       id: json['id'],
       name: json['name'] ?? '',
+      slug: json['slug'] ?? '',
       imageUrl: ImageHelper.getValidUrl(json['image_url']),
     );
   }

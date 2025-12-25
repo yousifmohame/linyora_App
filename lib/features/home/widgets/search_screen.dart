@@ -318,7 +318,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           155,
                           126,
                           203,
-                        ), // لون أمازون الأصفر
+                        ),
                         foregroundColor: Colors.black,
                         elevation: 0,
                         shape: RoundedRectangleBorder(

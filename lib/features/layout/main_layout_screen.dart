@@ -2,6 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+import 'package:linyora_project/features/cart/screens/cart_screen.dart';
+import 'package:linyora_project/features/categories/screens/categories_screen.dart';
 import '../home/screens/home_screen.dart';
 import '../reels/screens/reels_screen.dart';
 import '../profile/screens/profile_screen.dart';
@@ -32,10 +34,10 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
         index: _currentIndex,
         children: [
           const HomeScreen(),
-          const Center(child: Text("المتجر")),
+          const CategoriesScreen(),
           // ✅ التعديل هنا: نمرر isActive لمعرفة هل الصفحة معروضة أم لا
-          ReelsScreen(isActive: _currentIndex == 2), 
-          const Center(child: Text("السلة")),
+          ReelsScreen(isActive: _currentIndex == 2),
+          const CartScreen(),
           const ProfileScreen(),
         ],
       ),
@@ -80,9 +82,10 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
             child: Text(
               label,
               style: const TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey),
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+              ),
             ),
           ),
       ],

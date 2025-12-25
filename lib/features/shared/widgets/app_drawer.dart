@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart'; // يفضل إضافتها لأيقونات أجمل
+import 'package:linyora_project/features/orders/screens/my_orders_screen.dart';
 
 // استيراد الخدمات والموديلات الخاصة بك
 // تأكد من تعديل المسارات حسب مشروعك
@@ -16,6 +17,17 @@ class AppDrawer extends StatelessWidget {
     // في تطبيقك الحقيقي استخدم: AuthService.instance.currentUser
     final user = AuthService.instance.currentUser;
     final bool isLoggedIn = user != null;
+
+    void _navigateTo(BuildContext context, Widget screen) {
+      // 1. التقاط النافجيتور قبل إغلاق القائمة
+      final navigator = Navigator.of(context);
+
+      // 2. إغلاق القائمة (هذا يدمر الـ context الحالي للـ Drawer)
+      navigator.pop();
+
+      // 3. الانتقال للصفحة الجديدة باستخدام النافجيتور المحفوظ
+      navigator.push(MaterialPageRoute(builder: (context) => screen));
+    }
 
     final primaryColor = const Color(0xFFF105C6); // لون Linyora الوردي
 
@@ -44,22 +56,6 @@ class AppDrawer extends StatelessWidget {
                     title: 'تصفح Linyora',
                     items: [
                       _DrawerItem(
-                        icon: Icons.home_rounded,
-                        title: 'الرئيسية',
-                        onTap: () {},
-                      ),
-                      _DrawerItem(
-                        icon: Icons.grid_view_rounded,
-                        title: 'الأقسام',
-                        onTap: () {},
-                      ),
-                      _DrawerItem(
-                        icon: Icons.play_circle_fill,
-                        title: 'ستايل اليوم (Reels)',
-                        onTap: () {},
-                        isHighlight: true,
-                      ),
-                      _DrawerItem(
                         icon: Icons.local_offer_rounded,
                         title: 'العروض و التخفيضات',
                         onTap: () {},
@@ -74,7 +70,9 @@ class AppDrawer extends StatelessWidget {
                         _DrawerItem(
                           icon: Icons.shopping_bag_outlined,
                           title: 'طلباتي',
-                          onTap: () {},
+                          onTap:
+                              () =>
+                                  _navigateTo(context, const MyOrdersScreen()),
                         ),
                         _DrawerItem(
                           icon: Icons.favorite_border_rounded,
