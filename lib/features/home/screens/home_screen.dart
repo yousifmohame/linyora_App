@@ -129,16 +129,46 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
 
       // 3. العنوان (اسم التطبيق)
-      title: const Text(
-        "Linyora",
-        style: TextStyle(
-          color: Colors.black,
-          fontFamily: 'Playfair Display', // يفضل استخدام خط فخم
-          fontWeight: FontWeight.w900,
-          fontSize: 24,
-          letterSpacing: 1.2,
-        ),
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            "INOYRA",
+            style: TextStyle(
+              color: Colors.black,
+              fontFamily: 'Playfair Display',
+              fontWeight: FontWeight.w900,
+              fontSize: 24,
+              letterSpacing: 2.0,
+            ),
+          ),
+          const SizedBox(width: 2),
+          Stack(
+            alignment: Alignment.topRight,
+            children: [
+              const Text(
+                "L",
+                style: TextStyle(
+                  color: Colors.black,
+                  fontFamily: 'Playfair Display',
+                  fontWeight: FontWeight.w900,
+                  fontSize: 32,
+                  height: 0.8,
+                ),
+              ),
+              Transform.translate(
+                offset: const Offset(4, -4),
+                child: const Icon(
+                  Icons.star,
+                  color: Colors.pinkAccent,
+                  size: 18,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
+      // centerTitle: true, // تمت إزالته ليكون الشعار في البداية
       centerTitle: true,
 
       // 4. الأيقونات (تنبيهات + سلة)
@@ -261,23 +291,142 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildCategoriesScroller() {
+    // إذا لم تكن هناك بيانات، لا تعرض شيئاً
+    if (_categories.isEmpty)
+      return const SliverToBoxAdapter(child: SizedBox.shrink());
+
+    return SliverToBoxAdapter(
+      child: Container(
+        height: 120, // ارتفاع الشريط
+        color: Colors.transparent,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+
+        // ============================================================
+        // التغيير هنا: استبدلنا ListView بـ CarouselSlider
+        // ============================================================
+        child: CarouselSlider.builder(
+          itemCount: _categories.length,
+          options: CarouselOptions(
+            height: 100, // ارتفاع العنصر داخل السلايدر
+            // 1. تفعيل التمرير التلقائي
+            autoPlay: true,
+            autoPlayInterval: const Duration(seconds: 3), // السرعة بين كل حركة
+            autoPlayAnimationDuration: const Duration(milliseconds: 800),
+            autoPlayCurve: Curves.fastOutSlowIn,
+
+            // 2. أهم خاصية: عرض عدة عناصر في وقت واحد
+            // القيمة 0.22 تعني أن كل عنصر يأخذ 22% من عرض الشاشة
+            // (أي سيظهر تقريباً 4.5 عنصر في الشاشة الواحدة)
+            viewportFraction: 0.22,
+
+            // 3. التكرار اللانهائي
+            enableInfiniteScroll: true,
+
+            // جعل المحاذاة لليسار قليلاً لتبدو كشريط
+            padEnds: false,
+          ),
+          itemBuilder: (context, index, realIndex) {
+            final category = _categories[index];
+
+            // نستخدم Container لإضافة هوامش جانبية بدلاً من separatorBuilder
+            return Container(
+              margin: const EdgeInsets.symmetric(
+                horizontal: 6.0,
+              ), // مسافة بين العناصر
+              child: GestureDetector(
+                onTap: () {
+                  print("Open Category: ${category.name}");
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 1. دائرة الصورة
+                    Container(
+                      width: 65,
+                      height: 65,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.grey[100],
+                        border: Border.all(
+                          color: Colors.grey.shade300,
+                          width: 1,
+                        ),
+                      ),
+                      child: ClipOval(
+                        child:
+                            category.imageUrl.isNotEmpty
+                                ? CachedNetworkImage(
+                                  imageUrl: category.imageUrl,
+                                  fit: BoxFit.cover,
+                                  placeholder:
+                                      (_, __) => const Padding(
+                                        padding: EdgeInsets.all(15.0),
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                  errorWidget:
+                                      (_, __, ___) => const Icon(
+                                        Icons.category,
+                                        color: Colors.grey,
+                                      ),
+                                )
+                                : const Icon(
+                                  Icons.grid_view_rounded,
+                                  color: Colors.grey,
+                                ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    // 2. اسم القسم
+                    SizedBox(
+                      width: 70,
+                      child: Text(
+                        category.name,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   Widget _buildBannersSection() {
     if (_banners.isEmpty)
       return const SliverToBoxAdapter(child: SizedBox.shrink());
 
     return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8.0),
+      // 1. حذفنا الـ Padding هنا ليأخذ العرض كاملاً
+      child: SizedBox(
+        // جعلنا الارتفاع يعتمد على حجم الشاشة ليكون متجاوباً (مثلاً 35% من طول الشاشة)
+        height: MediaQuery.of(context).size.height * 0.35,
         child: CarouselSlider(
           carouselController: _carouselController,
           options: CarouselOptions(
-            height: 220.0,
-            autoPlay: false, // تحكم يدوي
-            enlargeCenterPage: true,
-            viewportFraction: 0.9,
+            height: double.infinity, // ليملأ الـ SizedBox الأب
+            // ============================================
+            // أهم التغييرات لجعل البانر يملأ الشاشة:
+            // ============================================
+            viewportFraction: 1.0, // يأخذ 100% من عرض الشاشة
+            enlargeCenterPage: false, // إلغاء تأثير التكبير والتبعيد
+            autoPlay: false, // تحكم يدوي (أو true حسب رغبتك)
             enableInfiniteScroll: true,
-            pageSnapping: true,
-            scrollPhysics: const BouncingScrollPhysics(),
+            scrollPhysics: const BouncingScrollPhysics(), // حركة ناعمة
             onPageChanged: (index, reason) {
               setState(() => _currentBannerIndex = index);
               _handleAutoPlay(index);
@@ -291,43 +440,36 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 return Builder(
                   builder: (BuildContext context) {
-                    return Container(
-                      width: MediaQuery.of(context).size.width,
-                      margin: const EdgeInsets.symmetric(horizontal: 0),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        color: Colors.black12,
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            // الخلفية (فيديو أو صورة)
-                            banner.isVideo
-                                ? BannerVideoPlayer(
-                                  videoUrl: banner.imageUrl,
-                                  isActive: isActive,
-                                  onVideoFinished: () {
-                                    if (isActive)
-                                      _carouselController.nextPage();
-                                  },
-                                )
-                                : CachedNetworkImage(
-                                  imageUrl: banner.imageUrl,
-                                  fit: BoxFit.cover,
-                                  placeholder:
-                                      (_, __) => const Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                  errorWidget:
-                                      (_, __, ___) => const Icon(Icons.error),
-                                ),
-                            // التظليل والنص
-                            _buildBannerOverlay(banner),
-                          ],
-                        ),
-                      ),
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        // 1. الخلفية (صورة أو فيديو)
+                        banner.isVideo
+                            ? BannerVideoPlayer(
+                              videoUrl: banner.imageUrl,
+                              isActive: isActive,
+                              onVideoFinished: () {
+                                if (isActive) _carouselController.nextPage();
+                              },
+                            )
+                            : CachedNetworkImage(
+                              imageUrl: banner.imageUrl,
+                              fit: BoxFit.cover, // يغطي المساحة بالكامل
+                              width: double.infinity,
+                              placeholder:
+                                  (_, __) => Container(
+                                    color: Colors.grey[200],
+                                    child: const Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  ),
+                              errorWidget:
+                                  (_, __, ___) => const Icon(Icons.error),
+                            ),
+
+                        // 2. التظليل والنص (Overlay)
+                        _buildBannerOverlay(banner),
+                      ],
                     );
                   },
                 );
@@ -391,8 +533,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: ElevatedButton(
                     onPressed: () {
                       // TODO: فتح الرابط هنا
-                      // مثال: Navigator.pushNamed(context, banner.link);
-                      print("Navigating to: ${banner.link}");
+                      Navigator.pushNamed(context, banner.link);
+                      // print("Navigating to: ${banner.link}");
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white, // خلفية بيضاء
@@ -431,53 +573,18 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildCategoriesSection() {
-    return SliverPadding(
-      padding: const EdgeInsets.all(16.0),
-      sliver: SliverGrid(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 4,
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
-          childAspectRatio: 0.8,
-        ),
-        delegate: SliverChildBuilderDelegate((context, index) {
-          final category = _categories[index];
-          return Column(
-            children: [
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.grey[200],
-                    image:
-                        category.imageUrl.isNotEmpty
-                            ? DecorationImage(
-                              image: CachedNetworkImageProvider(
-                                category.imageUrl,
-                              ),
-                              fit: BoxFit.cover,
-                            )
-                            : null,
-                  ),
-                  child:
-                      category.imageUrl.isEmpty
-                          ? const Icon(Icons.category, color: Colors.grey)
-                          : null,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                category.name,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12),
-              ),
-            ],
-          );
-        }, childCount: _categories.length),
-      ),
+  // دالة مساعدة تعرض قسماً واحداً بناءً على رقمه (Index)
+  Widget _buildSectionSafe(int index) {
+    // إذا كان الاندكس غير موجود (مثلاً لدينا 3 أقسام فقط وطلبنا القسم رقم 5)، نرجع فراغ
+    if (index >= _sections.length) return const SizedBox.shrink();
+
+    return Column(
+      children: [
+        // عرض القسم
+        SectionDisplay(section: _sections[index]),
+        // الفاصل تحته
+        Container(height: 8, color: Colors.grey[100]),
+      ],
     );
   }
 
@@ -559,26 +666,28 @@ class _HomeScreenState extends State<HomeScreen> {
                   // 4. Flash Sale
                   const SliverToBoxAdapter(child: FlashSaleSection()),
 
-                  // 5. Categories Header & Grid
                   const SliverToBoxAdapter(
                     child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 16.0,
-                        vertical: 8,
-                      ),
+                      padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
                       child: Text(
-                        "تسوق حسب القسم",
+                        'تسوق حسب الفئة',
                         style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.2,
+                          height: 1.3,
+                          color: Colors.black87,
                         ),
+                        textAlign: TextAlign.start,
                       ),
                     ),
                   ),
-                  _buildCategoriesSection(),
+
+                  _buildCategoriesScroller(),
 
                   _buildDivider(),
 
+                  // 5. Categories Header & Grid
                   SliverToBoxAdapter(
                     child: HorizontalProductList(
                       title: "وصل حديثاً 🆕",
@@ -591,11 +700,56 @@ class _HomeScreenState extends State<HomeScreen> {
                   // 6. Dynamic Sections (قائمة الأقسام المتغيرة)
                   SliverList(
                     delegate: SliverChildBuilderDelegate(
-                      (context, index) =>
-                          SectionDisplay(section: _sections[index]),
+                      // داخل SliverList delegate
+                      (context, index) {
+                        final sectionWidget = SectionDisplay(
+                          section: _sections[index],
+                        );
+                        Widget? injectedWidget;
+
+                        // حساب نقطة المنتصف (تجاهل الكسور باستخدام ~/ )
+                        // مثلاً لو العدد 15، المنتصف سيكون عند الاندكس 7
+                        int middleIndex = _sections.length ~/ 2;
+
+                        // 1. بعد القسم الأول مباشرة
+                        if (index == middleIndex) {
+                          injectedWidget = HorizontalProductList(
+                            title: "قد يعجبك أيضاً ❤️",
+                            products: _bestSellers,
+                            onSeeAll: () {},
+                          );
+                        }
+
+                        return Column(
+                          children: [
+                            sectionWidget,
+                            Container(height: 8, color: Colors.grey[100]),
+                            if (injectedWidget != null) ...[
+                              injectedWidget,
+                              Container(height: 8, color: Colors.grey[100]),
+                            ],
+                          ],
+                        );
+                      },
+                      // ======================================================
+                      // هذا الرقم يضمن عرض جميع الأقسام الـ 15 القادمة من الباك اند
+                      // ======================================================
                       childCount: _sections.length,
                     ),
                   ),
+
+                  // --- نضع تحته: الأكثر مبيعاً ---
+                  SliverToBoxAdapter(
+                    child: HorizontalProductList(
+                      title: "الأكثر مبيعاً 🔥",
+                      products: _bestSellers,
+                      onSeeAll: () {},
+                    ),
+                  ),
+                  _buildDivider(),
+
+                  // --- القسم الديناميكي الثالث (رقم 2) ---
+                  SliverToBoxAdapter(child: _buildSectionSafe(2)),
 
                   _buildDivider(),
 
