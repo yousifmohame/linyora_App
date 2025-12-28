@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:linyora_project/features/reels/screens/widgets/comments_sheet.dart';
 import 'package:linyora_project/models/reel_model.dart';
 import 'package:preload_page_view/preload_page_view.dart';
 import 'package:video_player/video_player.dart';
@@ -7,7 +8,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 // تأكد من المسارات الصحيحة
 import '../../../../core/utils/video_cache_manager.dart';
-import '../../services/reels_service.dart';
+import '../services/reels_service.dart';
 import 'widgets/optimized_video_player.dart';
 
 class ReelsScreen extends StatefulWidget {
@@ -146,6 +147,70 @@ class _ReelsScreenState extends State<ReelsScreen> with WidgetsBindingObserver {
     }
   }
 
+  // 1. دالة الإعجاب
+  Future<void> _handleLike(int index) async {
+    final reel = _videos[index];
+    final bool wasLiked = reel.isLiked;
+
+    // تحديث الواجهة فوراً (Optimistic Update)
+    setState(() {
+      reel.isLiked = !wasLiked;
+      reel.likesCount += wasLiked ? -1 : 1;
+    });
+
+    try {
+      if (wasLiked) {
+        // إذا كان معجب سابقاً، نحذف الإعجاب
+        await _reelsService.removeLike(reel.id.toString());
+      } else {
+        // إذا لم يكن معجب، نضيف إعجاب
+        await _reelsService.toggleLike(reel.id.toString());
+      }
+    } catch (e) {
+      // تراجع في حالة الخطأ
+      setState(() {
+        reel.isLiked = wasLiked;
+        reel.likesCount += wasLiked ? 1 : -1;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('حدث خطأ في الاتصال')));
+    }
+  }
+
+  // 2. دالة المشاركة
+  Future<void> _handleShare(int index) async {
+    final reel = _videos[index];
+
+    // التغيير هنا: إضافة .toString()
+    await _reelsService.trackShare(reel.id.toString());
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('تمت المشاركة بنجاح!')));
+  }
+
+  // 3. دالة عرض التعليقات (Bottom Sheet)
+  void _showComments(BuildContext context, int index) {
+    final reel = _videos[index];
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder:
+          (context) => CommentsSheet(
+            // التغيير هنا: إضافة .toString()
+            reelId: reel.id.toString(),
+            service: _reelsService,
+            onCommentAdded: () {
+              setState(() {
+                reel.commentsCount++;
+              });
+            },
+          ),
+    );
+  }
+
   void _playController(int index) {
     final controller = _controllers[index];
     if (controller != null && controller.value.isInitialized) {
@@ -260,7 +325,12 @@ class _ReelsScreenState extends State<ReelsScreen> with WidgetsBindingObserver {
               ),
 
               // الطبقة 5: البيانات والأزرار (تستقبل اللمس الخاص بها)
-              ReelContentOverlay(reel: _videos[index]),
+              ReelContentOverlay(
+                reel: _videos[index],
+                onLike: () => _handleLike(index),
+                onComment: () => _showComments(context, index),
+                onShare: () => _handleShare(index),
+              ),
             ],
           );
         },
@@ -272,8 +342,17 @@ class _ReelsScreenState extends State<ReelsScreen> with WidgetsBindingObserver {
 // --- ويدجت عرض البيانات (Overlay) ---
 class ReelContentOverlay extends StatelessWidget {
   final ReelModel reel;
+  final VoidCallback onLike;
+  final VoidCallback onComment;
+  final VoidCallback onShare;
 
-  const ReelContentOverlay({Key? key, required this.reel}) : super(key: key);
+  const ReelContentOverlay({
+    Key? key,
+    required this.reel,
+    required this.onLike,
+    required this.onComment,
+    required this.onShare,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -373,22 +452,25 @@ class ReelContentOverlay extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               _ActionButton(
-                icon: Icons.favorite,
+                icon:
+                    reel.isLiked
+                        ? Icons.favorite
+                        : Icons.favorite_border, // تغيير الأيقونة
                 label: '${reel.likesCount}',
-                color: Colors.redAccent,
-                onTap: () => print("Like"),
+                color: reel.isLiked ? Colors.red : Colors.white, // تغيير اللون
+                onTap: onLike, // ربط الدالة
               ),
               const SizedBox(height: 16),
               _ActionButton(
                 icon: Icons.comment,
                 label: '${reel.commentsCount}',
-                onTap: () => print("Comment"),
+                onTap: onComment, // ربط الدالة
               ),
               const SizedBox(height: 16),
               _ActionButton(
                 icon: Icons.share,
                 label: 'مشاركة',
-                onTap: () => print("Share"),
+                onTap: onShare, // ربط الدالة
               ),
               const SizedBox(height: 40),
             ],

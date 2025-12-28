@@ -2,6 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart'; // 1. استيراد الترجمة
+
 import 'package:linyora_project/features/cart/screens/cart_screen.dart';
 import 'package:linyora_project/features/categories/screens/categories_screen.dart';
 import '../home/screens/home_screen.dart';
@@ -23,6 +25,9 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 2. الوصول لمتغير الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       key: _scaffoldKey,
       extendBody: true,
@@ -51,11 +56,12 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
         animationCurve: Curves.easeInOut,
         animationDuration: const Duration(milliseconds: 300),
         items: <Widget>[
-          _buildNavItem(Icons.home_outlined, 'الرئيسية', 0),
-          _buildNavItem(Icons.grid_view_outlined, 'الأقسام', 1),
-          _buildNavItem(Icons.play_circle_outline, 'ريلز', 2),
-          _buildNavItem(Icons.shopping_cart_outlined, 'السلة', 3),
-          _buildNavItem(Icons.person_outline, 'حسابي', 4),
+          // 3. استخدام النصوص المترجمة
+          _buildNavItem(Icons.home_outlined, l10n.navHome, 0),
+          _buildNavItem(Icons.grid_view_outlined, l10n.navCategories, 1),
+          _buildNavItem(Icons.play_circle_outline, l10n.navReels, 2),
+          _buildNavItem(Icons.shopping_cart_outlined, l10n.navCart, 3),
+          _buildNavItem(Icons.person_outline, l10n.navProfile, 4),
         ],
         onTap: (index) {
           setState(() {

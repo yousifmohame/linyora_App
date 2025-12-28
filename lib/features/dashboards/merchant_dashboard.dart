@@ -8,7 +8,7 @@ class MerchantDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(AppLocalizations.of(context)!.roleMerchant), // نص مترجم
+        title: Text('data'), // نص مترجم
         backgroundColor: Colors.blue[900], // لون مميز للتاجر
       ),
       body: Center(

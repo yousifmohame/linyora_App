@@ -8,7 +8,7 @@ class ModelDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(AppLocalizations.of(context)!.roleMerchant), // نص مترجم
+        title: Text('test'), // نص مترجم
         backgroundColor: Colors.blue[900], // لون مميز للتاجر
       ),
       body: Center(

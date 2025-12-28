@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:linyora_project/features/orders/screens/my_orders_screen.dart';
+import 'package:linyora_project/features/wishlist/screens/wishlist_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart'; // استيراد ملفات الترجمة المولدة
+
+// تأكد من المسارات الصحيحة
+import '../../orders/screens/my_orders_screen.dart';
 import '../../auth/services/auth_service.dart';
 import '../../auth/screens/login_screen.dart';
+import '../../shared/providers/locale_provider.dart'; // استيراد البروفايدر
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -12,12 +18,13 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // للوصول لخدمة التوثيق (Singleton)
   final AuthService _authService = AuthService.instance;
 
   @override
   Widget build(BuildContext context) {
-    // التحقق من حالة تسجيل الدخول
+    // 1. الوصول للترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     final isLoggedIn = _authService.isLoggedIn;
     final user = _authService.currentUser;
 
@@ -26,46 +33,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          "حسابي",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        title: Text(
+          l10n.myProfile, // استخدام الترجمة
+          style: const TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
         actions: [
           if (isLoggedIn)
             IconButton(
               icon: const Icon(Icons.settings_outlined, color: Colors.black),
-              onPressed: () {
-                // الانتقال لصفحة الإعدادات
-              },
+              onPressed: () {},
             ),
         ],
       ),
       body:
           !isLoggedIn
-              ? _buildGuestView() // 1. عرض الزائر
+              ? _buildGuestView(context, l10n)
               : SingleChildScrollView(
-                // 2. عرض المستخدم المسجل
                 child: Column(
                   children: [
                     const SizedBox(height: 20),
-                    // رأس الصفحة (الصورة والاسم)
-                    _buildProfileHeader(user),
-
+                    _buildProfileHeader(user, l10n),
                     const SizedBox(height: 20),
-
-                    // إحصائيات سريعة (اختياري - مثل الموقع)
-                    _buildStatsRow(),
-
+                    _buildStatsRow(l10n),
                     const SizedBox(height: 20),
 
                     // القوائم
                     _buildMenuSection(
-                      title: "الطلبات والمشتريات",
+                      title: l10n.ordersAndPurchases,
                       children: [
                         _ProfileTile(
                           icon: Icons.shopping_bag_outlined,
-                          title: "طلباتي",
+                          title: l10n.myOrders,
                           onTap: () {
                             Navigator.push(
                               context,
@@ -77,62 +79,74 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         _ProfileTile(
                           icon: Icons.favorite_border,
-                          title: "المفضلة",
-                          onTap: () {},
+                          title: l10n.favorites,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const WishlistScreen(),
+                              ),
+                            );
+                          },
                         ),
                         _ProfileTile(
                           icon: Icons.assignment_return_outlined,
-                          title: "المرتجعات",
+                          title: l10n.returns,
                           onTap: () {},
                         ),
                       ],
                     ),
 
                     _buildMenuSection(
-                      title: "الحساب والمحفظة",
+                      title: l10n.accountAndWallet,
                       children: [
                         _ProfileTile(
                           icon: Icons.account_balance_wallet_outlined,
-                          title: "المحفظة",
-                          subtitle: "0.00 ر.س",
+                          title: l10n.wallet,
+                          subtitle: "0.00", // العملة يمكن جعلها ديناميكية أيضاً
                           onTap: () {},
                         ),
                         _ProfileTile(
                           icon: Icons.location_on_outlined,
-                          title: "عناويني",
+                          title: l10n.myAddresses,
                           onTap: () {},
                         ),
                         _ProfileTile(
                           icon: Icons.credit_card_outlined,
-                          title: "طرق الدفع",
+                          title: l10n.paymentMethods,
                           onTap: () {},
                         ),
                       ],
                     ),
 
                     _buildMenuSection(
-                      title: "التطبيق",
+                      title: l10n.appSettings,
                       children: [
+                        // زر اللغة
                         _ProfileTile(
                           icon: Icons.language,
-                          title: "اللغة / Language",
-                          trailingText: "العربية",
-                          onTap: () {},
+                          title: l10n.language,
+                          // عرض اللغة الحالية
+                          trailingText:
+                              Localizations.localeOf(context).languageCode ==
+                                      'ar'
+                                  ? 'العربية'
+                                  : 'English',
+                          onTap: () => _showLanguageBottomSheet(context),
                         ),
                         _ProfileTile(
                           icon: Icons.help_outline,
-                          title: "المساعدة والدعم",
+                          title: l10n.helpAndSupport,
                           onTap: () {},
                         ),
                         _ProfileTile(
                           icon: Icons.info_outline,
-                          title: "عن Linyora",
+                          title: l10n.aboutApp,
                           onTap: () {},
                         ),
                       ],
                     ),
 
-                    // زر تسجيل الخروج
                     Padding(
                       padding: const EdgeInsets.all(20),
                       child: SizedBox(
@@ -140,7 +154,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: ElevatedButton.icon(
                           onPressed: () async {
                             await _authService.logout();
-                            // إعادة بناء الصفحة أو التوجيه
                             if (mounted) {
                               Navigator.of(context).pushAndRemoveUntil(
                                 MaterialPageRoute(
@@ -151,7 +164,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             }
                           },
                           icon: const Icon(Icons.logout),
-                          label: const Text("تسجيل الخروج"),
+                          label: Text(l10n.logout),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.red[50],
                             foregroundColor: Colors.red,
@@ -164,18 +177,79 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     const SizedBox(height: 20),
                     Text(
-                      "الإصدار 1.0.0",
+                      "${l10n.version} 1.0.0",
                       style: TextStyle(color: Colors.grey[400], fontSize: 12),
                     ),
-                    const SizedBox(height: 80), // مسافة للفوتر السفلي
+                    const SizedBox(height: 80),
                   ],
                 ),
               ),
     );
   }
 
-  // --- 1. واجهة الزائر ---
-  Widget _buildGuestView() {
+  // دالة إظهار نافذة اختيار اللغة
+  void _showLanguageBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        final provider = Provider.of<LocaleProvider>(context, listen: false);
+        final currentLang = provider.locale.languageCode;
+
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                AppLocalizations.of(context)!.language,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: const Text("🇸🇦", style: TextStyle(fontSize: 24)),
+                title: const Text("العربية"),
+                trailing:
+                    currentLang == 'ar'
+                        ? const Icon(
+                          Icons.check_circle,
+                          color: Color(0xFFF105C6),
+                        )
+                        : null,
+                onTap: () {
+                  provider.setLocale(const Locale('ar'));
+                  Navigator.pop(context);
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Text("🇺🇸", style: TextStyle(fontSize: 24)),
+                title: const Text("English"),
+                trailing:
+                    currentLang == 'en'
+                        ? const Icon(
+                          Icons.check_circle,
+                          color: Color(0xFFF105C6),
+                        )
+                        : null,
+                onTap: () {
+                  provider.setLocale(const Locale('en'));
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGuestView(BuildContext context, AppLocalizations l10n) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(30.0),
@@ -195,10 +269,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
-              "قم بتسجيل الدخول للاستمتاع بتجربة تسوق كاملة",
+            Text(
+              l10n.guestTitle,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 30),
             SizedBox(
@@ -215,7 +289,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                child: const Text("تسجيل الدخول / إنشاء حساب"),
+                child: Text(l10n.loginSignup),
               ),
             ),
           ],
@@ -224,9 +298,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // --- 2. مكونات البروفايل ---
-
-  Widget _buildProfileHeader(dynamic user) {
+  Widget _buildProfileHeader(dynamic user, AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(16),
@@ -243,7 +315,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       child: Row(
         children: [
-          // الصورة
           Container(
             padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
@@ -264,13 +335,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(width: 15),
-          // البيانات
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  user?.name ?? "مستخدم Linyora",
+                  user?.name ?? l10n.userGuest,
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
@@ -283,9 +353,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 8),
                 InkWell(
-                  onTap: () {
-                    // تعديل الملف الشخصي
-                  },
+                  onTap: () {},
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -295,9 +363,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       color: Colors.grey[100],
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Text(
-                      "تعديل الملف الشخصي",
-                      style: TextStyle(
+                    child: Text(
+                      l10n.editProfile,
+                      style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                       ),
@@ -312,7 +380,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildStatsRow() {
+  Widget _buildStatsRow(AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.symmetric(vertical: 15),
@@ -323,11 +391,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildStatItem("0", "الطلبات"),
+          _buildStatItem("0", l10n.statsOrders),
           _buildVerticalDivider(),
-          _buildStatItem("0", "المتابعين"),
+          _buildStatItem("0", l10n.statsFollowers),
           _buildVerticalDivider(),
-          _buildStatItem("0", "قسائم"),
+          _buildStatItem("0", l10n.statsVouchers),
         ],
       ),
     );
@@ -378,7 +446,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-// --- عنصر القائمة (Tile) ---
 class _ProfileTile extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -432,7 +499,7 @@ class _ProfileTile extends StatelessWidget {
             ],
           ),
         ),
-        Divider(height: 1, indent: 60, color: Colors.grey[100]), // فاصل خفيف
+        Divider(height: 1, indent: 60, color: Colors.grey[100]),
       ],
     );
   }

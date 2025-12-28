@@ -1,88 +1,39 @@
-import 'dart:convert'; // ضروري للتعامل مع jsonEncode و jsonDecode
-import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dio/dio.dart';
+import '../../../core/api/api_client.dart';
 import '../../../models/cart_item_model.dart';
 
 class CartService {
-  static final CartService _instance = CartService._internal();
-  factory CartService() => _instance;
-  CartService._internal();
+  final ApiClient _apiClient = ApiClient();
 
-  static const String _cartKey = 'local_cart_data'; // المفتاح الذي سنخزن فيه البيانات
-
-  // 1. جلب العناصر من التخزين المحلي
-  Future<List<CartItemModel>> getCartItems() async {
+  // إرسال الطلب للسيرفر
+  Future<void> placeOrder(List<CartItemModel> items) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? cartString = prefs.getString(_cartKey);
+      // تجهيز البيانات بالشكل الذي يطلبه الباك اند (orderRoutes/orderController)
+      // عادة يتوقع الباك اند قائمة بـ {variant_id, quantity}
+      final List<Map<String, dynamic>> orderItems = items.map((item) {
+        return {
+          'variant_id': item.selectedVariant.id,
+          'quantity': item.quantity,
+          // قد تحتاج لإرسال product_id أيضاً حسب تصميم الباك اند
+          'product_id': item.product.id, 
+        };
+      }).toList();
 
-      if (cartString != null) {
-        // فك تشفير JSON وتحويله لقائمة
-        List<dynamic> decodedList = jsonDecode(cartString);
-        return decodedList.map((item) => CartItemModel.fromJson(item)).toList();
-      }
-      return [];
+      // إرسال الطلب
+      // تأكد من المسار الصحيح في الباك اند (مثلاً /orders)
+      await _apiClient.post('/orders', data: {
+        'items': orderItems,
+        'payment_method': 'cod', // افتراضياً الدفع عند الاستلام، يمكن تغييره
+        'shipping_address_id': 1, // يجب تمرير عنوان حقيقي هنا لاحقاً
+      });
+      
     } catch (e) {
-      debugPrint('Error loading cart: $e');
-      return [];
+      print('Checkout Error: $e');
+      throw Exception('فشل إتمام الطلب، يرجى المحاولة لاحقاً');
     }
   }
 
-  // 2. إضافة منتج للسلة (أو زيادة كميته إذا كان موجوداً)
-  Future<void> addToCart(CartItemModel newItem) async {
-    final prefs = await SharedPreferences.getInstance();
-    List<CartItemModel> currentItems = await getCartItems();
-
-    // التحقق هل المنتج موجود مسبقاً (نفس الـ ID ونفس الخيارات)
-    int existingIndex = currentItems.indexWhere((item) => 
-        item.productId == newItem.productId && 
-        item.color == newItem.color && 
-        item.size == newItem.size
-    );
-
-    if (existingIndex != -1) {
-      // إذا موجود، زود الكمية
-      currentItems[existingIndex].quantity += newItem.quantity;
-    } else {
-      // إذا جديد، أضفه للقائمة
-      currentItems.add(newItem);
-    }
-
-    // حفظ القائمة الجديدة
-    await _saveToStorage(currentItems, prefs);
-  }
-
-  // 3. تحديث الكمية
-  Future<void> updateQuantity(int productId, int newQty) async {
-    final prefs = await SharedPreferences.getInstance();
-    List<CartItemModel> currentItems = await getCartItems();
-
-    int index = currentItems.indexWhere((item) => item.productId == productId);
-    if (index != -1) {
-      currentItems[index].quantity = newQty;
-      await _saveToStorage(currentItems, prefs);
-    }
-  }
-
-  // 4. حذف عنصر
-  Future<void> removeItem(int productId) async {
-    final prefs = await SharedPreferences.getInstance();
-    List<CartItemModel> currentItems = await getCartItems();
-
-    currentItems.removeWhere((item) => item.productId == productId);
-    await _saveToStorage(currentItems, prefs);
-  }
-
-  // 5. تفريغ السلة (عند إتمام الطلب)
-  Future<void> clearCart() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_cartKey);
-  }
-
-  // دالة مساعدة للحفظ
-  Future<void> _saveToStorage(List<CartItemModel> items, SharedPreferences prefs) async {
-    // تحويل القائمة إلى نص JSON
-    String encodedList = jsonEncode(items.map((i) => i.toJson()).toList());
-    await prefs.setString(_cartKey, encodedList);
-  }
+  // يمكن إضافة دوال أخرى هنا مثل:
+  // - التحقق من توفر الكميات (Validate Stock)
+  // - حساب تكلفة الشحن (Calculate Shipping)
 }

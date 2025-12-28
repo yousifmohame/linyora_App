@@ -3,6 +3,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../models/top_user_model.dart';
 import '../services/home_service.dart';
 
+// استيراد شاشات الملف الشخصي العامة
+import '../../public_profiles/screens/model_profile_screen.dart';
+import '../../public_profiles/screens/merchant_profile_screen.dart';
+
 class TopUserCard extends StatefulWidget {
   final TopUserModel user;
   final bool isModel;
@@ -55,6 +59,29 @@ class _TopUserCardState extends State<TopUserCard>
     }
   }
 
+  // دالة الانتقال للملف الشخصي
+  void _navigateToProfile() {
+    if (widget.isModel) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ModelProfileScreen(
+            modelId: widget.user.id.toString(),
+          ),
+        ),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MerchantProfileScreen(
+            merchantId: widget.user.id.toString(),
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -74,10 +101,8 @@ class _TopUserCardState extends State<TopUserCard>
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {
-            // TODO: الانتقال لصفحة البروفايل
-            print("Open Profile: ${widget.user.displayName}");
-          },
+          // تم تفعيل الانتقال هنا
+          onTap: _navigateToProfile,
           borderRadius: BorderRadius.circular(16),
           child: Padding(
             padding: const EdgeInsets.all(12.0),
