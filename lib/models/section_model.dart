@@ -65,6 +65,7 @@ class SectionModel {
   // Lists
   final List<SectionSlide> slides;
   final List<SectionCategory> categories;
+  List<int> get categoryIds => categories.map((e) => e.id).toList();
 
   SectionModel({
     required this.id,

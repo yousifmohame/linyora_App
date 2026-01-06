@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:linyora_project/features/categories/screens/category_products_screen.dart';
+import 'package:linyora_project/features/home/screens/section_products_screen.dart';
 import '../../../core/utils/color_helper.dart';
 import '../../../models/section_model.dart';
 import '../widgets/banner_video_player.dart'; // سنعيد استخدام مشغل الفيديو
@@ -112,9 +113,23 @@ class SectionDisplay extends StatelessWidget {
                     ),
 
                     // زر التصفح
-                    CircleAvatar(
-                      backgroundColor: Colors.white,
-                      child: Icon(Icons.arrow_forward, color: themeColor),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (context) => SectionDetailsScreen(
+                                  sectionId:
+                                      section.id, // تمرير ID القسم (مثلاً 8)
+                                 ),
+                          ),
+                        );
+                      },
+                      child: CircleAvatar(
+                        backgroundColor: Colors.white,
+                        child: Icon(Icons.arrow_forward, color: themeColor),
+                      ),
                     ),
                   ],
                 ),
