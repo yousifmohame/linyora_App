@@ -2,7 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart'; // 1. استيراد الترجمة
+import 'package:linyora_project/features/trends/screens/trends_screen.dart';
+import 'package:linyora_project/l10n/app_localizations.dart';
 
 import 'package:linyora_project/features/cart/screens/cart_screen.dart';
 import 'package:linyora_project/features/categories/screens/categories_screen.dart';
@@ -42,7 +43,7 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
           const CategoriesScreen(),
           // ✅ التعديل هنا: نمرر isActive لمعرفة هل الصفحة معروضة أم لا
           ReelsScreen(isActive: _currentIndex == 2),
-          const CartScreen(),
+          const TrendsScreen(),
           const ProfileScreen(),
         ],
       ),
@@ -60,7 +61,7 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
           _buildNavItem(Icons.home_outlined, l10n.navHome, 0),
           _buildNavItem(Icons.grid_view_outlined, l10n.navCategories, 1),
           _buildNavItem(Icons.play_circle_outline, l10n.navReels, 2),
-          _buildNavItem(Icons.shopping_cart_outlined, l10n.navCart, 3),
+          _buildNavItem(Icons.arrow_outward, l10n.navtrends, 3),
           _buildNavItem(Icons.person_outline, l10n.navProfile, 4),
         ],
         onTap: (index) {

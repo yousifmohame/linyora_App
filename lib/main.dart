@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:linyora_project/features/address/providers/address_provider.dart';
+import 'package:linyora_project/features/payment/providers/payment_provider.dart';
+import 'package:linyora_project/features/trends/providers/trend_provider.dart';
+import 'package:linyora_project/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import 'features/layout/main_layout_screen.dart';
 import 'features/auth/screens/login_screen.dart';
@@ -11,6 +15,10 @@ import 'features/wishlist/providers/wishlist_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  Stripe.publishableKey =
+      'pk_test_51QMVVaRprtRJ29NO563CM9I4Fj1p1xVaz5Dyvo6GBg5bxCvJlSQPOfCxa0KD7cBjL9MJcq8uQDUyPfkWgbOqNZZs00wlW9KrBI';
+  await Stripe.instance.applySettings();
   await AuthService.instance.tryAutoLogin();
 
   runApp(
@@ -18,8 +26,13 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => CartProvider()),
         // تسجيل مزود اللغة هنا
-        ChangeNotifierProvider(create: (_) => LocaleProvider()), 
-        ChangeNotifierProvider(create: (_) => WishlistProvider()..fetchWishlist()),
+        ChangeNotifierProvider(create: (_) => LocaleProvider()),
+        ChangeNotifierProvider(
+          create: (_) => WishlistProvider()..fetchWishlist(),
+        ),
+        ChangeNotifierProvider(create: (_) => AddressProvider()),
+        ChangeNotifierProvider(create: (_) => PaymentProvider()),
+        ChangeNotifierProvider(create: (_) => TrendProvider()),
       ],
       child: const LinyoraApp(),
     ),
@@ -36,10 +49,10 @@ class LinyoraApp extends StatelessWidget {
       builder: (context, localeProvider, child) {
         return MaterialApp(
           title: 'Linyora',
-          
+
           // ربط اللغة بالبروفايدر
-          locale: localeProvider.locale, 
-          
+          locale: localeProvider.locale,
+
           localizationsDelegates: const [
             AppLocalizations.delegate,
             GlobalMaterialLocalizations.delegate,
@@ -58,19 +71,21 @@ class LinyoraApp extends StatelessWidget {
             fontFamily: 'Cairo',
             scaffoldBackgroundColor: Colors.white,
           ),
-          
+
           // هذا السطر مهم جداً لتحديد اتجاه النص تلقائياً بناءً على اللغة
           builder: (context, child) {
-            final dir = localeProvider.locale.languageCode == 'ar' 
-                ? TextDirection.rtl 
-                : TextDirection.ltr;
+            final dir =
+                localeProvider.locale.languageCode == 'ar'
+                    ? TextDirection.rtl
+                    : TextDirection.ltr;
             return Directionality(textDirection: dir, child: child!);
           },
 
-          home: AuthService.instance.isLoggedIn
-              ? const MainLayoutScreen()
-              : const LoginScreen(),
-              
+          home:
+              AuthService.instance.isLoggedIn
+                  ? const MainLayoutScreen()
+                  : const LoginScreen(),
+
           routes: {
             '/login': (context) => const LoginScreen(),
             '/home': (context) => const MainLayoutScreen(),

@@ -5,7 +5,7 @@
     "navHome": "الرئيسية",
     "navCategories": "الأقسام",
     "navReels": "ريلز",
-    "navCart": "السلة",
+    "navtrends": "الترندات",
     "navProfile": "حسابي",
 
     "myProfile": "حسابي",
@@ -14,7 +14,7 @@
     "ordersAndPurchases": "الطلبات والمشتريات",
     "myOrders": "طلباتي",
     "favorites": "المفضلة",
-    "returns": "المرتجعات",
+    "trends": "الترندات",
     "accountAndWallet": "الحساب والمحفظة",
     "wallet": "المحفظة",
     "myAddresses": "عناويني",

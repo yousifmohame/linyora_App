@@ -1,5 +1,7 @@
 package com.example.linyora_project
 
-import io.flutter.embedding.android.FlutterActivity
+// 👇 التغيير الأول: استيراد FlutterFragmentActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 
-class MainActivity : FlutterActivity()
+// 👇 التغيير الثاني: الوراثة من FlutterFragmentActivity
+class MainActivity : FlutterFragmentActivity()

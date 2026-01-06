@@ -4,6 +4,7 @@ class OrderModel {
   final String status;
   final double totalPrice;
   final String date;
+  final double shippingCost;
   final List<OrderItemModel> items;
 
   OrderModel({
@@ -11,6 +12,7 @@ class OrderModel {
     required this.orderNumber,
     required this.status,
     required this.totalPrice,
+    required this.shippingCost,
     required this.date,
     this.items = const [],
   });
@@ -18,17 +20,23 @@ class OrderModel {
   factory OrderModel.fromJson(Map<String, dynamic> json) {
     // 1. تحديد مكان البيانات (هل هي مباشرة أم داخل 'details' كما في صفحة التفاصيل)
     final data = json['details'] != null ? json['details'] : json;
-    
+
     // 2. معالجة المنتجات (Items)
     var itemsList = <OrderItemModel>[];
-    
+
     // في صفحة التفاصيل، المنتجات تأتي في مفتاح 'items' بجانب 'details'
     if (json['items'] != null) {
-      itemsList = (json['items'] as List).map((i) => OrderItemModel.fromJson(i)).toList();
-    } 
+      itemsList =
+          (json['items'] as List)
+              .map((i) => OrderItemModel.fromJson(i))
+              .toList();
+    }
     // في صفحة القائمة (بعد تعديل الباك إند أعلاه)، وضعنا صورة وهمية داخل items
     else if (data['items'] != null) {
-       itemsList = (data['items'] as List).map((i) => OrderItemModel.fromJson(i)).toList();
+      itemsList =
+          (data['items'] as List)
+              .map((i) => OrderItemModel.fromJson(i))
+              .toList();
     }
 
     // 3. قراءة الحقول مع مراعاة اختلاف التسميات (camelCase vs snake_case)
@@ -37,9 +45,18 @@ class OrderModel {
       orderNumber: '#${data['id']}',
       status: data['status'] ?? 'pending',
       // الباك إند يرسل totalAmount في التفاصيل و totalPrice في القائمة (بعد تعديلنا)
-      totalPrice: double.tryParse((data['totalPrice'] ?? data['totalAmount'] ?? 0).toString()) ?? 0.0,
+      totalPrice:
+          double.tryParse(
+            (data['totalPrice'] ?? data['totalAmount'] ?? 0).toString(),
+          ) ??
+          0.0,
       // الباك إند يرسل created_at في التفاصيل و date في القائمة
       date: data['date'] ?? data['created_at'] ?? '',
+      shippingCost:
+          double.tryParse(
+            (data['shipping_cost'] ?? data['shippingCost'] ?? 0).toString(),
+          ) ??
+          0.0,
       items: itemsList,
     );
   }
@@ -63,11 +80,13 @@ class OrderItemModel {
   factory OrderItemModel.fromJson(Map<String, dynamic> json) {
     // معالجة الصور القادمة من الباك إند
     String image = '';
-    
+
     // الحالة 1: في صفحة التفاصيل، الصور تأتي مصفوفة ['url1', 'url2']
-    if (json['images'] != null && json['images'] is List && (json['images'] as List).isNotEmpty) {
-      image = json['images'][0]; 
-    } 
+    if (json['images'] != null &&
+        json['images'] is List &&
+        (json['images'] as List).isNotEmpty) {
+      image = json['images'][0];
+    }
     // الحالة 2: في القائمة (بعد تعديل الباك إند)، أرسلناها باسم productImage
     else if (json['productImage'] != null) {
       image = json['productImage'];

@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:linyora_project/features/cart/providers/cart_provider.dart';
+import 'package:linyora_project/features/cart/screens/cart_screen.dart';
 import 'package:linyora_project/features/categories/screens/category_products_screen.dart';
 import 'package:linyora_project/features/home/screens/notifications_screen.dart';
 // --- Services & Models ---
@@ -14,6 +16,7 @@ import 'package:linyora_project/models/section_model.dart';
 import 'package:linyora_project/models/banner_model.dart';
 import 'package:linyora_project/models/category_model.dart';
 import 'package:linyora_project/models/top_user_model.dart';
+import 'package:provider/provider.dart';
 
 // --- Widgets ---
 import 'package:linyora_project/features/home/widgets/flash_sale_section.dart';
@@ -73,6 +76,8 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _fetchData();
     _updateUnreadCount();
+
+    Future.microtask(() => Provider.of<CartProvider>(context, listen: false));
   }
 
   @override
@@ -255,37 +260,62 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
 
         // أيقونة السلة (مهمة جداً)
-        Stack(
-          alignment: Alignment.center,
-          children: [
-            IconButton(
-              icon: const Icon(
-                Icons.shopping_cart,
-                color: Colors.black,
-                size: 28,
-              ),
-              onPressed: () {},
-            ),
-            Positioned(
-              top: 3,
-              right: 8,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: const BoxDecoration(
-                  color: Colors.red,
-                  shape: BoxShape.circle,
-                ),
-                child: const Text(
-                  "2", // رقم ثابت للتجربة
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
+        // أيقونة السلة (تم التعديل لتكون حقيقية)
+        Consumer<CartProvider>(
+          builder: (context, cart, child) {
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                IconButton(
+                  icon: const Icon(
+                    Icons
+                        .shopping_cart_outlined, // يفضل outlined ليتناسق مع التنبيهات
+                    color: Colors.black,
+                    size: 28,
                   ),
+                  onPressed: () {
+                    // ✅ الانتقال لصفحة السلة
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const CartScreen(),
+                      ),
+                    );
+                  },
                 ),
-              ),
-            ),
-          ],
+
+                // ✅ عرض الشارة فقط إذا كان هناك منتجات
+                if (cart.itemCount > 0)
+                  Positioned(
+                    top: 3,
+                    right: 4, // تعديل الموضع قليلاً
+                    child: Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      child: Center(
+                        child: Text(
+                          "${cart.itemCount}", // ✅ العدد الحقيقي
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            height: 1.0,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
         const SizedBox(width: 8),
       ],

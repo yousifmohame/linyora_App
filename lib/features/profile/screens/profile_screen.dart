@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:linyora_project/features/address/screens/addresses_screen.dart';
+import 'package:linyora_project/features/home/screens/contact_us_screen.dart';
+import 'package:linyora_project/features/payment/screens/payment_methods_screen.dart';
+import 'package:linyora_project/features/trends/screens/trends_screen.dart';
+
 import 'package:linyora_project/features/wishlist/screens/wishlist_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart'; // استيراد ملفات الترجمة المولدة
+import 'package:linyora_project/l10n/app_localizations.dart';
 
 // تأكد من المسارات الصحيحة
 import '../../orders/screens/my_orders_screen.dart';
@@ -91,8 +96,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         _ProfileTile(
                           icon: Icons.assignment_return_outlined,
-                          title: l10n.returns,
-                          onTap: () {},
+                          title: l10n.trends,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const TrendsScreen(),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -101,20 +113,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       title: l10n.accountAndWallet,
                       children: [
                         _ProfileTile(
-                          icon: Icons.account_balance_wallet_outlined,
-                          title: l10n.wallet,
-                          subtitle: "0.00", // العملة يمكن جعلها ديناميكية أيضاً
-                          onTap: () {},
-                        ),
-                        _ProfileTile(
                           icon: Icons.location_on_outlined,
-                          title: l10n.myAddresses,
-                          onTap: () {},
+                          title: l10n.myAddresses, // أو l10n.addresses
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const AddressesScreen(),
+                              ),
+                            );
+                          },
                         ),
                         _ProfileTile(
                           icon: Icons.credit_card_outlined,
                           title: l10n.paymentMethods,
-                          onTap: () {},
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (context) => const PaymentMethodsScreen(),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -137,7 +158,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _ProfileTile(
                           icon: Icons.help_outline,
                           title: l10n.helpAndSupport,
-                          onTap: () {},
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const ContactUsScreen(),
+                              ),
+                            );
+                          },
                         ),
                         _ProfileTile(
                           icon: Icons.info_outline,

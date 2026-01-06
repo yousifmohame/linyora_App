@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart'; // استيراد ملفات اللغة
+import 'package:linyora_project/l10n/app_localizations.dart';
 
 class ModelDashboard extends StatelessWidget {
   const ModelDashboard({super.key});

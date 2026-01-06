@@ -2,11 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:linyora_project/features/cart/providers/merchant_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../../core/utils/color_helper.dart'; // لتنسيق الألوان
+
+// --- Imports (تأكد من صحة المسارات في مشروعك) ---
 import '../../../models/checkout_models.dart';
 import '../../../models/cart_item_model.dart';
+import '../../../models/payment_card_model.dart';
+
 import '../providers/cart_provider.dart';
 import '../services/checkout_service.dart';
+
+// استيراد البروفايدر وشاشة إضافة البطاقة
+import '../../payment/providers/payment_provider.dart';
+import '../../payment/screens/add_card_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({Key? key}) : super(key: key);
@@ -19,13 +26,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final CheckoutService _checkoutService = CheckoutService();
   
   bool _isLoading = true;
-  bool _isProcessing = false; // عند ضغط زر الدفع
+  bool _isProcessing = false;
   
+  // العناوين
   List<AddressModel> _addresses = [];
   int? _selectedAddressId;
   
+  // مجموعات التجار والشحن
   List<MerchantGroup> _merchantGroups = [];
-  String _paymentMethod = 'card'; // 'card' or 'cod'
+  
+  // الدفع
+  String _paymentMethodType = 'card'; // 'card' or 'cod'
+  String? _selectedCardId; // ID البطاقة المختارة من Stripe
 
   @override
   void initState() {
@@ -33,31 +45,56 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _initData();
   }
 
-  // تجهيز البيانات الأولية (تجميع المنتجات + جلب العناوين والشحن)
   Future<void> _initData() async {
     final cart = Provider.of<CartProvider>(context, listen: false);
+    final paymentProvider = Provider.of<PaymentProvider>(context, listen: false);
+    
     if (cart.items.isEmpty) {
-      Navigator.pop(context);
+      // السلة فارغة، نعود للخلف
+      WidgetsBinding.instance.addPostFrameCallback((_) => Navigator.pop(context));
       return;
     }
 
     try {
-      // 1. جلب العناوين
+      // تنفيذ الطلبات بشكل متوازي لتسريع التحميل
+      await Future.wait([
+        _fetchCheckoutData(cart),
+        paymentProvider.fetchCards(),
+      ]);
+
+      // تعيين البطاقة الافتراضية إذا وجدت
+      if (paymentProvider.cards.isNotEmpty) {
+        final defaultCard = paymentProvider.cards.firstWhere(
+          (c) => c.isDefault, 
+          orElse: () => paymentProvider.cards.first
+        );
+        _selectedCardId = defaultCard.id;
+      }
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      print("Checkout Init Error: $e");
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // منطق جلب العناوين وتجميع المنتجات وخيارات الشحن
+  Future<void> _fetchCheckoutData(CartProvider cart) async {
+      // 1. العناوين
       final addresses = await _checkoutService.getAddresses();
       
-      // 2. تجميع المنتجات (Client-side Grouping)
+      // 2. تجميع المنتجات حسب التاجر
       final Map<String, MerchantGroup> groupsMap = {};
-      
       for (var item in cart.items) {
-        // افتراض: ProductDetailsModel يحتوي على merchantName و merchantId
-        // إذا كان دروبشيبينغ نستخدم supplierId (تحتاج لتوفير هذه البيانات في المودل)
-        // للتبسيط سنعتمد على التاجر الأساسي حالياً
-        final merchantId = item.product.merchantId.toString(); // يفضل استخدام ID فريد
-        final groupId = "mer-$merchantId"; // مفتاح للمجموعة
+        // نستخدم ID التاجر كمفتاح
+        final merchantId = item.product.merchantId.toString(); 
+        final groupId = "mer-$merchantId";
 
         if (!groupsMap.containsKey(groupId)) {
           groupsMap[groupId] = MerchantGroup(
-            groupId: merchantId, // هنا المفروض ID التاجر الحقيقي
+            groupId: merchantId,
             merchantName: item.product.merchantName,
             items: [],
           );
@@ -67,91 +104,104 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       final groups = groupsMap.values.toList();
 
-      // 3. جلب خيارات الشحن لكل مجموعة
+      // 3. جلب خيارات الشحن لكل تاجر
       for (var group in groups) {
         final productIds = group.items.map((e) => e.product.id).toList();
         final options = await _checkoutService.getShippingOptions(productIds);
-        
         group.shippingOptions = options;
+        
+        // اختيار أول خيار شحن افتراضياً
         if (options.isNotEmpty) {
-          group.selectedShipping = options.first; // اختيار الافتراضي
+          group.selectedShipping = options.first;
         }
       }
 
       if (mounted) {
         setState(() {
           _addresses = addresses;
-          // اختيار العنوان الافتراضي
+          // تعيين العنوان الافتراضي
           if (addresses.isNotEmpty) {
             final defaultAddr = addresses.firstWhere((a) => a.isDefault, orElse: () => addresses.first);
             _selectedAddressId = defaultAddr.id;
           }
           _merchantGroups = groups;
-          _isLoading = false;
         });
       }
-    } catch (e) {
-      print("Checkout Init Error: $e");
-      setState(() => _isLoading = false);
-    }
   }
 
-  // حساب تكلفة الشحن الكلية
+  // حساب تكلفة الشحن الإجمالية
   double get _totalShippingCost {
     return _merchantGroups.fold(0.0, (sum, group) {
       return sum + (group.selectedShipping?.cost ?? 0.0);
     });
   }
 
-  // تنفيذ الدفع
+  // تنفيذ عملية الدفع
   Future<void> _handlePayment() async {
+    // 1. التحقق من العنوان
     if (_selectedAddressId == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الرجاء اختيار عنوان شحن')));
       return;
     }
 
-    // التحقق من اختيار شركة شحن لكل تاجر
-    for (var group in _merchantGroups) {
-      if (group.shippingOptions.isNotEmpty && group.selectedShipping == null) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('الرجاء اختيار طريقة شحن لـ ${group.merchantName}')));
-        return;
-      }
+    // 2. التحقق من شركات الشحن
+    // الموقع يستخدم متغير missingShipping
+    bool missingShipping = _merchantGroups.any((g) => g.shippingOptions.isNotEmpty && g.selectedShipping == null);
+    if (missingShipping) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الرجاء اختيار طريقة شحن لكل تاجر')));
+      return;
+    }
+
+    // 3. التحقق من البطاقة
+    if (_paymentMethodType == 'card' && _selectedCardId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الرجاء اختيار بطاقة')));
+      return;
     }
 
     setState(() => _isProcessing = true);
 
     try {
       final cart = Provider.of<CartProvider>(context, listen: false);
-      
-      // تجهيز خيارات الشحن للباك اند
+      final totalAmount = cart.totalAmount + _totalShippingCost;
+
+      // تجهيز خيارات الشحن بنفس أسماء الموقع (merchant_id, shipping_option_id)
       final shippingSelections = _merchantGroups.map((g) {
         return {
-          'merchant_id': g.groupId, // تأكد أنه ID رقمي إذا كان الباك اند يطلبه
+          'merchant_id': g.groupId, // تأكد أن هذا يطابق merchantId في الباك إند
           'shipping_option_id': g.selectedShipping?.id
         };
       }).toList();
 
-      if (_paymentMethod == 'cod') {
+      if (_paymentMethodType == 'cod') {
         await _checkoutService.placeCodOrder(
           cartItems: cart.items,
           addressId: _selectedAddressId!,
           shippingSelections: shippingSelections,
           shippingCost: _totalShippingCost,
+          totalAmount: totalAmount,
         );
-        
-        // نجاح
-        cart.clearCart();
-        if (mounted) {
-          Navigator.pushReplacementNamed(context, '/checkout/success'); // أو صفحة نجاح مخصصة
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الطلب بنجاح!'), backgroundColor: Colors.green));
-        }
       } else {
-        // منطق الدفع بالبطاقة (Stripe)
-        // يتطلب package: flutter_stripe
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('الدفع بالبطاقة يتطلب إعداد Stripe')));
+        await _checkoutService.placeCardOrder(
+          cartItems: cart.items,
+          addressId: _selectedAddressId!,
+          shippingSelections: shippingSelections,
+          shippingCost: _totalShippingCost,
+          totalAmount: totalAmount,
+          paymentMethodId: _selectedCardId!,
+        );
       }
+      
+      // نجاح
+      cart.clearCart();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الطلب بنجاح!'), backgroundColor: Colors.green));
+        // الذهاب لصفحة النجاح
+        // Navigator.pushReplacementNamed(context, '/checkout/success'); 
+        Navigator.pop(context);
+      }
+
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('حدث خطأ: $e'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: ${e.toString()}'), backgroundColor: Colors.red));
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
@@ -183,25 +233,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             _buildAddressSection(),
             const SizedBox(height: 20),
 
-            // 2. المنتجات والشحن (مجمعة)
+            // 2. مجموعات التجار والمنتجات
             ..._merchantGroups.map((group) => _buildMerchantGroupCard(group)).toList(),
             const SizedBox(height: 20),
-
-            // 3. طريقة الدفع
+            
+            // 3. قسم الدفع (المحدث)
             _buildPaymentMethodSection(),
             const SizedBox(height: 20),
 
-            // 4. الملخص
+            // 4. ملخص الفاتورة
             _buildSummarySection(subTotal, total),
             const SizedBox(height: 30),
 
-            // زر الدفع
+            // 5. زر الدفع
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: _isProcessing ? null : _handlePayment,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF105C6), // لون البراند
+                  backgroundColor: const Color(0xFFF105C6),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -233,7 +283,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             if (_addresses.isEmpty)
               Center(
                 child: TextButton.icon(
-                  onPressed: () { /* فتح مودال إضافة عنوان */ },
+                  onPressed: () { 
+                    // TODO: فتح صفحة إضافة عنوان
+                  },
                   icon: const Icon(Icons.add),
                   label: const Text("إضافة عنوان جديد"),
                 ),
@@ -301,14 +353,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           children: [
             Row(children: [const Icon(Icons.store, color: Colors.blue), const SizedBox(width: 8), Text(group.merchantName, style: const TextStyle(fontWeight: FontWeight.bold))]),
             const Divider(height: 24),
-            // المنتجات
+            
+            // قائمة المنتجات
             ...group.items.map((item) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: CachedNetworkImage(imageUrl: item.selectedVariant.images.isNotEmpty ? item.selectedVariant.images[0] : '', width: 50, height: 50, fit: BoxFit.cover),
+                    child: CachedNetworkImage(
+                      imageUrl: item.selectedVariant.images.isNotEmpty ? item.selectedVariant.images[0] : '', 
+                      width: 50, height: 50, fit: BoxFit.cover,
+                      errorWidget: (context, url, error) => Container(color: Colors.grey[200], child: const Icon(Icons.image_not_supported)),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -324,7 +381,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ],
               ),
             )).toList(),
+            
             const SizedBox(height: 12),
+            
             // خيارات الشحن
             Container(
               padding: const EdgeInsets.all(12),
@@ -365,47 +424,145 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildPaymentMethodSection() {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.shade200)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Consumer<PaymentProvider>(
+      builder: (context, paymentProvider, child) {
+        return Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.shade200)),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(children: [Icon(Icons.payment, color: Colors.green), SizedBox(width: 8), Text("طريقة الدفع", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))]),
+                const SizedBox(height: 16),
+                
+                // 1. خيار الدفع بالبطاقة
+                InkWell(
+                  onTap: () => setState(() => _paymentMethodType = 'card'),
+                  child: Row(
+                    children: [
+                      Radio<String>(
+                        value: 'card',
+                        groupValue: _paymentMethodType,
+                        activeColor: const Color(0xFFF105C6),
+                        onChanged: (val) => setState(() => _paymentMethodType = val!),
+                      ),
+                      const Text("بطاقة ائتمان / مدى", style: TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+
+                // عرض البطاقات فقط إذا تم اختيار الدفع بالبطاقة
+                if (_paymentMethodType == 'card') ...[
+                  if (paymentProvider.cards.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 32, top: 8),
+                      child: Text("لا توجد بطاقات محفوظة", style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                    )
+                  else
+                    // قائمة البطاقات المحفوظة
+                    Column(
+                      children: paymentProvider.cards.map((card) => 
+                        _buildSavedCardItem(card)
+                      ).toList(),
+                    ),
+
+                  // زر إضافة بطاقة جديدة
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12, top: 12),
+                    child: TextButton.icon(
+                      onPressed: () {
+                         Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const AddCardScreen()),
+                        ).then((_) {
+                          // تحديث القائمة بعد العودة من الإضافة
+                          paymentProvider.fetchCards();
+                        });
+                      },
+                      icon: const Icon(Icons.add_circle_outline, size: 20),
+                      label: const Text("إضافة بطاقة جديدة"),
+                      style: TextButton.styleFrom(foregroundColor: const Color(0xFFF105C6)),
+                    ),
+                  ),
+                ],
+
+                const Divider(height: 24),
+
+                // 2. خيار الدفع عند الاستلام
+                InkWell(
+                  onTap: () => setState(() {
+                    _paymentMethodType = 'cod';
+                    _selectedCardId = null; // تفريغ البطاقة المختارة
+                  }),
+                  child: Row(
+                    children: [
+                      Radio<String>(
+                        value: 'cod',
+                        groupValue: _paymentMethodType,
+                        activeColor: const Color(0xFFF105C6),
+                        onChanged: (val) => setState(() {
+                          _paymentMethodType = val!;
+                          _selectedCardId = null;
+                        }),
+                      ),
+                      const Text("الدفع عند الاستلام"),
+                      const Spacer(),
+                      const Icon(Icons.money, color: Colors.grey),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSavedCardItem(PaymentCardModel card) {
+    bool isSelected = _selectedCardId == card.id;
+    return Container(
+      margin: const EdgeInsets.only(top: 8, right: 16),
+      decoration: BoxDecoration(
+        border: Border.all(color: isSelected ? const Color(0xFFF105C6) : Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(10),
+        color: isSelected ? Colors.purple.withOpacity(0.05) : Colors.white,
+      ),
+      child: RadioListTile<String>(
+        value: card.id,
+        groupValue: _selectedCardId,
+        activeColor: const Color(0xFFF105C6),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+        title: Row(
           children: [
-            const Row(children: [Icon(Icons.payment, color: Colors.green), SizedBox(width: 8), Text("طريقة الدفع", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))]),
-            const SizedBox(height: 16),
-            _buildPaymentRadio("card", "بطاقة ائتمان / مدى", Icons.credit_card),
-            const SizedBox(height: 10),
-            _buildPaymentRadio("cod", "الدفع عند الاستلام", Icons.money),
+            _getCardIcon(card.brand),
+            const SizedBox(width: 10),
+            Text("•••• ${card.last4}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            const Spacer(),
+            Text(card.expiryDateFormatted, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
           ],
         ),
+        onChanged: (val) {
+          setState(() {
+            _selectedCardId = val;
+            _paymentMethodType = 'card';
+          });
+        },
       ),
     );
   }
 
-  Widget _buildPaymentRadio(String value, String label, IconData icon) {
-    final isSelected = _paymentMethod == value;
-    return InkWell(
-      onTap: () => setState(() => _paymentMethod = value),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          border: Border.all(color: isSelected ? const Color(0xFFF105C6) : Colors.grey.shade300),
-          borderRadius: BorderRadius.circular(12),
-          color: isSelected ? Colors.purple.withOpacity(0.05) : Colors.white,
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: isSelected ? const Color(0xFFF105C6) : Colors.grey),
-            const SizedBox(width: 12),
-            Text(label, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-            const Spacer(),
-            if (isSelected) const Icon(Icons.check_circle, color: Color(0xFFF105C6)),
-          ],
-        ),
-      ),
-    );
+  Widget _getCardIcon(String brand) {
+    IconData icon = Icons.credit_card;
+    Color color = Colors.grey;
+    if (brand.toLowerCase().contains('visa')) {
+      return const Icon(Icons.credit_card, color: Colors.blue); 
+    } else if (brand.toLowerCase().contains('master')) {
+      return const Icon(Icons.credit_card, color: Colors.orange);
+    }
+    return Icon(icon, color: color);
   }
 
   Widget _buildSummarySection(double subTotal, double total) {

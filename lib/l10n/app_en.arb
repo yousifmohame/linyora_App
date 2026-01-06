@@ -5,7 +5,7 @@
     "navHome": "Home",
     "navCategories": "Categories",
     "navReels": "Reels",
-    "navCart": "Cart",
+    "navtrends": "Trends",
     "navProfile": "My Profile",
 
     "myProfile": "My Profile",
@@ -14,7 +14,7 @@
     "ordersAndPurchases": "Orders & Purchases",
     "myOrders": "My Orders",
     "favorites": "Favorites",
-    "returns": "Returns",
+    "trends": "Trends",
     "accountAndWallet": "Account & Wallet",
     "wallet": "Wallet",
     "myAddresses": "My Addresses",
