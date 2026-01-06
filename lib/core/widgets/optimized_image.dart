@@ -19,9 +19,12 @@ class OptimizedImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // تحديد حجم الكاش بناءً على الحجم المطلوب (لتقليل استهلاك الرامات)
-    final int? cacheWidth = width != null ? (width! * 2.5).toInt() : null; // نضرب في 2.5 للشاشات عالية الدقة
-    final int? cacheHeight = height != null ? (height! * 2.5).toInt() : null;
+    // التصحيح: التحقق من أن العرض والارتفاع أرقام محدودة (ليست Infinity) قبل التحويل
+    final int? cacheWidth =
+        (width != null && width!.isFinite) ? (width! * 2.5).toInt() : null;
+
+    final int? cacheHeight =
+        (height != null && height!.isFinite) ? (height! * 2.5).toInt() : null;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
@@ -30,16 +33,16 @@ class OptimizedImage extends StatelessWidget {
         width: width,
         height: height,
         fit: fit,
-        // 👇 هذا هو السر: تحديد حجم الصورة في الذاكرة
-        memCacheWidth: cacheWidth, 
+        // إذا كان العرض Infinity (مثل حالة ProductCard)، سيتم تمرير null هنا وسيعمل بشكل طبيعي
+        memCacheWidth: cacheWidth,
         memCacheHeight: cacheHeight,
-        // عرض مربع رمادي خفيف بدلاً من لودينج ثقيل
         placeholder: (context, url) => Container(color: Colors.grey[200]),
-        errorWidget: (context, url, error) => Container(
-          color: Colors.grey[200],
-          child: const Icon(Icons.broken_image, color: Colors.grey),
-        ),
-        fadeInDuration: const Duration(milliseconds: 200), // تقليل وقت الأنيميشن
+        errorWidget:
+            (context, url, error) => Container(
+              color: Colors.grey[200],
+              child: const Icon(Icons.broken_image, color: Colors.grey),
+            ),
+        fadeInDuration: const Duration(milliseconds: 200),
       ),
     );
   }

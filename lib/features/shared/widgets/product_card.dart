@@ -56,7 +56,8 @@ class ProductCard extends StatelessWidget {
                   ),
                   child: OptimizedImage(
                     imageUrl: product.imageUrl,
-                    width: width,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
                     height: 215,
                   ),
                 ),

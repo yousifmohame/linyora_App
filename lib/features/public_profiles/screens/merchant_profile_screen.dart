@@ -299,7 +299,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
                           const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
                             childAspectRatio:
-                                0.65, // تعديل النسبة لتناسب الكروت
+                                0.55, // تعديل النسبة لتناسب الكروت
                             mainAxisSpacing: 10,
                             crossAxisSpacing: 10,
                           ),

@@ -25,6 +25,18 @@ class WishlistService {
     }
   }
 
+  Future<bool> checkIsWishlisted(String productId) async {
+    try {
+      // نفس منطق الويب: customer/wishlist/status
+      final response = await _apiClient.post('/customer/wishlist/status', data: {
+        'productIds': [productId]
+      });
+      return response.data[productId] == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // إضافة للمفضلة
   Future<void> addToWishlist(int productId) async {
     try {

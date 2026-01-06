@@ -362,22 +362,16 @@ class _SectionDetailsScreenState extends State<SectionDetailsScreen> {
                   ),
                 ),
               )
-              : SliverPadding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
+              : SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.55,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
                 ),
-                sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.55,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                  ),
-                  delegate: SliverChildBuilderDelegate((context, index) {
-                    return ProductCard(product: _products[index]);
-                  }, childCount: _products.length),
-                ),
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  return ProductCard(product: _products[index]);
+                }, childCount: _products.length),
               ),
 
           // مساحة إضافية في الأسفل

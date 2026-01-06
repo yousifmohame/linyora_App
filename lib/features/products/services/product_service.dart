@@ -19,13 +19,54 @@ class ProductService {
     }
   }
 
+  Future<List<ProductDetailsModel>> getProducts({
+    int? categoryId,
+    int? merchantId,
+    int limit = 6,
+  }) async {
+    try {
+      final Map<String, dynamic> queryParams = {'limit': limit};
+
+      if (categoryId != null) {
+        queryParams['category_id'] = categoryId;
+      } else if (merchantId != null) {
+        queryParams['merchant_id'] = merchantId;
+      }
+
+      final response = await _apiClient.get(
+        '/products',
+        queryParameters: queryParams,
+      );
+
+      // --- التصحيح هنا ---
+      List<dynamic> dataList = [];
+
+      // التحقق مما إذا كانت البيانات تأتي كقائمة مباشرة (وهذا هو الحال في مشروعك)
+      if (response.data is List) {
+        dataList = response.data;
+      }
+      // أو إذا كانت تأتي داخل مفتاح 'data' (للاحتياط)
+      else if (response.data is Map && response.data['data'] is List) {
+        dataList = response.data['data'];
+      }
+
+      return dataList.map((e) => ProductDetailsModel.fromJson(e)).toList();
+    } catch (e) {
+      print("Error fetching products: $e");
+      return [];
+    }
+  }
+
   // دالة إضافة للمفضلة
   Future<void> toggleWishlist(int productId, bool isCurrentlyWishlisted) async {
     try {
       if (isCurrentlyWishlisted) {
         await _apiClient.delete('/customer/wishlist/$productId');
       } else {
-        await _apiClient.post('/customer/wishlist', data: {'productId': productId});
+        await _apiClient.post(
+          '/customer/wishlist',
+          data: {'productId': productId},
+        );
       }
     } catch (e) {
       rethrow;
@@ -33,16 +74,17 @@ class ProductService {
   }
 
   // جلب منتجات مقترحة (بناءً على الفئة أو عشوائي)
-  Future<List<ProductModel>> getRelatedProducts(int categoryId) async {
+  Future<List<ProductDetailsModel>> getRelatedProducts(
+    String categoryId,
+  ) async {
     try {
-      // يمكنك تغيير المسار حسب الـ API لديك، مثلاً /products?category_id=$categoryId&limit=4
-      final response = await _apiClient.get('/products/$categoryId');
-      if (response.statusCode == 200 && response.data is List) {
-        return (response.data as List)
-            .map((e) => ProductModel.fromJson(e))
-            .toList();
-      }
-      return [];
+      final response = await _apiClient.get(
+        '/products',
+        queryParameters: {'category_id': categoryId, 'limit': 20},
+      );
+      return (response.data['data'] as List)
+          .map((e) => ProductDetailsModel.fromJson(e))
+          .toList();
     } catch (e) {
       return [];
     }
