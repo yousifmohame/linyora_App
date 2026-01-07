@@ -4,6 +4,7 @@ import 'package:carousel_slider/carousel_slider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:linyora_project/features/cart/providers/cart_provider.dart';
 import 'package:linyora_project/features/cart/screens/cart_screen.dart';
+import 'package:linyora_project/features/categories/screens/categories_screen.dart';
 import 'package:linyora_project/features/categories/screens/category_products_screen.dart';
 import 'package:linyora_project/features/home/screens/notifications_screen.dart';
 // --- Services & Models ---
@@ -147,10 +148,12 @@ class _HomeScreenState extends State<HomeScreen> {
           Colors.white, // منع تغيير اللون عند السكرول في Material 3
       // 2. الجزء الأيسر (القائمة أو اللوجو)
       leading: IconButton(
-        icon: const Icon(Icons.menu, color: Colors.black),
+        icon: const Icon(Icons.grid_view_outlined, color: Colors.black),
         onPressed: () {
-          // سيقوم بالبحث عن أقرب Scaffold (الموجود في MainLayout) ويفتحه
-          Scaffold.of(context).openDrawer();
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => CategoriesScreen()),
+          );
         },
       ),
 
@@ -236,8 +239,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   // تحديد حد أدنى للعرض ليكون دائرياً حتى مع الأرقام الصغيرة
                   constraints: const BoxConstraints(
-                    minWidth: 18,
-                    minHeight: 18,
+                    minWidth: 15,
+                    minHeight: 15,
                   ),
                   child: Center(
                     child: Text(

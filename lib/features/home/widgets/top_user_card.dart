@@ -1,9 +1,10 @@
+import 'dart:async'; // 1. إضافة مكتبة async
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:linyora_project/core/utils/event_bus.dart';
 import '../../../models/top_user_model.dart';
 import '../services/home_service.dart';
 
-// استيراد شاشات الملف الشخصي العامة
 import '../../public_profiles/screens/model_profile_screen.dart';
 import '../../public_profiles/screens/merchant_profile_screen.dart';
 
@@ -22,30 +23,57 @@ class _TopUserCardState extends State<TopUserCard>
   late bool isFollowed;
   final HomeService _homeService = HomeService();
 
-  // للتحكم في انيميشن الزر
+  // 2. متغير للاشتراك في الأحداث
+  StreamSubscription? _subscription;
+
   double _scale = 1.0;
 
   @override
   void initState() {
     super.initState();
     isFollowed = widget.user.isFollowed;
+
+    // 3. الاشتراك في الاستماع للتغييرات العامة
+    _subscription = GlobalEventBus.stream.listen((event) {
+      // إذا كان الحدث يخص هذا المستخدم تحديداً
+      if (event.userId == widget.user.id) {
+        if (mounted) {
+          setState(() {
+            isFollowed = event.isFollowed;
+          });
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    // 4. إلغاء الاشتراك عند إغلاق الويتجت لمنع تسريب الذاكرة
+    _subscription?.cancel();
+    super.dispose();
   }
 
   void _toggleFollow() async {
-    // انيميشن ضغط بسيط
     setState(() => _scale = 0.95);
     await Future.delayed(const Duration(milliseconds: 100));
     setState(() => _scale = 1.0);
 
-    // تحديث الواجهة (Optimistic UI)
-    setState(() => isFollowed = !isFollowed);
+    final newStatus = !isFollowed;
 
-    // إرسال للسيرفر
+    // تحديث الواجهة محلياً
+    setState(() => isFollowed = newStatus);
+
+    // 5. إرسال خبر لباقي التطبيق بأن الحالة تغيرت
+    GlobalEventBus.sendEvent(widget.user.id, newStatus);
+
     final success = await _homeService.toggleFollow(widget.user.id);
 
     if (!success && mounted) {
-      setState(() => isFollowed = !isFollowed);
-      // استخدام SnackBar بتصميم بسيط
+      // تراجع في حال الفشل
+      setState(() => isFollowed = !newStatus);
+      // إرسال خبر التراجع لباقي التطبيق
+      GlobalEventBus.sendEvent(widget.user.id, !newStatus);
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text("تعذر تحديث الحالة، تحقق من الانترنت"),
@@ -59,24 +87,23 @@ class _TopUserCardState extends State<TopUserCard>
     }
   }
 
-  // دالة الانتقال للملف الشخصي
   void _navigateToProfile() {
     if (widget.isModel) {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => ModelProfileScreen(
-            modelId: widget.user.id.toString(),
-          ),
+          builder:
+              (context) =>
+                  ModelProfileScreen(modelId: widget.user.id.toString()),
         ),
       );
     } else {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => MerchantProfileScreen(
-            merchantId: widget.user.id.toString(),
-          ),
+          builder:
+              (context) =>
+                  MerchantProfileScreen(merchantId: widget.user.id.toString()),
         ),
       );
     }
@@ -84,9 +111,10 @@ class _TopUserCardState extends State<TopUserCard>
 
   @override
   Widget build(BuildContext context) {
+    // ... (باقي كود التصميم كما هو تماماً بدون تغيير)
     return Container(
-      width: 130, // زيادة العرض قليلاً للتنفس
-      margin: const EdgeInsets.only(left: 12, top: 4, bottom: 4), // هوامش للظل
+      width: 130,
+      margin: const EdgeInsets.only(left: 12, top: 4, bottom: 4),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -101,7 +129,6 @@ class _TopUserCardState extends State<TopUserCard>
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          // تم تفعيل الانتقال هنا
           onTap: _navigateToProfile,
           borderRadius: BorderRadius.circular(16),
           child: Padding(
@@ -109,13 +136,11 @@ class _TopUserCardState extends State<TopUserCard>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // 1. الصورة مع الإطار المتدرج
                 Stack(
                   alignment: Alignment.bottomCenter,
                   children: [
-                    // الإطار المتدرج (Gradient Border)
                     Container(
-                      padding: const EdgeInsets.all(2.5), // سمك الإطار
+                      padding: const EdgeInsets.all(2.5),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: LinearGradient(
@@ -128,15 +153,13 @@ class _TopUserCardState extends State<TopUserCard>
                         ),
                       ),
                       child: Container(
-                        padding: const EdgeInsets.all(
-                          2,
-                        ), // المسافة البيضاء بين الإطار والصورة
+                        padding: const EdgeInsets.all(2),
                         decoration: const BoxDecoration(
                           color: Colors.white,
                           shape: BoxShape.circle,
                         ),
                         child: CircleAvatar(
-                          radius: 32, // حجم الصورة
+                          radius: 32,
                           backgroundColor: Colors.grey[100],
                           backgroundImage: CachedNetworkImageProvider(
                             widget.user.imageUrl,
@@ -146,8 +169,6 @@ class _TopUserCardState extends State<TopUserCard>
                         ),
                       ),
                     ),
-
-                    // شارة التقييم (Floating Badge)
                     Positioned(
                       bottom: -2,
                       child: Container(
@@ -189,10 +210,7 @@ class _TopUserCardState extends State<TopUserCard>
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 12),
-
-                // 2. النصوص (الاسم واللقب)
                 Text(
                   widget.user.displayName,
                   maxLines: 1,
@@ -212,10 +230,7 @@ class _TopUserCardState extends State<TopUserCard>
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-
                 const Spacer(),
-
-                // 3. زر المتابعة المتحرك
                 AnimatedScale(
                   scale: _scale,
                   duration: const Duration(milliseconds: 100),

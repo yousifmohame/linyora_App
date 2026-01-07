@@ -128,6 +128,12 @@ abstract class AppLocalizations {
   /// **'Trends'**
   String get navtrends;
 
+  /// No description provided for @navProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'Products'**
+  String get navProducts;
+
   /// No description provided for @navProfile.
   ///
   /// In en, this message translates to:

@@ -24,6 +24,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navtrends => 'Trends';
 
   @override
+  String get navProducts => 'Products';
+
+  @override
   String get navProfile => 'My Profile';
 
   @override

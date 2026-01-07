@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:linyora_project/features/products/screens/main_prodects.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../../../models/cart_item_model.dart';
@@ -93,7 +94,13 @@ class CartScreen extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed:
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ProductsScreen(),
+                  ),
+                ),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFF105C6),
               foregroundColor: Colors.white,

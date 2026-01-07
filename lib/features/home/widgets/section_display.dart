@@ -122,7 +122,7 @@ class SectionDisplay extends StatelessWidget {
                                 (context) => SectionDetailsScreen(
                                   sectionId:
                                       section.id, // تمرير ID القسم (مثلاً 8)
-                                 ),
+                                ),
                           ),
                         );
                       },

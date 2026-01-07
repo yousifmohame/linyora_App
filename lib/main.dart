@@ -25,6 +25,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => CartProvider()),
+
         // تسجيل مزود اللغة هنا
         ChangeNotifierProvider(create: (_) => LocaleProvider()),
         ChangeNotifierProvider(

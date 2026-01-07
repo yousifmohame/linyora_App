@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:linyora_project/features/address/screens/addresses_screen.dart';
+import 'package:linyora_project/features/home/screens/AboutLinyoraScreen.dart';
 import 'package:linyora_project/features/home/screens/contact_us_screen.dart';
 import 'package:linyora_project/features/payment/screens/payment_methods_screen.dart';
+import 'package:linyora_project/features/profile/screens/EditProfileScreen.dart';
 import 'package:linyora_project/features/trends/screens/trends_screen.dart';
 
 import 'package:linyora_project/features/wishlist/screens/wishlist_screen.dart';
@@ -50,7 +52,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (isLoggedIn)
             IconButton(
               icon: const Icon(Icons.settings_outlined, color: Colors.black),
-              onPressed: () {},
+              onPressed: () async {
+                // الانتقال لصفحة التعديل
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const EditProfileScreen(),
+                  ),
+                );
+                // عند العودة، نقوم بتحديث الصفحة لرؤية البيانات الجديدة
+                setState(() {});
+              },
             ),
         ],
       ),
@@ -170,7 +182,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _ProfileTile(
                           icon: Icons.info_outline,
                           title: l10n.aboutApp,
-                          onTap: () {},
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (context) => const AboutLinyoraScreen(),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -380,8 +400,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
                 const SizedBox(height: 8),
+                // داخل _buildProfileHeader
                 InkWell(
-                  onTap: () {},
+                  onTap: () async {
+                    // الانتقال لصفحة التعديل
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const EditProfileScreen(),
+                      ),
+                    );
+                    // عند العودة، نقوم بتحديث الصفحة لرؤية البيانات الجديدة
+                    setState(() {});
+                  },
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,

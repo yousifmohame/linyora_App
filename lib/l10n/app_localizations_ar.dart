@@ -24,6 +24,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get navtrends => 'الترندات';
 
   @override
+  String get navProducts => 'المنتجات';
+
+  @override
   String get navProfile => 'حسابي';
 
   @override

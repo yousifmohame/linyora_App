@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+import 'package:linyora_project/features/products/screens/main_prodects.dart';
 import 'package:linyora_project/features/trends/screens/trends_screen.dart';
 import 'package:linyora_project/l10n/app_localizations.dart';
 
@@ -40,7 +41,7 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
         index: _currentIndex,
         children: [
           const HomeScreen(),
-          const CategoriesScreen(),
+          const ProductsScreen(),
           // ✅ التعديل هنا: نمرر isActive لمعرفة هل الصفحة معروضة أم لا
           ReelsScreen(isActive: _currentIndex == 2),
           const TrendsScreen(),
@@ -59,7 +60,7 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
         items: <Widget>[
           // 3. استخدام النصوص المترجمة
           _buildNavItem(Icons.home_outlined, l10n.navHome, 0),
-          _buildNavItem(Icons.grid_view_outlined, l10n.navCategories, 1),
+          _buildNavItem(Icons.inventory_2_outlined, l10n.navProducts, 1),
           _buildNavItem(Icons.play_circle_outline, l10n.navReels, 2),
           _buildNavItem(Icons.arrow_outward, l10n.navtrends, 3),
           _buildNavItem(Icons.person_outline, l10n.navProfile, 4),

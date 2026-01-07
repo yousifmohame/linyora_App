@@ -1,8 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+
+// استيراد الموديلات والخدمات والصفحات
 import 'package:linyora_project/models/product_model.dart';
 import 'package:linyora_project/features/home/services/home_service.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../../products/screens/product_details_screen.dart'; // تأكد من المسار
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({Key? key}) : super(key: key);
@@ -16,16 +20,15 @@ class _SearchScreenState extends State<SearchScreen> {
   final HomeService _homeService = HomeService();
 
   List<ProductModel> _searchResults = [];
+  List<String> _recentSearches = []; // أصبحت فارغة ليتم ملؤها من الذاكرة
   bool _isLoading = false;
   Timer? _debounce;
 
-  // قائمة وهمية لعمليات البحث السابقة (للمظهر الاحترافي)
-  final List<String> _recentSearches = [
-    "فستان سهرة",
-    "ساعة ذكية",
-    "حذاء رياضي",
-    "حقيبة يد",
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadSearchHistory(); // تحميل السجل عند فتح الصفحة
+  }
 
   @override
   void dispose() {
@@ -34,10 +37,60 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
+  // --- دوال إدارة سجل البحث (Local Storage) ---
+  Future<void> _loadSearchHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _recentSearches = prefs.getStringList('search_history') ?? [];
+    });
+  }
+
+  Future<void> _addToHistory(String query) async {
+    if (query.trim().isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    List<String> history = prefs.getStringList('search_history') ?? [];
+
+    // إزالة التكرار (نحذف القديم ونضيف الجديد في البداية)
+    if (history.contains(query)) {
+      history.remove(query);
+    }
+    history.insert(0, query);
+
+    // الاحتفاظ بآخر 10 عمليات بحث فقط
+    if (history.length > 10) {
+      history = history.sublist(0, 10);
+    }
+
+    await prefs.setStringList('search_history', history);
+    setState(() {
+      _recentSearches = history;
+    });
+  }
+
+  Future<void> _removeFromHistory(String query) async {
+    final prefs = await SharedPreferences.getInstance();
+    List<String> history = prefs.getStringList('search_history') ?? [];
+    history.remove(query);
+    await prefs.setStringList('search_history', history);
+    setState(() {
+      _recentSearches = history;
+    });
+  }
+
+  Future<void> _clearHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('search_history');
+    setState(() {
+      _recentSearches = [];
+    });
+  }
+  // ---------------------------------------------
+
   void _onSearchChanged(String query) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
 
-    _debounce = Timer(const Duration(milliseconds: 500), () {
+    _debounce = Timer(const Duration(milliseconds: 600), () {
       if (query.isNotEmpty) {
         _performSearch(query);
       } else {
@@ -51,7 +104,14 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _performSearch(String query) async {
     setState(() => _isLoading = true);
+
+    // حفظ البحث في السجل فقط إذا كان طويلاً بما يكفي (اختياري)
+    if (query.length > 2) {
+      _addToHistory(query);
+    }
+
     final results = await _homeService.searchProducts(query);
+
     if (mounted) {
       setState(() {
         _searchResults = results;
@@ -65,14 +125,13 @@ class _SearchScreenState extends State<SearchScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white, // لون أمازون الرسمي أو الأبيض
+        backgroundColor: Colors.white,
         elevation: 0,
-        titleSpacing: 0, // إزالة المسافات الزائدة
+        titleSpacing: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        // حقل البحث بتصميم Input Box
         title: Container(
           height: 45,
           margin: const EdgeInsets.only(right: 16),
@@ -91,6 +150,9 @@ class _SearchScreenState extends State<SearchScreen> {
           child: TextField(
             controller: _searchController,
             autofocus: true,
+            textInputAction:
+                TextInputAction.search, // تغيير زر الكيبورد لـ "بحث"
+            onSubmitted: (val) => _performSearch(val), // البحث عند ضغط Enter
             onChanged: _onSearchChanged,
             decoration: InputDecoration(
               hintText: "ابحث في Linyora...",
@@ -106,7 +168,9 @@ class _SearchScreenState extends State<SearchScreen> {
                         ),
                         onPressed: () {
                           _searchController.clear();
-                          _onSearchChanged('');
+                          setState(() {
+                            _searchResults = [];
+                          });
                         },
                       )
                       : null,
@@ -124,11 +188,11 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildBody() {
     if (_isLoading) {
       return const Center(
-        child: CircularProgressIndicator(color: Colors.amber),
-      );
+        child: CircularProgressIndicator(color: Color(0xFFF105C6)),
+      ); // لون البراند
     }
 
-    // الحالة 1: البحث فارغ -> عرض عمليات البحث السابقة (ستايل أمازون)
+    // الحالة 1: البحث فارغ -> عرض عمليات البحث السابقة
     if (_searchController.text.isEmpty) {
       return _buildRecentSearches();
     }
@@ -150,7 +214,7 @@ class _SearchScreenState extends State<SearchScreen> {
       );
     }
 
-    // الحالة 3: عرض النتائج (ستايل القائمة التفصيلية)
+    // الحالة 3: عرض النتائج
     return ListView.separated(
       itemCount: _searchResults.length,
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -163,33 +227,58 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  // ودجت لعرض عمليات البحث السابقة
   Widget _buildRecentSearches() {
+    if (_recentSearches.isEmpty) {
+      return const Center(
+        child: Text(
+          "ابدأ البحث عن منتجاتك المفضلة",
+          style: TextStyle(color: Colors.grey),
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Text(
-            "عمليات البحث الأخيرة",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "عمليات البحث الأخيرة",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              if (_recentSearches.isNotEmpty)
+                GestureDetector(
+                  onTap: _clearHistory,
+                  child: const Text(
+                    "مسح الكل",
+                    style: TextStyle(color: Colors.red, fontSize: 12),
+                  ),
+                ),
+            ],
           ),
         ),
         Expanded(
           child: ListView.builder(
             itemCount: _recentSearches.length,
             itemBuilder: (context, index) {
+              final term = _recentSearches[index];
               return ListTile(
                 leading: const Icon(Icons.history, color: Colors.grey),
-                title: Text(_recentSearches[index]),
-                trailing: const Icon(
-                  Icons.north_west,
-                  size: 16,
-                  color: Colors.grey,
+                title: Text(term),
+                trailing: IconButton(
+                  icon: const Icon(Icons.close, size: 16, color: Colors.grey),
+                  onPressed: () => _removeFromHistory(term), // حذف عنصر واحد
                 ),
                 onTap: () {
-                  _searchController.text = _recentSearches[index];
-                  _onSearchChanged(_recentSearches[index]);
+                  _searchController.text = term;
+                  // تحريك المؤشر للنهاية
+                  _searchController.selection = TextSelection.fromPosition(
+                    TextPosition(offset: term.length),
+                  );
+                  _performSearch(term);
                 },
               );
             },
@@ -199,19 +288,25 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  // ودجت بطاقة المنتج (تصميم أمازون)
   Widget _buildProductCard(ProductModel product) {
     return InkWell(
       onTap: () {
-        // TODO: Navigate to details
+        // الانتقال لصفحة التفاصيل وتمرير الـ ID
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder:
+                (_) => ProductDetailsScreen(productId: product.id.toString()),
+          ),
+        );
       },
       child: Container(
         padding: const EdgeInsets.all(12),
-        height: 150, // ارتفاع ثابت للبطاقة
+        height: 150,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. الصورة (يسار)
+            // الصورة
             Container(
               width: 130,
               height: double.infinity,
@@ -223,7 +318,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 borderRadius: BorderRadius.circular(8),
                 child: CachedNetworkImage(
                   imageUrl: product.imageUrl,
-                  fit: BoxFit.contain, // contain أفضل للمنتجات لتظهر كاملة
+                  fit: BoxFit.contain,
                   placeholder:
                       (_, __) => const Center(
                         child: CircularProgressIndicator(strokeWidth: 2),
@@ -234,33 +329,26 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
               ),
             ),
-
             const SizedBox(width: 12),
-
-            // 2. التفاصيل (يمين)
+            // التفاصيل
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // العنوان
                   Text(
                     product.name,
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 15,
                       height: 1.3,
-                      fontWeight:
-                          FontWeight.w400, // أمازون تستخدم خطاً عادياً للعناوين
+                      fontWeight: FontWeight.w400,
                     ),
                   ),
-
                   const SizedBox(height: 6),
-
-                  // التقييمات
                   Row(
                     children: [
-                      _buildRatingStars(product.rating), // دالة لرسم النجوم
+                      _buildRatingStars(product.rating),
                       const SizedBox(width: 4),
                       Text(
                         "(${product.reviewCount})",
@@ -268,20 +356,17 @@ class _SearchScreenState extends State<SearchScreen> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 8),
-
-                  // السعر
                   RichText(
                     text: TextSpan(
                       children: [
                         TextSpan(
                           text: "${product.price.toInt()}",
                           style: const TextStyle(
-                            fontSize: 22,
+                            fontSize: 20,
                             color: Colors.black,
                             fontWeight: FontWeight.bold,
-                          ), // الرقم الصحيح كبير
+                          ),
                         ),
                         TextSpan(
                           text:
@@ -290,43 +375,46 @@ class _SearchScreenState extends State<SearchScreen> {
                             fontSize: 12,
                             color: Colors.black,
                             fontWeight: FontWeight.bold,
-                          ), // الكسور صغيرة علوية
+                          ),
                         ),
-                        TextSpan(
+                        const TextSpan(
                           text: " ﷼",
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.black,
+                            color: Colors.red,
                             fontFamily: 'Arial',
-                          ), // العملة صغيرة
+                          ),
                         ),
                       ],
                     ),
                   ),
-
                   const Spacer(),
-
-                  // زر الإضافة للسلة (الأصفر المميز)
                   SizedBox(
                     height: 36,
                     width: 140,
                     child: ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        // الانتقال للتفاصيل لإضافة للسلة (لأن المنتج يحتاج اختيار لون/مقاس)
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (_) => ProductDetailsScreen(
+                                  productId: product.id.toString(),
+                                ),
+                          ),
+                        );
+                      },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color.fromARGB(
-                          255,
-                          155,
-                          126,
-                          203,
-                        ),
-                        foregroundColor: Colors.black,
+                        backgroundColor: const Color(0xFFF105C6), // لون البراند
+                        foregroundColor: Colors.white,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
                         ),
                       ),
                       child: const Text(
-                        "أضف إلى العربة",
+                        "عرض التفاصيل",
                         style: TextStyle(fontSize: 12),
                       ),
                     ),
@@ -340,17 +428,16 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  // دالة مساعدة لرسم النجوم
   Widget _buildRatingStars(double rating) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(5, (index) {
         if (index < rating.floor()) {
-          return const Icon(Icons.star, color: Colors.orange, size: 16);
+          return const Icon(Icons.star, color: Colors.amber, size: 16);
         } else if (index < rating && rating % 1 != 0) {
-          return const Icon(Icons.star_half, color: Colors.orange, size: 16);
+          return const Icon(Icons.star_half, color: Colors.amber, size: 16);
         } else {
-          return const Icon(Icons.star_border, color: Colors.orange, size: 16);
+          return const Icon(Icons.star_border, color: Colors.amber, size: 16);
         }
       }),
     );

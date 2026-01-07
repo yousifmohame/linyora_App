@@ -1,11 +1,11 @@
-import 'product_model.dart'; // تأكد من استيراد موديل المنتج
+import 'product_model.dart';
 
 class ReelModel {
   final int id;
   final String videoUrl;
-  final String? description; // caption in backend
+  final String? description;
   final String? thumbnailUrl;
-  bool isLiked; // متغير قابل للتغيير ليعكس حالة isLikedByMe
+  bool isLiked;
   int likesCount;
   int commentsCount;
   final UserModel? user;
@@ -28,16 +28,13 @@ class ReelModel {
       id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
       videoUrl: json['video_url'] ?? '',
       thumbnailUrl: json['thumbnail_url'],
-      description: json['caption'], // الباك اند يرسلها باسم caption
-      // هنا الإصلاح لمشكلة عدم حفظ حالة اللايك
+      description: json['caption'],
       isLiked: (json['isLikedByMe'] == true || json['isLikedByMe'] == 1),
       likesCount: json['likes_count'] ?? 0,
       commentsCount: json['comments_count'] ?? 0,
-
-      // هنا الإصلاح لمشكلة عدم ظهور بيانات المستخدم
-      // البيانات تأتي مباشرة في الروت وليس داخل كائن 'model'
-      user: UserModel.fromJson(json),
-
+      user: UserModel.fromJson(
+        json,
+      ), // تمرير الـ json كاملاً لاستخراج بيانات المستخدم
       products:
           json['tagged_products'] != null
               ? (json['tagged_products'] as List)
@@ -52,32 +49,53 @@ class UserModel {
   final int id;
   final String name;
   final String avatar;
+  bool isFollowing; // ✅ تمت الإضافة: متغير حالة المتابعة (قابل للتعديل)
 
-  UserModel({required this.id, required this.name, required this.avatar});
+  UserModel({
+    required this.id,
+    required this.name,
+    required this.avatar,
+    this.isFollowing = false, // القيمة الافتراضية
+  });
 
-  // الباك اند يرسل البيانات باسم userId, userName, userAvatar
   factory UserModel.fromJson(Map<String, dynamic> json) {
-    // نتحقق مما إذا كانت البيانات مجمعة أو منفصلة
+    // 1. الحالة الأولى: البيانات مسطحة (Flat structure) كما في بعض ردود الـ API
     if (json.containsKey('userId')) {
       return UserModel(
         id:
             json['userId'] is int
                 ? json['userId']
-                : int.parse(json['userId'].toString()),
+                : int.tryParse(json['userId'].toString()) ?? 0,
         name: json['userName'] ?? 'User',
         avatar: json['userAvatar'] ?? '',
+        // ✅ قراءة حالة المتابعة (قد تأتي باسم isFollowedByMe أو isFollowing)
+        isFollowing:
+            (json['isFollowedByMe'] == true || json['isFollowing'] == true),
       );
     }
-    // حالة احتياطية لو تغير الباك اند
-    else if (json.containsKey('user')) {
-      final userJson = json['user'];
+    // 2. الحالة الثانية: البيانات داخل كائن 'user' أو 'model'
+    else if (json.containsKey('user') || json.containsKey('model')) {
+      final userData = json['user'] ?? json['model'];
       return UserModel(
-        id: userJson['id'],
-        name: userJson['name'],
-        avatar: userJson['profile_picture_url'] ?? '',
+        id:
+            userData['id'] is int
+                ? userData['id']
+                : int.tryParse(userData['id'].toString()) ?? 0,
+        name: userData['name'] ?? 'User',
+        avatar: userData['profile_picture_url'] ?? userData['avatar'] ?? '',
+        // ✅ قراءة الحالة من الكائن الداخلي
+        isFollowing:
+            (userData['isFollowedByMe'] == true ||
+                userData['isFollowing'] == true),
       );
     }
 
-    return UserModel(id: 0, name: 'Linyora User', avatar: '');
+    // حالة افتراضية
+    return UserModel(
+      id: 0,
+      name: 'Linyora User',
+      avatar: '',
+      isFollowing: false,
+    );
   }
 }
