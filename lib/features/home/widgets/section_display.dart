@@ -5,7 +5,7 @@ import 'package:linyora_project/features/categories/screens/category_products_sc
 import 'package:linyora_project/features/home/screens/section_products_screen.dart';
 import '../../../core/utils/color_helper.dart';
 import '../../../models/section_model.dart';
-import '../widgets/banner_video_player.dart'; // سنعيد استخدام مشغل الفيديو
+import '../widgets/banner_video_player.dart';
 
 class SectionDisplay extends StatelessWidget {
   final SectionModel section;
@@ -14,9 +14,11 @@ class SectionDisplay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // تحويل لون الثيم من Hex إلى Color
+    // 1. حسابات التجاوب (دون LayoutBuilder)
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isTablet = screenWidth > 600;
+
     final Color themeColor = ColorHelper.fromHex(section.themeColor);
-    // لون ثانوي للتدرج (أغمق قليلاً)
     final Color gradientColor = ColorHelper.adjustColor(
       themeColor,
       amount: -30,
@@ -24,10 +26,15 @@ class SectionDisplay extends StatelessWidget {
 
     return Column(
       children: [
-        // 1. رأس القسم (Banner)
+        // --- 1. رأس القسم (Banner) ---
         Container(
-          margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
-          height: 110, // ارتفاع البانر
+          // نزيد الهوامش في التابلت
+          margin: EdgeInsets.symmetric(
+            horizontal: isTablet ? 12 : 5,
+            vertical: 4,
+          ),
+          // نزيد الارتفاع في التابلت
+          height: isTablet ? 140 : 110,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
             gradient: LinearGradient(
@@ -45,12 +52,12 @@ class SectionDisplay extends StatelessWidget {
           ),
           child: Stack(
             children: [
-              // دوائر خلفية جمالية
+              // خلفية جمالية
               Positioned(
                 left: -30,
                 top: -30,
                 child: CircleAvatar(
-                  radius: 50,
+                  radius: isTablet ? 70 : 50,
                   backgroundColor: Colors.white.withOpacity(0.1),
                 ),
               ),
@@ -58,7 +65,7 @@ class SectionDisplay extends StatelessWidget {
                 right: 20,
                 bottom: -20,
                 child: CircleAvatar(
-                  radius: 40,
+                  radius: isTablet ? 60 : 40,
                   backgroundColor: Colors.white.withOpacity(0.1),
                 ),
               ),
@@ -68,7 +75,6 @@ class SectionDisplay extends StatelessWidget {
                 padding: const EdgeInsets.all(10.0),
                 child: Row(
                   children: [
-                    // الأيقونة
                     if (section.icon.isNotEmpty)
                       Container(
                         margin: const EdgeInsets.only(left: 12),
@@ -79,8 +85,8 @@ class SectionDisplay extends StatelessWidget {
                         ),
                         child: CachedNetworkImage(
                           imageUrl: section.icon,
-                          width: 40,
-                          height: 40,
+                          width: isTablet ? 55 : 40, // تكبير الأيقونة
+                          height: isTablet ? 55 : 40,
                           color: Colors.white,
                         ),
                       ),
@@ -92,9 +98,9 @@ class SectionDisplay extends StatelessWidget {
                         children: [
                           Text(
                             section.title,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: Colors.white,
-                              fontSize: 20,
+                              fontSize: isTablet ? 24 : 20, // تكبير الخط
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -105,30 +111,32 @@ class SectionDisplay extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: Colors.white.withOpacity(0.9),
-                              fontSize: 12,
+                              fontSize: isTablet ? 14 : 12, // تكبير الخط
                             ),
                           ),
                         ],
                       ),
                     ),
 
-                    // زر التصفح
                     GestureDetector(
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder:
-                                (context) => SectionDetailsScreen(
-                                  sectionId:
-                                      section.id, // تمرير ID القسم (مثلاً 8)
-                                ),
+                                (context) =>
+                                    SectionDetailsScreen(sectionId: section.id),
                           ),
                         );
                       },
                       child: CircleAvatar(
+                        radius: isTablet ? 25 : 20, // تكبير الزر
                         backgroundColor: Colors.white,
-                        child: Icon(Icons.arrow_forward, color: themeColor),
+                        child: Icon(
+                          Icons.arrow_forward,
+                          color: themeColor,
+                          size: isTablet ? 28 : 24,
+                        ),
                       ),
                     ),
                   ],
@@ -138,62 +146,52 @@ class SectionDisplay extends StatelessWidget {
           ),
         ),
 
-        // 2. المحتوى المميز (منتج أو سلايدر)
+        // --- 2. المحتوى المميز (منتج أو سلايدر) ---
         Container(
-          height: 250,
-          margin: const EdgeInsets.symmetric(horizontal: 5),
+          // نزيد ارتفاع السلايدر في التابلت ليملأ الشاشة جمالياً
+          height: isTablet ? 320 : 250,
+          margin: EdgeInsets.symmetric(horizontal: isTablet ? 12 : 5),
           child:
               section.featuredProductId != null
-                  ? _buildFeaturedProduct(context, themeColor)
-                  : _buildSlideshow(context),
+                  ? _buildFeaturedProduct(context, themeColor, isTablet)
+                  : _buildSlideshow(context, isTablet),
         ),
 
-        // 3. شبكة التصنيفات (Categories Grid)
+        // --- 3. شريط التصنيفات (Categories Slider) ---
         if (section.categories.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(
-              vertical: 10.0,
-            ), // مسافة رأسية فقط
+            padding: const EdgeInsets.symmetric(vertical: 10.0),
             child: SizedBox(
-              height: 120, // تحديد ارتفاع الشريط
+              height: 120,
               child: CarouselSlider.builder(
                 itemCount: section.categories.length,
                 options: CarouselOptions(
                   height: 130,
-
-                  // 1. تفعيل الحركة التلقائية
                   autoPlay: true,
-                  autoPlayInterval: const Duration(seconds: 3), // سرعة التقليب
+                  autoPlayInterval: const Duration(seconds: 3),
                   autoPlayAnimationDuration: const Duration(milliseconds: 800),
                   autoPlayCurve: Curves.fastOutSlowIn,
 
-                  // 2. أهم إعداد: عرض عدة عناصر في وقت واحد
-                  // القيمة 0.28 تعني ظهور حوالي 3.5 عنصر في الشاشة (شريط)
-                  viewportFraction: 0.28,
+                  // التعديل الجوهري هنا:
+                  // في التابلت، نعرض 5 عناصر (0.2)، في الموبايل 3.5 (0.28)
+                  viewportFraction: isTablet ? 0.15 : 0.28,
 
-                  // 3. التكرار اللانهائي
                   enableInfiniteScroll: true,
-                  padEnds: false, // البدء من اليسار
+                  padEnds: false,
                 ),
                 itemBuilder: (context, index, realIndex) {
                   final category = section.categories[index];
-
-                  // نستخدم Container لإضافة هوامش جانبية بين العناصر
                   return Container(
                     margin: const EdgeInsets.symmetric(horizontal: 5.0),
                     child: GestureDetector(
                       onTap: () {
-                        // أكشن عند الضغط على التصنيف
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder:
                                 (context) => CategoryProductsScreen(
-                                  slug:
-                                      category.slug, // نمرر الـ slug للباك إند
-                                  categoryName:
-                                      category
-                                          .name, // نمرر الاسم للعرض في العنوان
+                                  slug: category.slug,
+                                  categoryName: category.name,
                                 ),
                           ),
                         );
@@ -201,15 +199,15 @@ class SectionDisplay extends StatelessWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // حاوية الصورة
                           Container(
-                            height: 80,
-                            width: 80, // جعلناها مربعة لتناسب الشريط
+                            height:
+                                isTablet
+                                    ? 75
+                                    : 80, // تصغير بسيط ليناسب العرض المتعدد
+                            width: isTablet ? 75 : 80,
                             decoration: BoxDecoration(
                               color: themeColor.withOpacity(0.05),
-                              borderRadius: BorderRadius.circular(
-                                16,
-                              ), // حواف دائرية
+                              borderRadius: BorderRadius.circular(16),
                               border: Border.all(
                                 color: themeColor.withOpacity(0.2),
                               ),
@@ -231,12 +229,9 @@ class SectionDisplay extends StatelessWidget {
                               ),
                             ),
                           ),
-
                           const SizedBox(height: 8),
-
-                          // اسم التصنيف
                           SizedBox(
-                            width: 80, // نفس عرض الصورة لضمان توسيط النص
+                            width: 80,
                             child: Text(
                               category.name,
                               textAlign: TextAlign.center,
@@ -262,15 +257,15 @@ class SectionDisplay extends StatelessWidget {
   }
 
   // ويدجت المنتج المميز
-  Widget _buildFeaturedProduct(BuildContext context, Color themeColor) {
+  Widget _buildFeaturedProduct(
+    BuildContext context,
+    Color themeColor,
+    bool isTablet,
+  ) {
     return GestureDetector(
-      onTap: () {
-        // TODO: الانتقال لصفحة تفاصيل المنتج
-        // Navigator.pushNamed(context, '/product', arguments: section.featuredProductId);
-      },
+      onTap: () {},
       child: Stack(
         children: [
-          // الصورة
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: CachedNetworkImage(
@@ -278,15 +273,9 @@ class SectionDisplay extends StatelessWidget {
               width: double.infinity,
               height: double.infinity,
               fit: BoxFit.cover,
-              errorWidget:
-                  (_, __, ___) => Container(
-                    color: Colors.grey[200],
-                    child: const Icon(Icons.broken_image),
-                  ),
+              errorWidget: (_, __, ___) => Container(color: Colors.grey[200]),
             ),
           ),
-
-          // طبقة داكنة
           Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
@@ -297,8 +286,6 @@ class SectionDisplay extends StatelessWidget {
               ),
             ),
           ),
-
-          // بادج "مميز"
           Positioned(
             top: 12,
             right: 12,
@@ -324,10 +311,8 @@ class SectionDisplay extends StatelessWidget {
               ),
             ),
           ),
-
-          // تفاصيل المنتج
           Positioned(
-            bottom: 16,
+            bottom: isTablet ? 24 : 16, // رفع النص قليلاً في التابلت
             left: 16,
             right: 16,
             child: Column(
@@ -335,9 +320,9 @@ class SectionDisplay extends StatelessWidget {
               children: [
                 Text(
                   section.productName ?? '',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white,
-                    fontSize: 18,
+                    fontSize: isTablet ? 22 : 18, // خط أكبر
                     fontWeight: FontWeight.bold,
                   ),
                   maxLines: 1,
@@ -356,15 +341,21 @@ class SectionDisplay extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {}, // إضافة للسلة
+                    onPressed: () {},
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: themeColor,
+                      padding: EdgeInsets.symmetric(
+                        vertical: isTablet ? 14 : 10,
+                      ), // زر أكبر
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text("تسوق الآن"),
+                    child: Text(
+                      "تسوق الآن",
+                      style: TextStyle(fontSize: isTablet ? 16 : 14),
+                    ),
                   ),
                 ),
               ],
@@ -375,10 +366,14 @@ class SectionDisplay extends StatelessWidget {
     );
   }
 
-  // ويدجت السلايدر (إذا لم يكن هناك منتج)
-  Widget _buildSlideshow(BuildContext context) {
+  // ويدجت السلايدر
+  Widget _buildSlideshow(BuildContext context, bool isTablet) {
+    // ارتفاع ديناميكي
+    final double sliderHeight = isTablet ? 320 : 250;
+
     if (section.slides.isEmpty) {
       return Container(
+        height: sliderHeight,
         decoration: BoxDecoration(
           color: Colors.grey[100],
           borderRadius: BorderRadius.circular(16),
@@ -391,8 +386,8 @@ class SectionDisplay extends StatelessWidget {
 
     return CarouselSlider(
       options: CarouselOptions(
-        height: 250,
-        viewportFraction: 1.0, // عرض كامل
+        height: sliderHeight,
+        viewportFraction: 1.0,
         autoPlay: true,
         enableInfiniteScroll: section.slides.length > 1,
       ),
@@ -414,7 +409,6 @@ class SectionDisplay extends StatelessWidget {
                         fit: BoxFit.cover,
                       ),
 
-                  // نص الشريحة
                   Container(
                     alignment: Alignment.bottomRight,
                     padding: const EdgeInsets.all(16),
@@ -427,9 +421,9 @@ class SectionDisplay extends StatelessWidget {
                     ),
                     child: Text(
                       slide.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white,
-                        fontSize: 16,
+                        fontSize: isTablet ? 18 : 16, // خط أكبر
                         fontWeight: FontWeight.bold,
                       ),
                     ),

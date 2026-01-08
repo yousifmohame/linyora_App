@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:linyora_project/features/categories/screens/category_products_screen.dart';
-import 'package:shimmer/shimmer.dart'; // يفضل إضافتها لعمل Loading Skeleton
 import '../../../../models/category_model.dart';
 import '../services/category_service.dart';
 
@@ -20,10 +19,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   List<CategoryModel> _filteredCategories = [];
   bool _isLoading = true;
 
-  // حالة العرض (شبكة أو قائمة)
   bool _isGridView = true;
-  // حالة الفلتر (الكل، مميز، تريند)
-  String _activeFilter = 'all'; // values: 'all', 'featured', 'trending'
+  String _activeFilter = 'all';
 
   @override
   void initState() {
@@ -46,20 +43,16 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   void _applyFilters() {
     setState(() {
       _filteredCategories =
-          _allCategories.filter((category) {
-            // 1. فلتر البحث
+          _allCategories.where((category) {
             final matchesSearch = category.name.toLowerCase().contains(
               _searchController.text.toLowerCase(),
             );
-
-            // 2. فلتر التصنيف (Tags)
             bool matchesTag = true;
             if (_activeFilter == 'featured') {
               matchesTag = category.isFeatured;
             } else if (_activeFilter == 'trending') {
               matchesTag = category.isTrending;
             }
-
             return matchesSearch && matchesTag;
           }).toList();
     });
@@ -67,6 +60,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // --- حسابات التجاوب ---
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isTablet = screenWidth > 600;
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -83,13 +80,12 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         padding: const EdgeInsets.only(bottom: 75),
         child: Column(
           children: [
-            // --- القسم العلوي (بحث + فلاتر) ---
+            // --- القسم العلوي ---
             Container(
               color: Colors.white,
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Column(
                 children: [
-                  // شريط البحث
                   TextField(
                     controller: _searchController,
                     onChanged: (value) => _applyFilters(),
@@ -106,11 +102,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-
-                  // أدوات التحكم (فلاتر + تبديل العرض)
                   Row(
                     children: [
-                      // أزرار الفلترة
                       Expanded(
                         child: SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
@@ -119,16 +112,12 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                           ),
                         ),
                       ),
-
-                      // فاصل
                       Container(
                         height: 20,
                         width: 1,
                         color: Colors.grey[300],
                         margin: const EdgeInsets.symmetric(horizontal: 8),
                       ),
-
-                      // زر تبديل العرض (Grid/List)
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.grey[100],
@@ -177,18 +166,20 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
               ),
             ),
 
-            // --- محتوى القائمة ---
+            // --- المحتوى ---
             Expanded(
               child:
                   _isLoading
-                      ? _buildLoadingSkeleton()
+                      ? _buildLoadingSkeleton(isTablet)
                       : _filteredCategories.isEmpty
                       ? _buildEmptyState()
                       : RefreshIndicator(
                         onRefresh: _fetchCategories,
                         color: const Color(0xFFF105C6),
                         child:
-                            _isGridView ? _buildGridView() : _buildListView(),
+                            _isGridView
+                                ? _buildGridView(isTablet)
+                                : _buildListView(isTablet),
                       ),
             ),
           ],
@@ -197,14 +188,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     );
   }
 
-  // --- Widgets مساعدة ---
-
-  Widget _buildFilterChip(
-    String label,
-    String value, {
-    IconData? icon,
-    Color? color,
-  }) {
+  Widget _buildFilterChip(String label, String value) {
     final bool isSelected = _activeFilter == value;
     return GestureDetector(
       onTap: () {
@@ -217,62 +201,72 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? (color ?? const Color(0xFFF105C6)) : Colors.white,
+          color: isSelected ? const Color(0xFFF105C6) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color:
-                isSelected
-                    ? (color ?? const Color(0xFFF105C6))
-                    : Colors.grey[300]!,
+            color: isSelected ? const Color(0xFFF105C6) : Colors.grey[300]!,
           ),
         ),
-        child: Row(
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 16, color: isSelected ? Colors.white : color),
-              const SizedBox(width: 4),
-            ],
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? Colors.white : Colors.black87,
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-          ],
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.black87,
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
         ),
       ),
     );
   }
 
-  // 1. Grid View Implementation
-  Widget _buildGridView() {
+  // --- Grid View (متجاوب) ---
+  Widget _buildGridView(bool isTablet) {
+    // في التابلت نعرض 5 أعمدة، وفي الموبايل 3
+    final int crossAxisCount = isTablet ? 5 : 3;
+    final double aspectRatio = isTablet ? 0.85 : 0.8;
+
     return GridView.builder(
       padding: const EdgeInsets.all(12),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3, // 3 أعمدة مثل الموقع في الموبايل
-        childAspectRatio: 0.8,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        childAspectRatio: aspectRatio,
         crossAxisSpacing: 10,
         mainAxisSpacing: 10,
       ),
       itemCount: _filteredCategories.length,
       itemBuilder: (context, index) {
-        final category = _filteredCategories[index];
-        return _CategoryGridCard(category: category);
+        return _CategoryGridCard(category: _filteredCategories[index]);
       },
     );
   }
 
-  // 2. List View Implementation
-  Widget _buildListView() {
+  // --- List View (متجاوب) ---
+  Widget _buildListView(bool isTablet) {
+    // في التابلت، عرض القائمة كسجل واحد طويل غير جميل.
+    // لذا، نعرضها كقائمة عريضة (2 كولوم) لملء الشاشة.
+    if (isTablet) {
+      return GridView.builder(
+        padding: const EdgeInsets.all(16),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2, // عمودين للقائمة في التابلت
+          childAspectRatio: 3.5, // بطاقة عريضة تشبه القائمة
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+        ),
+        itemCount: _filteredCategories.length,
+        itemBuilder: (context, index) {
+          return _CategoryListCard(category: _filteredCategories[index]);
+        },
+      );
+    }
+
+    // الموبايل العادي
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: _filteredCategories.length,
       separatorBuilder: (c, i) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
-        final category = _filteredCategories[index];
-        return _CategoryListCard(category: category);
+        return _CategoryListCard(category: _filteredCategories[index]);
       },
     );
   }
@@ -293,18 +287,18 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     );
   }
 
-  Widget _buildLoadingSkeleton() {
+  Widget _buildLoadingSkeleton(bool isTablet) {
+    final int crossAxisCount = isTablet ? 5 : 3;
     return GridView.builder(
       padding: const EdgeInsets.all(12),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
         childAspectRatio: 0.8,
         crossAxisSpacing: 10,
         mainAxisSpacing: 10,
       ),
       itemCount: 12,
       itemBuilder: (context, index) {
-        // يمكنك استخدام مكتبة Shimmer هنا لنتيجة أفضل
         return Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -324,7 +318,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   }
 }
 
-// --- بطاقة الشبكة (Grid Card) ---
+// --- Cards (كما هي) ---
 class _CategoryGridCard extends StatelessWidget {
   final CategoryModel category;
   const _CategoryGridCard({required this.category});
@@ -333,14 +327,13 @@ class _CategoryGridCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        // ✅ التعديل هنا: الانتقال لشاشة المنتجات
         Navigator.push(
           context,
           MaterialPageRoute(
             builder:
                 (context) => CategoryProductsScreen(
-                  slug: category.slug, // نمرر الـ slug للباك إند
-                  categoryName: category.name, // نمرر الاسم للعرض في العنوان
+                  slug: category.slug,
+                  categoryName: category.name,
                 ),
           ),
         );
@@ -374,9 +367,7 @@ class _CategoryGridCard extends StatelessWidget {
                     placeholder:
                         (context, url) => Container(color: Colors.grey[100]),
                     errorWidget:
-                        (context, url, error) => Image.asset(
-                          'assets/images/placeholder.png',
-                        ), // صورة احتياطية
+                        (context, url, error) => const Icon(Icons.error),
                   ),
                 ),
               ),
@@ -404,7 +395,6 @@ class _CategoryGridCard extends StatelessWidget {
   }
 }
 
-// --- بطاقة القائمة (List Card) ---
 class _CategoryListCard extends StatelessWidget {
   final CategoryModel category;
   const _CategoryListCard({required this.category});
@@ -413,7 +403,16 @@ class _CategoryListCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        // الانتقال لصفحة المنتجات
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder:
+                (context) => CategoryProductsScreen(
+                  slug: category.slug,
+                  categoryName: category.name,
+                ),
+          ),
+        );
       },
       child: Container(
         padding: const EdgeInsets.all(10),
@@ -492,16 +491,5 @@ class _CategoryListCard extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-// دالة مساعدة للفلترة في القوائم (Extension Method)
-extension ListFilter<E> on List<E> {
-  List<E> filter(bool Function(E element) test) {
-    List<E> result = [];
-    for (var element in this) {
-      if (test(element)) result.add(element);
-    }
-    return result;
   }
 }

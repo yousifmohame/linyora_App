@@ -381,48 +381,44 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCategoriesScroller() {
-    // إذا لم تكن هناك بيانات، لا تعرض شيئاً
     if (_categories.isEmpty)
       return const SliverToBoxAdapter(child: SizedBox.shrink());
 
+    // 1. حساب عرض الشاشة لتحديد القيم المتجاوبة
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isTablet = screenWidth > 600;
+
     return SliverToBoxAdapter(
       child: Container(
-        height: 120, // ارتفاع الشريط
+        height: isTablet ? 140 : 120, // زيادة الارتفاع قليلاً في التابلت
         color: Colors.transparent,
         padding: const EdgeInsets.symmetric(vertical: 12),
-
-        // ============================================================
-        // التغيير هنا: استبدلنا ListView بـ CarouselSlider
-        // ============================================================
         child: CarouselSlider.builder(
           itemCount: _categories.length,
           options: CarouselOptions(
-            height: 100, // ارتفاع العنصر داخل السلايدر
-            // 1. تفعيل التمرير التلقائي
+            height: isTablet ? 120 : 100, // ارتفاع العنصر
             autoPlay: true,
-            autoPlayInterval: const Duration(seconds: 3), // السرعة بين كل حركة
+            autoPlayInterval: const Duration(seconds: 3),
             autoPlayAnimationDuration: const Duration(milliseconds: 800),
             autoPlayCurve: Curves.fastOutSlowIn,
 
-            // 2. أهم خاصية: عرض عدة عناصر في وقت واحد
-            // القيمة 0.22 تعني أن كل عنصر يأخذ 22% من عرض الشاشة
-            // (أي سيظهر تقريباً 4.5 عنصر في الشاشة الواحدة)
-            viewportFraction: 0.22,
+            // 2. التعديل الجوهري هنا:
+            // في الموبايل: 0.22 (يعرض ~4.5 عنصر)
+            // في التابلت: 0.15 (يعرض ~6.5 عنصر) لأن الشاشة أعرض
+            viewportFraction: isTablet ? 0.15 : 0.22,
 
-            // 3. التكرار اللانهائي
             enableInfiniteScroll: true,
-
-            // جعل المحاذاة لليسار قليلاً لتبدو كشريط
             padEnds: false,
           ),
           itemBuilder: (context, index, realIndex) {
             final category = _categories[index];
 
-            // نستخدم Container لإضافة هوامش جانبية بدلاً من separatorBuilder
+            // تكبير العناصر قليلاً في التابلت
+            final double circleSize = isTablet ? 80 : 65;
+            final double fontSize = isTablet ? 14 : 12;
+
             return Container(
-              margin: const EdgeInsets.symmetric(
-                horizontal: 6.0,
-              ), // مسافة بين العناصر
+              margin: const EdgeInsets.symmetric(horizontal: 6.0),
               child: GestureDetector(
                 onTap: () {
                   Navigator.push(
@@ -430,9 +426,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     MaterialPageRoute(
                       builder:
                           (context) => CategoryProductsScreen(
-                            slug: category.slug, // نمرر الـ slug للباك إند
-                            categoryName:
-                                category.name, // نمرر الاسم للعرض في العنوان
+                            slug: category.slug,
+                            categoryName: category.name,
                           ),
                     ),
                   );
@@ -440,10 +435,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // 1. دائرة الصورة
+                    // دائرة الصورة (متجاوبة)
                     Container(
-                      width: 65,
-                      height: 65,
+                      width: circleSize,
+                      height: circleSize,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: Colors.grey[100],
@@ -480,16 +475,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     const SizedBox(height: 8),
 
-                    // 2. اسم القسم
+                    // اسم القسم (متجاوب)
                     SizedBox(
-                      width: 70,
+                      width: circleSize + 10,
                       child: Text(
                         category.name,
                         textAlign: TextAlign.center,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
+                        style: TextStyle(
+                          fontSize: fontSize,
                           fontWeight: FontWeight.w600,
                           color: Colors.black87,
                         ),

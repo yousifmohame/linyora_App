@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:linyora_project/features/products/widgets/product_filter_drawer.dart'; // تأكد من إنشاء هذا الملف
+import 'package:linyora_project/features/products/widgets/product_filter_drawer.dart';
 import 'package:linyora_project/features/shared/widgets/product_card.dart';
 import 'package:linyora_project/models/product_model.dart';
 import 'package:linyora_project/models/product_details_model.dart';
@@ -32,7 +32,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
     _fetchProducts();
   }
 
-  /// دالة لجلب المنتجات وتحويلها
   Future<void> _fetchProducts() async {
     setState(() {
       _isLoading = true;
@@ -40,26 +39,15 @@ class _ProductsScreenState extends State<ProductsScreen> {
     });
 
     try {
-      // 1. تجهيز جميع الفلاتر لإرسالها
       final Map<String, dynamic> requestFilters = {};
-
-      // إضافة الترتيب
       if (_sortBy.isNotEmpty) {
-        requestFilters['sortBy'] =
-            _sortBy; // تأكد أن الاسم يطابق الباك إند (غالباً sortBy أو sort)
+        requestFilters['sortBy'] = _sortBy;
       }
-
-      // إضافة الفلاتر النشطة (السعر، الماركات، إلخ)
       requestFilters.addAll(_activeFilters);
 
-      // 2. استدعاء السيرفر مع الفلاتر
       final List<ProductDetailsModel> rawProducts = await _productService
-          .getProducts(
-            limit: 50, // نطلب عدد أكبر عند الفلترة
-            filters: requestFilters, // <-- التغيير الجوهري هنا
-          );
+          .getProducts(limit: 50, filters: requestFilters);
 
-      // 3. تحويل البيانات للعرض
       final List<ProductModel> mappedProducts =
           rawProducts.map((detail) {
             return _mapToProductModel(detail);
@@ -82,13 +70,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
     }
   }
 
-  /// دالة التحويل من تفاصيل إلى موديل العرض
   ProductModel _mapToProductModel(ProductDetailsModel detail) {
-    // استخراج البيانات من المتغير الأول كواجهة افتراضية
     final firstVariant =
         detail.variants.isNotEmpty ? detail.variants.first : null;
 
-    // حساب التقييم
     double rating = 0.0;
     if (detail.reviews.isNotEmpty) {
       final total = detail.reviews.fold(0.0, (sum, item) => sum + item.rating);
@@ -108,15 +93,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
       rating: rating,
       reviewCount: detail.reviews.length,
       merchantName: detail.merchantName,
-      isNew: false, // يمكن ربطها بتاريخ الإنشاء
+      isNew: false,
     );
   }
 
-  /// دالة لتطبيق الفلاتر والترتيب محلياً (مؤقتاً حتى يتم دعمها من السيرفر)
   List<ProductModel> _applyLocalFiltersAndSort(List<ProductModel> products) {
     var result = List<ProductModel>.from(products);
 
-    // 1. فلتر السعر
     if (_activeFilters['price_min'] != null &&
         _activeFilters['price_max'] != null) {
       result =
@@ -129,7 +112,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
               .toList();
     }
 
-    // 2. الترتيب
     switch (_sortBy) {
       case 'price_asc':
         result.sort((a, b) => a.price.compareTo(b.price));
@@ -142,7 +124,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
         break;
       case 'latest':
       default:
-        // نفترض أنها مرتبة افتراضياً أو حسب الـ ID
         result.sort((a, b) => b.id.compareTo(a.id));
         break;
     }
@@ -153,7 +134,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
   void _onSortChanged(String? value) {
     if (value != null) {
       setState(() => _sortBy = value);
-      // إعادة تطبيق الترتيب فقط دون طلب الشبكة لتوفير الموارد
       setState(() {
         _products = _applyLocalFiltersAndSort(_products);
       });
@@ -162,7 +142,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   void _onFiltersApplied(Map<String, dynamic> filters) {
     setState(() => _activeFilters = filters);
-    _fetchProducts(); // إعادة طلب البيانات لأن الفلترة قد تحتاج بيانات جديدة
+    _fetchProducts();
   }
 
   @override
@@ -170,7 +150,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: const Color(0xFFF9F9F9),
-      // القائمة الجانبية للفلاتر
       endDrawer: ProductFilterDrawer(
         currentFilters: _activeFilters,
         onApplyFilters: _onFiltersApplied,
@@ -188,15 +167,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
           ),
         ),
         actions: [
-          // زر الفلتر
           Stack(
             alignment: Alignment.center,
             children: [
               IconButton(
-                icon: const Icon(
-                  Icons.tune,
-                  color: Colors.black,
-                ), // أيقونة الفلتر
+                icon: const Icon(Icons.tune, color: Colors.black),
                 onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
               ),
               if (_activeFilters.isNotEmpty)
@@ -218,7 +193,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       ),
       body: Column(
         children: [
-          // شريط الأدوات العلوي (عدد المنتجات + الترتيب + طريقة العرض)
+          // Toolbar
           Container(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             decoration: BoxDecoration(
@@ -227,7 +202,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
             ),
             child: Row(
               children: [
-                // عدد النتائج
                 Text(
                   "${_products.length} منتج",
                   style: TextStyle(
@@ -237,8 +211,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   ),
                 ),
                 const Spacer(),
-
-                // أيقونات العرض
                 Container(
                   height: 36,
                   decoration: BoxDecoration(
@@ -246,22 +218,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.grey.shade200),
                   ),
-                  child: Row(
-                    children: [
-                      _buildViewIcon(Icons.grid_view_rounded, true),
-                      Container(
-                        width: 1,
-                        height: 20,
-                        color: Colors.grey.shade300,
-                      ),
-                      _buildViewIcon(Icons.view_list_rounded, false),
-                    ],
-                  ),
                 ),
-
                 const SizedBox(width: 10),
-
-                // قائمة الترتيب
                 Container(
                   height: 36,
                   padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -309,7 +267,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
             ),
           ),
 
-          // المحتوى الرئيسي
+          // Content
           Expanded(
             child:
                 _isLoading
@@ -324,13 +282,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     ? _buildEmptyState()
                     : _buildProductsList(),
           ),
-          SizedBox(height: 70),
+          // مساحة للتنقل السفلي
+          const SizedBox(height: 70),
         ],
       ),
     );
   }
 
-  // ودجت أيقونة تغيير العرض
   Widget _buildViewIcon(IconData icon, bool isGrid) {
     final isSelected = _isGridView == isGrid;
     return InkWell(
@@ -346,13 +304,23 @@ class _ProductsScreenState extends State<ProductsScreen> {
     );
   }
 
+  // --- التعديل هنا: دالة بناء القائمة المتجاوبة ---
   Widget _buildProductsList() {
+    // 1. حسابات التجاوب
+    final double screenWidth = MediaQuery.of(context).size.width;
+
+    // عدد الأعمدة: 2 للموبايل، 3 للتابلت، 4 للشاشات الكبيرة
+    int crossAxisCount = screenWidth > 900 ? 4 : (screenWidth > 600 ? 4 : 2);
+
+    // نسبة الأبعاد: تعديل بسيط للتابلت ليكون الكارت متناسقاً
+    double childAspectRatio = screenWidth > 600 ? 0.55 : 0.55;
+
     if (_isGridView) {
       return GridView.builder(
         padding: const EdgeInsets.all(12),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          childAspectRatio: 0.55, // نسبة العرض للطول (تم تعديلها لتناسب الكارت)
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount, // ديناميكي
+          childAspectRatio: childAspectRatio, // ديناميكي
           crossAxisSpacing: 10,
           mainAxisSpacing: 10,
         ),
@@ -362,25 +330,24 @@ class _ProductsScreenState extends State<ProductsScreen> {
         },
       );
     } else {
+      // في وضع القائمة (List View)، في التابلت يمكننا عرض كارتين بجانب بعض بدلاً من واحد عريض جداً
+      // أو الإبقاء على واحد عريض ولكن بتقييد العرض (Center & Constrain)
       return ListView.separated(
         padding: const EdgeInsets.all(12),
         itemCount: _products.length,
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
-          // عرض القائمة (يمكنك إنشاء ProductListCard مخصص هنا إذا أردت)
-          // حالياً نستخدم نفس الكارت ولكن بعرض كامل
-          return SizedBox(
-            height: 140,
-            child: Row(
-              children: [
-                // يمكن تخصيص تصميم عرض القائمة هنا ليكون مختلفاً عن الشبكة
-                Expanded(
-                  child: ProductCard(
-                    product: _products[index],
-                    width: double.infinity,
-                  ),
-                ),
-              ],
+          return Center(
+            child: Container(
+              // في التابلت، نحدد أقصى عرض للكارت لكي لا يمتط بشكل بشع
+              constraints: const BoxConstraints(maxWidth: 600),
+              height: 140,
+              child: ProductCard(
+                product: _products[index],
+                width: double.infinity, // سيأخذ عرض الـ Container المقيد
+                // هنا قد تحتاج لتعديل ProductCard ليدعم وضع الـ List (صورة يسار نص يمين)
+                // إذا لم يكن يدعم، سيعرض الكارت العمودي بشكل مضغوط
+              ),
             ),
           );
         },

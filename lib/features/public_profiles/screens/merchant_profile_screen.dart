@@ -67,6 +67,15 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
       );
     }
 
+    // --- حسابات التجاوب (Responsive Calculations) ---
+    final double screenWidth = MediaQuery.of(context).size.width;
+
+    // تحديد عدد الأعمدة: 2 للموبايل، 3 للتابلت، 4 للشاشات العريضة جداً
+    int crossAxisCount = screenWidth > 900 ? 4 : (screenWidth > 600 ? 4 : 2);
+
+    // ضبط نسبة الطول للعرض: في التابلت نجعل الكارت أعرض قليلاً
+    double childAspectRatio = screenWidth > 600 ? 0.55 : 0.55;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: CustomScrollView(
@@ -88,6 +97,8 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
                       : Container(color: Colors.grey[300]),
             ),
           ),
+
+          // معلومات البروفايل (Profile Header)
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -121,7 +132,6 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
                                           _merchant!.profilePictureUrl!,
                                         )
                                         : null,
-
                                 child:
                                     (_merchant!.profilePictureUrl == null ||
                                             _merchant!
@@ -131,7 +141,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
                                           _merchant!.storeName.isNotEmpty
                                               ? _merchant!.storeName[0]
                                                   .toUpperCase()
-                                              : '?', // حرف بديل في حال كان الاسم فارغاً
+                                              : '?',
                                           style: const TextStyle(
                                             fontSize: 24,
                                             fontWeight: FontWeight.bold,
@@ -283,7 +293,7 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
             ),
           ),
 
-          // Products Grid
+          // Products Grid (متجاوب الآن)
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             sliver:
@@ -295,14 +305,13 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
                       ),
                     )
                     : SliverGrid(
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio:
-                                0.55, // تعديل النسبة لتناسب الكروت
-                            mainAxisSpacing: 10,
-                            crossAxisSpacing: 10,
-                          ),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        // استخدام القيم المحسوبة بناءً على حجم الشاشة
+                        crossAxisCount: crossAxisCount,
+                        childAspectRatio: childAspectRatio,
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 10,
+                      ),
                       delegate: SliverChildBuilderDelegate((context, index) {
                         return ProductCard(product: _merchant!.products[index]);
                       }, childCount: _merchant!.products.length),

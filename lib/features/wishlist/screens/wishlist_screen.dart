@@ -8,6 +8,16 @@ class WishlistScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // --- 1. حسابات التجاوب (Responsive Calculations) ---
+    final double screenWidth = MediaQuery.of(context).size.width;
+
+    // عدد الأعمدة: 2 للموبايل، 3 للتابلت، 4 للشاشات العريضة
+    int crossAxisCount = screenWidth > 900 ? 4 : (screenWidth > 600 ? 4 : 2);
+
+    // نسبة الأبعاد: في التابلت نزيد العرض قليلاً لأن البطاقة تكون أعرض
+    // 0.48 للموبايل (كما اخترت أنت)، و 0.58 للتابلت لتكون متناسقة
+    double childAspectRatio = screenWidth > 600 ? 0.55 : 0.48;
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -44,22 +54,20 @@ class WishlistScreen extends StatelessWidget {
 
           return GridView.builder(
             padding: const EdgeInsets.all(16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              // ✅ الإصلاح 2: تعديل النسبة لتكون البطاقة أطول وتتسع للمحتوى
-              // القيمة الأقل تعني ارتفاعاً أكبر (العرض / الارتفاع)
-              childAspectRatio: 0.48,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              // ✅ استخدام القيم الديناميكية هنا
+              crossAxisCount: crossAxisCount,
+              childAspectRatio: childAspectRatio,
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
             ),
             itemCount: provider.items.length,
             itemBuilder: (context, index) {
-              // ✅ الإصلاح 3: استخدام LayoutBuilder للحصول على العرض الفعلي
               return LayoutBuilder(
                 builder: (context, constraints) {
                   return ProductCard(
                     product: provider.items[index],
-                    // تمرير العرض الفعلي بدلاً من infinity
+                    // تمرير العرض الفعلي بناءً على حجم العمود
                     width: constraints.maxWidth,
                   );
                 },

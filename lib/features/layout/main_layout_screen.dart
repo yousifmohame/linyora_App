@@ -22,34 +22,34 @@ class MainLayoutScreen extends StatefulWidget {
 
 class _MainLayoutScreenState extends State<MainLayoutScreen> {
   int _currentIndex = 0;
-  final GlobalKey<CurvedNavigationBarState> _bottomNavigationKey = GlobalKey();
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  // مراجع للمفاتيح لإجبار إعادة بناء ReelsScreen عند تغيير الحالة
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
-    // 2. الوصول لمتغير الترجمة
     final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       key: _scaffoldKey,
       extendBody: true,
       backgroundColor: Colors.grey[100],
-
       drawer: const AppDrawer(),
-      // نستخدم IndexedStack للحفاظ على حالة الصفحات
       body: IndexedStack(
         index: _currentIndex,
         children: [
           const HomeScreen(),
           const ProductsScreen(),
-          // ✅ التعديل هنا: نمرر isActive لمعرفة هل الصفحة معروضة أم لا
-          ReelsScreen(isActive: _currentIndex == 2),
+          // ✅ أهم تعديل: استخدام Key ثابت + تحديث isActive من _currentIndex
+          ReelsScreen(
+            key: const PageStorageKey('reels_screen'),
+            isActive: _currentIndex == 2,
+          ),
           const TrendsScreen(),
           const ProfileScreen(),
         ],
       ),
       bottomNavigationBar: CurvedNavigationBar(
-        key: _bottomNavigationKey,
         index: _currentIndex,
         height: 75.0,
         color: Colors.white,
@@ -58,7 +58,6 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
         animationCurve: Curves.easeInOut,
         animationDuration: const Duration(milliseconds: 300),
         items: <Widget>[
-          // 3. استخدام النصوص المترجمة
           _buildNavItem(Icons.home_outlined, l10n.navHome, 0),
           _buildNavItem(Icons.inventory_2_outlined, l10n.navProducts, 1),
           _buildNavItem(Icons.play_circle_outline, l10n.navReels, 2),

@@ -2,20 +2,20 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:chewie/chewie.dart'; // مكتبة المشغل
+import 'package:chewie/chewie.dart';
 import 'package:video_player/video_player.dart';
 import 'package:preload_page_view/preload_page_view.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:shimmer/shimmer.dart'; // مكتبة التحميل الجمالي
+import 'package:shimmer/shimmer.dart';
 
-// --- استيرادات مشروعك (لا تغيرها) ---
+// --- استيرادات مشروعك ---
 import 'package:linyora_project/core/utils/event_bus.dart';
 import 'package:linyora_project/features/public_profiles/screens/model_profile_screen.dart';
 import 'package:linyora_project/features/public_profiles/services/public_profile_service.dart';
 import 'package:linyora_project/features/reels/screens/widgets/comments_sheet.dart';
 import 'package:linyora_project/models/reel_model.dart';
-import '../../../../core/utils/video_cache_manager.dart';
+// import '../../../../core/utils/video_cache_manager.dart'; // ❌ لم نعد بحاجة لهذا لغرض التشغيل الفوري
 import '../services/reels_service.dart';
 
 class ReelsScreen extends StatefulWidget {
@@ -41,16 +41,14 @@ class _ReelsScreenState extends State<ReelsScreen> with WidgetsBindingObserver {
   bool _isAppActive = true;
   int _focusedIndex = 0;
   bool _isProcessingFollow = false;
-  bool _interactionUnlocked = false; // فتح التفاعل بعد التشغيل
-  bool _isAudioFadedIn = false; // صوت fade-in
 
-  // --- أدوات الاحترافية ---
+  // التحكم في التفاعل
+  bool _interactionUnlocked = false;
+  bool _isAudioFadedIn = false;
+
+  // أدوات التحكم
   Timer? _scrollDebounceTimer;
   ScrollPhysics _scrollPhysics = const NeverScrollableScrollPhysics();
-
-  // ---------------------------------------------------------------------------
-  // Lifecycle Methods
-  // ---------------------------------------------------------------------------
 
   @override
   void initState() {
@@ -62,7 +60,7 @@ class _ReelsScreenState extends State<ReelsScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     _scrollDebounceTimer?.cancel();
-    _pauseAll();
+    _muteAndPauseAll(); // كتم الصوت قبل التخلص
     _disposeAllControllers();
     WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
@@ -75,9 +73,8 @@ class _ReelsScreenState extends State<ReelsScreen> with WidgetsBindingObserver {
     _isAppActive = active;
 
     if (!active) {
-      _pauseAll();
+      _muteAndPauseAll();
     } else if (widget.isActive) {
-      // فقط شغل إذا كانت الصفحة نشطة
       _forcePlayAtIndex(_focusedIndex);
     }
   }
@@ -85,19 +82,14 @@ class _ReelsScreenState extends State<ReelsScreen> with WidgetsBindingObserver {
   @override
   void didUpdateWidget(ReelsScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // هذا الكود يعمل عند التنقل بين التابات
     if (widget.isActive != oldWidget.isActive) {
       if (widget.isActive) {
         _forcePlayAtIndex(_focusedIndex);
       } else {
-        _pauseAll();
+        _muteAndPauseAll();
       }
     }
   }
-
-  // ---------------------------------------------------------------------------
-  // Data Loading
-  // ---------------------------------------------------------------------------
 
   Future<void> _loadReels() async {
     try {
@@ -114,73 +106,70 @@ class _ReelsScreenState extends State<ReelsScreen> with WidgetsBindingObserver {
         if (reels.length > 1) _preload(1);
       }
     } catch (_) {
-      debugPrint("Error loading reels data");
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Page Navigation Logic
-  // ---------------------------------------------------------------------------
-
   void _onPageChanged(int index) {
-    _pauseAll();
+    // 1. كتم وإيقاف فوري للجميع
+    _muteAndPauseAll();
     _scrollDebounceTimer?.cancel();
 
     setState(() {
       _focusedIndex = index;
       _interactionUnlocked = false;
-      _scrollPhysics = const NeverScrollableScrollPhysics(); // قفل التمرير
+      // قفل التمرير حتى يعمل الفيديو الجديد (لمنع السكرول المجنون)
+      _scrollPhysics = const NeverScrollableScrollPhysics();
     });
 
     _collectGarbage(index);
 
+    // مهلة قصيرة جداً (50ms) لبدء التحميل
     _scrollDebounceTimer = Timer(const Duration(milliseconds: 50), () async {
       if (!mounted || !_isAppActive || !widget.isActive) return;
 
       await _initAndPlay(index);
 
+      // تحميل الفيديو التالي في الخلفية (Buffering)
       final next = index + 1;
       if (next < _videos.length) _preload(next);
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // Video Logic
-  // ---------------------------------------------------------------------------
+  // --- دوال التحكم في الفيديو والصوت (محسنة) ---
 
-  void _pauseAll() {
+  // دالة آمنة للإيقاف وكتم الصوت
+  void _muteAndPauseAll() {
     for (final c in _controllers.values) {
-      if (c.videoPlayerController.value.isPlaying) {
+      final videoCtrl = c.videoPlayerController;
+      if (videoCtrl.value.volume > 0) {
+        videoCtrl.setVolume(0.0); // كتم الصوت فوراً
+      }
+      if (videoCtrl.value.isPlaying) {
         c.pause();
-      }
-      if (c.videoPlayerController.value.isPlaying) {
-        c.videoPlayerController.pause();
+        videoCtrl.pause();
       }
     }
   }
 
+  // رفع الصوت تدريجياً (Fade In) لمنع "الفرقعة" الصوتية
   void _fadeInVolume(VideoPlayerController controller) async {
+    if (!mounted) return;
     double volume = 0.0;
-    const step = 0.05;
-    const delay = Duration(milliseconds: 15);
-
+    // خطوات سريعة للوصول لـ 1.0
     while (volume < 1.0) {
-      await Future.delayed(delay);
-      volume += step;
-      if (!mounted) break;
-      if (!controller.value.isInitialized) break;
-      controller.setVolume(volume.clamp(0.0, 1.0));
+      if (!controller.value.isPlaying) return; // توقف إذا توقف الفيديو
+      volume += 0.1;
+      await controller.setVolume(volume.clamp(0.0, 1.0));
+      await Future.delayed(const Duration(milliseconds: 50));
     }
-    controller.setVolume(1.0);
   }
 
-  // === الدالة المسؤولة عن التشغيل (تم التعديل هنا) ===
   void _forcePlayAtIndex(int index) {
-    // 1. شرط الحماية الأهم: إذا لم تكن هذه الصفحة هي المعروضة، لا تشغل شيئاً
     if (!widget.isActive) return;
 
     final c = _controllers[index];
+    // تحقق صارم
     if (c == null ||
         !c.videoPlayerController.value.isInitialized ||
         index != _focusedIndex) {
@@ -189,31 +178,38 @@ class _ReelsScreenState extends State<ReelsScreen> with WidgetsBindingObserver {
 
     final videoCtrl = c.videoPlayerController;
 
-    // البدء بصوت مكتوم لتجنب الإزعاج المفاجئ
+    // 1. ابدأ بصوت مكتوم تماماً
     videoCtrl.setVolume(0.0);
-    videoCtrl.seekTo(Duration.zero);
+
+    // 2. تشغيل الفيديو
     c.play();
 
     _isAudioFadedIn = false;
     _interactionUnlocked = false;
 
-    // مستمع لفتح التفاعل فقط عندما يبدأ الفيديو بالتحرك فعلياً
+    // 3. مراقب لفتح الصوت والتفاعل
     void listener() {
       final value = videoCtrl.value;
 
+      // نعتبر الفيديو "يعمل" إذا تحرك المؤشر قليلاً (مثلاً 100ms)
+      // هذا يضمن أن الإطارات بدأت بالتحرك فعلياً
       if (value.isPlaying &&
-          value.position >= const Duration(milliseconds: 200)) {
+          value.position > const Duration(milliseconds: 100)) {
         videoCtrl.removeListener(listener);
 
-        if (!mounted || index != _focusedIndex) return;
+        if (!mounted || index != _focusedIndex) {
+          videoCtrl.setVolume(0.0);
+          c.pause();
+          return;
+        }
 
-        // الفيديو يعمل الآن => افتح التفاعل والتمرير
+        // فتح التفاعل والسكرول
         setState(() {
           _interactionUnlocked = true;
           _scrollPhysics = const AlwaysScrollableScrollPhysics();
         });
 
-        // رفع الصوت تدريجياً (Fade In)
+        // الآن فقط نرفع الصوت
         if (!_isAudioFadedIn) {
           _isAudioFadedIn = true;
           _fadeInVolume(videoCtrl);
@@ -234,12 +230,21 @@ class _ReelsScreenState extends State<ReelsScreen> with WidgetsBindingObserver {
 
     try {
       final reel = _videos[index];
-      final file = await VideoCacheUtils.getCachedVideoFile(reel.videoUrl);
 
-      final videoCtrl = VideoPlayerController.file(file);
+      // ✅ التغيير الجوهري: استخدام networkUrl بدلاً من file
+      // هذا يسمح بالتشغيل أثناء التحميل (Buffering) مثل تيك توك ويوتيوب
+      final videoCtrl = VideoPlayerController.networkUrl(
+        Uri.parse(reel.videoUrl),
+        videoPlayerOptions: VideoPlayerOptions(
+          mixWithOthers: true,
+        ), // خيار لتحسين الصوت
+      );
+
+      // تهيئة (تأخذ وقت أقل بكثير الآن لأنها لا تنتظر الملف كاملاً)
       await videoCtrl.initialize();
 
       if (!mounted || index != _focusedIndex) {
+        await videoCtrl.setVolume(0);
         await videoCtrl.dispose();
         return;
       }
@@ -251,31 +256,28 @@ class _ReelsScreenState extends State<ReelsScreen> with WidgetsBindingObserver {
         showControls: false,
         allowFullScreen: false,
         aspectRatio: videoCtrl.value.aspectRatio,
+        // لون خلفية أسود أثناء التحميل
         placeholder: Container(color: Colors.black),
       );
 
       setState(() => _controllers[index] = chewie);
 
-      // هنا يتم استدعاء دالة التشغيل، لكنها لن تعمل إلا إذا كان widget.isActive == true
       _forcePlayAtIndex(index);
     } catch (e) {
-      debugPrint("Error initializing video $index: $e");
-      // في حالة الخطأ، نفتح التمرير لكي لا يعلق المستخدم
-      if (mounted) {
-        setState(() {
-          _scrollPhysics = const AlwaysScrollableScrollPhysics();
-        });
-      }
+      debugPrint("Error video $index: $e");
+      // في حالة الخطأ، نفتح السكرول لكي لا يعلق المستخدم
+      if (mounted)
+        setState(() => _scrollPhysics = const AlwaysScrollableScrollPhysics());
     }
   }
 
   Future<void> _preload(int index) async {
     if (_controllers.containsKey(index) || index >= _videos.length) return;
     try {
-      final file = await VideoCacheUtils.getCachedVideoFile(
-        _videos[index].videoUrl,
+      // البريلود أيضاً يستخدم NetworkUrl
+      final videoCtrl = VideoPlayerController.networkUrl(
+        Uri.parse(_videos[index].videoUrl),
       );
-      final videoCtrl = VideoPlayerController.file(file);
       await videoCtrl.initialize();
 
       final chewie = ChewieController(
@@ -293,19 +295,21 @@ class _ReelsScreenState extends State<ReelsScreen> with WidgetsBindingObserver {
   void _collectGarbage(int index) {
     final allowed = {index, index - 1, index + 1};
     _controllers.keys.where((k) => !allowed.contains(k)).toList().forEach((k) {
+      _controllers[k]?.videoPlayerController.setVolume(0); // أمان إضافي
+      _controllers[k]?.pause();
       _controllers[k]?.dispose();
       _controllers.remove(k);
     });
   }
 
   void _disposeAllControllers() {
-    for (final c in _controllers.values) c.dispose();
+    for (final c in _controllers.values) {
+      c.videoPlayerController.setVolume(0);
+      c.pause();
+      c.dispose();
+    }
     _controllers.clear();
   }
-
-  // ---------------------------------------------------------------------------
-  // Build UI
-  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -313,18 +317,6 @@ class _ReelsScreenState extends State<ReelsScreen> with WidgetsBindingObserver {
       return const Scaffold(
         backgroundColor: Colors.black,
         body: Center(child: ReelSkeleton()),
-      );
-    }
-
-    if (_videos.isEmpty) {
-      return const Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(
-          child: Text(
-            "لا توجد فيديوهات",
-            style: TextStyle(color: Colors.white),
-          ),
-        ),
       );
     }
 
@@ -339,15 +331,19 @@ class _ReelsScreenState extends State<ReelsScreen> with WidgetsBindingObserver {
         onPageChanged: _onPageChanged,
         itemBuilder: (context, index) {
           final controller = _controllers[index];
-          final isReady =
+          final isInitialized =
               controller != null &&
               controller.videoPlayerController.value.isInitialized;
+
+          final isBuffering =
+              isInitialized &&
+              controller.videoPlayerController.value.isBuffering;
 
           return Stack(
             fit: StackFit.expand,
             children: [
-              // الطبقة 1: الفيديو أو السكيلتون
-              if (isReady)
+              // 1. الفيديو
+              if (isInitialized)
                 FittedBox(
                   fit: BoxFit.cover,
                   child: SizedBox(
@@ -362,9 +358,21 @@ class _ReelsScreenState extends State<ReelsScreen> with WidgetsBindingObserver {
               else
                 const ReelSkeleton(),
 
-              // الطبقة 2: التفاعل واللمس
-              // لن تظهر إلا إذا كان الفيديو جاهزاً + تم فتح قفل التفاعل (بعد بدء التشغيل)
-              if (isReady && _interactionUnlocked)
+              // 2. مؤشر التحميل (Buffering)
+              if (isBuffering)
+                const Center(
+                  child: SizedBox(
+                    width: 50,
+                    height: 50,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                ),
+
+              // 3. طبقة اللمس
+              if (isInitialized && _interactionUnlocked)
                 Positioned.fill(
                   child: GestureDetector(
                     onTap: () {
@@ -379,8 +387,11 @@ class _ReelsScreenState extends State<ReelsScreen> with WidgetsBindingObserver {
                   ),
                 ),
 
-              // الطبقة 3: أيقونة التشغيل
-              if (isReady && _interactionUnlocked && !controller.isPlaying)
+              // 4. أيقونة التشغيل
+              if (isInitialized &&
+                  _interactionUnlocked &&
+                  !controller.isPlaying &&
+                  !isBuffering)
                 const Center(
                   child: Icon(
                     Icons.play_arrow_rounded,
@@ -389,7 +400,7 @@ class _ReelsScreenState extends State<ReelsScreen> with WidgetsBindingObserver {
                   ),
                 ),
 
-              // الطبقة 4: الظل
+              // 5. تدرج الظل
               const Positioned.fill(
                 child: IgnorePointer(
                   child: DecoratedBox(
@@ -410,32 +421,28 @@ class _ReelsScreenState extends State<ReelsScreen> with WidgetsBindingObserver {
                 ),
               ),
 
-              // الطبقة 5: المحتوى
-              AbsorbPointer(
-                absorbing: !isReady,
-                child: ReelContentOverlay(
-                  reel: _videos[index],
-                  isLoading: !isReady,
-                  onLike: () => _handleLike(index),
-                  onComment: () => _showComments(context, index),
-                  onShare: () => _handleShare(index),
-                  onFollow: () => _handleFollow(index),
-                  onProfileTap: () {
-                    _controllers[index]?.pause();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder:
-                            (_) => ModelProfileScreen(
-                              modelId: _videos[index].user!.id.toString(),
-                            ),
-                      ),
-                    ).then((_) {
-                      // عند العودة، شغل الفيديو فقط إذا كنا ما زلنا في صفحة الريلز
-                      if (widget.isActive) _forcePlayAtIndex(index);
-                    });
-                  },
-                ),
+              // 6. المحتوى (Overlay) - ✅ تمت إزالة AbsorbPointer من هنا
+              ReelContentOverlay(
+                reel: _videos[index],
+                isLoading: !isInitialized, // تمرير الحالة للداخل
+                onLike: () => _handleLike(index),
+                onComment: () => _showComments(context, index),
+                onShare: () => _handleShare(index),
+                onFollow: () => _handleFollow(index),
+                onProfileTap: () {
+                  _muteAndPauseAll();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder:
+                          (_) => ModelProfileScreen(
+                            modelId: _videos[index].user!.id.toString(),
+                          ),
+                    ),
+                  ).then((_) {
+                    if (widget.isActive) _forcePlayAtIndex(index);
+                  });
+                },
               ),
             ],
           );
@@ -444,7 +451,7 @@ class _ReelsScreenState extends State<ReelsScreen> with WidgetsBindingObserver {
     );
   }
 
-  // --- Actions ---
+  // --- بقية دوال الـ Actions (Like, Share, etc) كما هي ---
   Future<void> _handleLike(int index) async {
     final reel = _videos[index];
     final bool wasLiked = reel.isLiked;
@@ -520,13 +527,10 @@ class _ReelsScreenState extends State<ReelsScreen> with WidgetsBindingObserver {
   }
 }
 
-// -----------------------------------------------------------------------------
-// --- Reel Skeleton & Overlay Widgets ---
-// -----------------------------------------------------------------------------
+
 
 class ReelSkeleton extends StatelessWidget {
   const ReelSkeleton({Key? key}) : super(key: key);
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -564,15 +568,6 @@ class ReelSkeleton extends StatelessWidget {
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        Container(
-                          width: 150,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
                         const SizedBox(height: 12),
                         Container(
                           width: 80,
@@ -590,15 +585,6 @@ class ReelSkeleton extends StatelessWidget {
                       const CircleAvatar(
                         radius: 25,
                         backgroundColor: Colors.white,
-                      ),
-                      const SizedBox(height: 20),
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                        ),
                       ),
                       const SizedBox(height: 20),
                       Container(
@@ -650,127 +636,98 @@ class ReelContentOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedOpacity(
-      duration: const Duration(milliseconds: 300),
-      opacity: isLoading ? 0.0 : 1.0,
-      child: Positioned(
-        bottom: 20,
-        left: 16,
-        right: 10,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(right: 15.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    GestureDetector(
-                      onTap: onProfileTap,
-                      child: Text(
-                        '${reel.user?.name ?? 'Unknown'}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 22,
-                          shadows: [
-                            Shadow(color: Colors.black45, blurRadius: 4),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (reel.description != null)
-                      Text(
-                        reel.description!,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          height: 1.3,
-                          shadows: [
-                            Shadow(color: Colors.black45, blurRadius: 2),
-                          ],
-                        ),
-                      ),
-                    const SizedBox(height: 12),
-                    if (reel.products != null && reel.products!.isNotEmpty)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            color: Colors.white.withOpacity(0.15),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.shopping_bag_outlined,
-                                  color: Colors.white,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'تسوق ${reel.products!.length} منتجات',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
+    // ✅ الإصلاح: Positioned يجب أن يكون في القمة لكي يتعرف عليه الـ Stack
+    return Positioned(
+      bottom: 20,
+      left: 16,
+      right: 10,
+      child: AbsorbPointer(
+        // ✅ نقلنا وظيفة منع اللمس هنا
+        absorbing: isLoading,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 300),
+          opacity: isLoading ? 0.0 : 1.0,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 15.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      GestureDetector(
+                        onTap: onProfileTap,
+                        child: Text(
+                          '@${reel.user?.name ?? 'Unknown'}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            shadows: [
+                              Shadow(color: Colors.black45, blurRadius: 4),
+                            ],
                           ),
                         ),
                       ),
-                    const SizedBox(height: 110),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                GestureDetector(
-                  onTap: onProfileTap,
-                  child: _ProfileFollowButton(
-                    avatarUrl: reel.user?.avatar,
-                    isFollowing: reel.user?.isFollowing ?? false,
-                    onFollow: onFollow,
+                      const SizedBox(height: 8),
+                      if (reel.description != null)
+                        Text(
+                          reel.description!,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            height: 1.3,
+                            shadows: [
+                              Shadow(color: Colors.black45, blurRadius: 2),
+                            ],
+                          ),
+                        ),
+                      const SizedBox(height: 120),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 20),
-                _GlassyActionButton(
-                  icon: reel.isLiked ? Icons.favorite : Icons.favorite_border,
-                  label: '${reel.likesCount}',
-                  iconColor:
-                      reel.isLiked ? const Color(0xFFFE2C55) : Colors.white,
-                  onTap: onLike,
-                ),
-                const SizedBox(height: 16),
-                _GlassyActionButton(
-                  icon: Icons.comment_rounded,
-                  label: '${reel.commentsCount}',
-                  onTap: onComment,
-                ),
-                const SizedBox(height: 16),
-                _GlassyActionButton(
-                  icon: Icons.share_rounded,
-                  label: 'مشاركة',
-                  onTap: onShare,
-                ),
-                const SizedBox(height: 140),
-              ],
-            ),
-          ],
+              ),
+              const SizedBox(width: 10),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: onProfileTap,
+                    child: _ProfileFollowButton(
+                      avatarUrl: reel.user?.avatar,
+                      isFollowing: reel.user?.isFollowing ?? false,
+                      onFollow: onFollow,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _GlassyActionButton(
+                    icon: reel.isLiked ? Icons.favorite : Icons.favorite_border,
+                    label: '${reel.likesCount}',
+                    iconColor:
+                        reel.isLiked ? const Color(0xFFFE2C55) : Colors.white,
+                    onTap: onLike,
+                  ),
+                  const SizedBox(height: 16),
+                  _GlassyActionButton(
+                    icon: Icons.comment_rounded,
+                    label: '${reel.commentsCount}',
+                    onTap: onComment,
+                  ),
+                  const SizedBox(height: 16),
+                  _GlassyActionButton(
+                    icon: Icons.share_rounded,
+                    label: 'مشاركة',
+                    onTap: onShare,
+                  ),
+                  const SizedBox(height: 140),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -781,13 +738,11 @@ class _ProfileFollowButton extends StatelessWidget {
   final String? avatarUrl;
   final bool isFollowing;
   final VoidCallback onFollow;
-
   const _ProfileFollowButton({
     required this.avatarUrl,
     required this.isFollowing,
     required this.onFollow,
   });
-
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -849,14 +804,12 @@ class _GlassyActionButton extends StatelessWidget {
   final String label;
   final Color iconColor;
   final VoidCallback? onTap;
-
   const _GlassyActionButton({
     required this.icon,
     required this.label,
     this.iconColor = Colors.white,
     this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return Column(

@@ -39,6 +39,15 @@ class _TrendsScreenState extends State<TrendsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // --- حسابات التجاوب (Responsive Calculations) ---
+    final double screenWidth = MediaQuery.of(context).size.width;
+
+    // 1. عدد الأعمدة: 2 للموبايل، 3 للتابلت، 4 للشاشات الكبيرة
+    int crossAxisCount = screenWidth > 900 ? 4 : (screenWidth > 600 ? 4 : 2);
+
+    // 2. نسبة الأبعاد: نزيد العرض قليلاً في التابلت لتتناسق العناصر
+    double childAspectRatio = screenWidth > 600 ? 0.55 : 0.58;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
@@ -53,9 +62,8 @@ class _TrendsScreenState extends State<TrendsScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: false,
-
         actions: [
-          // عداد وقت عالمي في الهيدر (مثل علي اكسبريس)
+          // عداد وقت عالمي
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -69,14 +77,14 @@ class _TrendsScreenState extends State<TrendsScreen> {
       ),
       body:
           _isLoading
-              ? _buildGridSkeleton()
+              ? _buildGridSkeleton(crossAxisCount, childAspectRatio)
               : _products.isEmpty
               ? _buildEmptyState()
               : GridView.builder(
                 padding: const EdgeInsets.all(8),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2, // بطاقتين في الصف
-                  childAspectRatio: 0.58, // نسبة الطول للعرض (بطاقة طويلة)
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount, // ديناميكي
+                  childAspectRatio: childAspectRatio, // ديناميكي
                   crossAxisSpacing: 8,
                   mainAxisSpacing: 8,
                 ),
@@ -91,12 +99,13 @@ class _TrendsScreenState extends State<TrendsScreen> {
     );
   }
 
-  Widget _buildGridSkeleton() {
+  // نمرر القيم المحسوبة للسكيلتون ليكون مطابقاً للشبكة الحقيقية
+  Widget _buildGridSkeleton(int crossAxisCount, double aspectRatio) {
     return GridView.builder(
       padding: const EdgeInsets.all(8),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 0.6,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        childAspectRatio: aspectRatio,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
       ),
@@ -130,7 +139,6 @@ class _TrendGridCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // محاكاة لنسبة البيع (للعرض فقط)
     final double soldPercentage = (0.4 + (index % 5) * 0.1).clamp(0.0, 0.95);
 
     return GestureDetector(
@@ -162,7 +170,6 @@ class _TrendGridCard extends StatelessWidget {
             Expanded(
               child: Stack(
                 children: [
-                  // الصورة
                   ClipRRect(
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(12),
@@ -188,7 +195,7 @@ class _TrendGridCard extends StatelessWidget {
                           vertical: 4,
                         ),
                         decoration: const BoxDecoration(
-                          color: Color(0xFFFF4747), // أحمر فاقع
+                          color: Color(0xFFFF4747),
                           borderRadius: BorderRadius.only(
                             topLeft: Radius.circular(12),
                             bottomRight: Radius.circular(12),
@@ -205,7 +212,7 @@ class _TrendGridCard extends StatelessWidget {
                       ),
                     ),
 
-                  // عداد وقت صغير على الصورة (لأول 4 منتجات)
+                  // عداد وقت صغير
                   if (index < 4)
                     Positioned(
                       bottom: 0,
@@ -276,7 +283,7 @@ class _TrendGridCard extends StatelessWidget {
 
                   const SizedBox(height: 6),
 
-                  // شريط التقدم (Sold Bar) - ستايل علي اكسبريس
+                  // شريط التقدم
                   Stack(
                     children: [
                       Container(
@@ -315,7 +322,6 @@ class _TrendGridCard extends StatelessWidget {
 
                   const SizedBox(height: 8),
 
-                  // شارة الترويج أو اسم المنتج
                   if (product.promotionTierName.isNotEmpty)
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -356,7 +362,7 @@ class _TrendGridCard extends StatelessWidget {
   }
 }
 
-// ودجت العد التنازلي (الساعات : الدقائق : الثواني)
+// ودجت العد التنازلي
 class _GlobalCountDown extends StatefulWidget {
   const _GlobalCountDown({Key? key}) : super(key: key);
 
@@ -366,11 +372,7 @@ class _GlobalCountDown extends StatefulWidget {
 
 class _GlobalCountDownState extends State<_GlobalCountDown> {
   late Timer _timer;
-  Duration _timeLeft = const Duration(
-    hours: 4,
-    minutes: 25,
-    seconds: 13,
-  ); // وقت افتراضي
+  Duration _timeLeft = const Duration(hours: 4, minutes: 25, seconds: 13);
 
   @override
   void initState() {
