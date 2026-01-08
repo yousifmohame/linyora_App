@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:linyora_project/features/public_profiles/screens/merchant_profile_screen.dart';
+import 'package:linyora_project/models/product_details_model.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
@@ -12,7 +13,7 @@ import '../../cart/providers/cart_provider.dart';
 import '../../cart/screens/cart_screen.dart';
 import '../../cart/screens/checkout_screen.dart';
 import '../services/product_service.dart';
-import '../../../models/product_details_model.dart'; // موديل التفاصيل
+
 
 class ProductDetailsScreen extends StatefulWidget {
   final String productId;
@@ -71,7 +72,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       description: _product!.description,
       // نستخدم سعر وصورة المتغير المختار حالياً
       price: _selectedVariant!.price,
-      compare_at_price: _selectedVariant!.compareAtPrice,
+      compareAtPrice: _selectedVariant!.compareAtPrice,
       imageUrl:
           _selectedVariant!.images.isNotEmpty
               ? _selectedVariant!.images.first

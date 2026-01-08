@@ -1,3 +1,7 @@
+
+
+import 'package:linyora_project/core/utils/image_helper.dart';
+
 class ProductDetailsModel {
   final int id;
   final String name;
@@ -40,42 +44,49 @@ class ProductDetailsModel {
 }
 
 class ProductVariant {
-  final int id;
+  final int? id;
+  final String color;
   final double price;
   final double? compareAtPrice;
   final int stockQuantity;
-  final String color;
+  final String? sku;
   final List<String> images;
 
   ProductVariant({
-    required this.id,
+    this.id,
+    required this.color,
     required this.price,
     this.compareAtPrice,
     required this.stockQuantity,
-    required this.color,
+    this.sku,
     required this.images,
   });
 
   factory ProductVariant.fromJson(Map<String, dynamic> json) {
-    // معالجة الصور التي قد تأتي كنص JSON أو قائمة
+    // ✅ إصلاح آمن للصور: التأكد من أنها قائمة
     List<String> parsedImages = [];
     if (json['images'] != null) {
       if (json['images'] is List) {
-        parsedImages = List<String>.from(json['images']);
+        parsedImages =
+            (json['images'] as List)
+                .map((e) => ImageHelper.getValidUrl(e.toString()))
+                .toList();
       } else if (json['images'] is String) {
-        // في حال كانت نصاً وتخلصنا من الأقواس المربعة يدوياً (أو تركناها كما هي حسب الباك اند)
-        // الأفضل تركها فارغة هنا لأن الباك اند يرسلها parsed حسب الكود الخاص بك
+        // في بعض الأحيان قد تأتي كسلسلة نصية واحدة
+        parsedImages = [ImageHelper.getValidUrl(json['images'])];
       }
     }
 
     return ProductVariant(
-      id: json['id'],
-      price: double.parse(json['price'].toString()),
-      compareAtPrice: json['compare_at_price'] != null
-          ? double.parse(json['compare_at_price'].toString())
-          : null,
-      stockQuantity: json['stock_quantity'] ?? 0,
+      id: int.tryParse(json['id'].toString()),
       color: json['color'] ?? '',
+      price: double.tryParse(json['price'].toString()) ?? 0.0,
+      compareAtPrice:
+          json['compare_at_price'] != null
+              ? double.tryParse(json['compare_at_price'].toString())
+              : null,
+      stockQuantity: int.tryParse(json['stock_quantity'].toString()) ?? 0,
+      sku: json['sku'],
       images: parsedImages,
     );
   }

@@ -10,8 +10,9 @@ class ApiClient {
     : _dio = Dio(
         BaseOptions(
           baseUrl: ApiConstants.baseUrl,
-          connectTimeout: const Duration(seconds: 20),
-          receiveTimeout: const Duration(seconds: 20),
+          connectTimeout: const Duration(seconds: 60),
+          receiveTimeout: const Duration(seconds: 60),
+          sendTimeout: const Duration(seconds: 60),
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -41,6 +42,8 @@ class ApiClient {
       ),
     );
   }
+
+  
 
   // دوال مختصرة للطلبات (GET, POST, PUT, DELETE)
 

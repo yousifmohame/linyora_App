@@ -276,20 +276,25 @@ class AuthService {
     if (token == null) return;
 
     try {
-      // نفترض وجود مسار لجلب البروفايل (Profile)
-      final response = await _apiClient.get('/users/profile'); // أو /auth/me
+      // إضافة الهيدر يدوياً للتأكد
+      final response = await _apiClient.get(
+        '/users/profile',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
 
       if (response.statusCode == 200) {
-        final data = response.data['data'] ?? response.data;
-        _currentUser = UserModel.fromJson(data);
-        debugPrint("User Auto-Logged in: ${_currentUser?.name}");
+        final data = response.data['user'] ?? response.data['data'] ?? response.data;
+        // دمج التوكن مع البيانات لأنه قد لا يأتي من بروفايل المستخدم
+        _currentUser = UserModel.fromJson(data).copyWith(token: token);
+        debugPrint("✅ User Auto-Logged in: ${_currentUser?.name}");
       } else {
-        // التوكن منتهي الصلاحية
+        debugPrint("⚠️ Token expired or invalid: ${response.statusCode}");
         await logout();
       }
     } catch (e) {
-      debugPrint("Auto login failed: $e");
-      await logout();
+      debugPrint("❌ Auto login failed: $e");
+      // في حالة 401 أو Timeout، نخرج المستخدم لكي يسجل دخول من جديد
+      await logout(); 
     }
   }
 

@@ -1,83 +1,102 @@
+import 'package:linyora_project/models/product_details_model.dart';
+
 import '../core/utils/image_helper.dart';
 
 class ProductModel {
   final int id;
   final String name;
   final String description;
-  final double price;
-  final double? compare_at_price;
   final String imageUrl;
   final double rating;
   final int reviewCount;
   final String merchantName;
   final bool isNew;
+  final String? brand;
+  final String status;
+  final double price;
+  final double? compareAtPrice;
+  final int stock;
+  final List<ProductVariant>? variants;
+  final List<int>? categoryIds;
 
   ProductModel({
     required this.id,
     required this.name,
     required this.description,
-    required this.price,
-    this.compare_at_price,
     required this.imageUrl,
     required this.rating,
     required this.reviewCount,
     required this.merchantName,
     this.isNew = false,
+    this.brand,
+    this.status = 'active',
+    required this.price,
+    this.compareAtPrice,
+    this.stock = 0,
+    this.variants,
+    this.categoryIds,
   });
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
-    // تهيئة المتغيرات
-    double price = 0.0;
-    double? compare_at_price;
-    String imageUrl = '';
-
-    // ---------------------------------------------------------
-    // السيناريو الأول: البيانات قادمة من تفاصيل المنتج (يوجد Variants)
-    // ---------------------------------------------------------
-    if (json['variants'] != null && (json['variants'] as List).isNotEmpty) {
-      final firstVariant = json['variants'][0];
-      price = double.tryParse(firstVariant['price'].toString()) ?? 0.0;
-      compare_at_price = double.tryParse(firstVariant['compare_at_price'].toString());
-
-      if (firstVariant['images'] != null) {
-        var imgs = firstVariant['images'];
-        if (imgs is List && imgs.isNotEmpty) {
-          imageUrl = imgs[0].toString();
-        } else if (imgs is String) {
-             // أحياناً يتم تخزين JSON كـ String في قاعدة البيانات
-             imageUrl = imgs; 
-        }
+    // ✅ 1. استخراج المتغيرات (Variants) بشكل آمن
+    List<ProductVariant> variantsList = [];
+    if (json['variants'] != null) {
+      if (json['variants'] is List) {
+        variantsList =
+            (json['variants'] as List)
+                .map((v) => ProductVariant.fromJson(v))
+                .toList();
+      } else if (json['variants'] is Map) {
+        // حالة نادرة: إذا جاءت المتغيرات كـ Map بدلاً من List
+        // (Map<String, dynamic> يتم تحويل قيمها إلى List)
+        (json['variants'] as Map<String, dynamic>).forEach((key, value) {
+          variantsList.add(ProductVariant.fromJson(value));
+        });
       }
-    } 
-    
-    // ---------------------------------------------------------
-    // السيناريو الثاني: البيانات قادمة من البحث (Flat Data)
-    // أو فشل استخراج البيانات من Variants
-    // ---------------------------------------------------------
-    
-    // 1. معالجة السعر (إذا لم يتم تعيينه من الـ Variants)
-    if (price == 0.0 && json['price'] != null) {
-      price = double.tryParse(json['price'].toString()) ?? 0.0;
     }
 
-    // 2. معالجة الصورة (الأولوية لـ image_url القادمة من البحث)
-    if (imageUrl.isEmpty) {
+    // 2. تحديد البيانات الرئيسية للعرض
+    double displayPrice = 0.0;
+    double? displayComparePrice;
+    String displayImage = '';
+    int totalStock = 0;
+
+    if (variantsList.isNotEmpty) {
+      final first = variantsList.first;
+      displayPrice = first.price;
+      displayComparePrice = first.compareAtPrice;
+      if (first.images.isNotEmpty) {
+        displayImage = first.images.first;
+      }
+      totalStock = variantsList.fold(
+        0,
+        (sum, item) => sum + item.stockQuantity,
+      );
+    } else {
+      displayPrice = double.tryParse(json['price'].toString()) ?? 0.0;
       if (json['image_url'] != null) {
-        // هذا هو المفتاح الذي يرسله كود البحث (MySQL)
-        imageUrl = json['image_url'].toString();
+        displayImage = json['image_url'].toString();
       } else if (json['image'] != null) {
-        // احتياطي
-        imageUrl = json['image'].toString();
+        displayImage = json['image'].toString();
       }
+      totalStock = int.tryParse(json['stock'].toString()) ?? 0;
     }
 
-    // 3. معالجة اسم التاجر أو العلامة التجارية
-    // البحث يرجع 'brand' بينما التفاصيل قد ترجع 'merchantName'
-    String merchant = '';
-    if (json['merchantName'] != null) {
-      merchant = json['merchantName'];
-    } else if (json['brand'] != null) {
-      merchant = json['brand'];
+    String merchant = json['merchantName'] ?? json['brand'] ?? '';
+    String brandName = json['brand'] ?? '';
+
+    // ✅ 3. معالجة الفئات بشكل آمن
+    List<int> catIds = [];
+    if (json['categoryIds'] != null && json['categoryIds'] is List) {
+      catIds =
+          (json['categoryIds'] as List)
+              .map((e) => int.parse(e.toString()))
+              .toList();
+    } else if (json['categories'] != null && json['categories'] is List) {
+      catIds =
+          (json['categories'] as List)
+              .map((e) => int.parse(e['id'].toString()))
+              .toList();
     }
 
     // 4. حساب "جديد"
@@ -93,14 +112,18 @@ class ProductModel {
       id: int.tryParse(json['id'].toString()) ?? 0,
       name: json['name'] ?? '',
       description: json['description'] ?? '',
-      price: price,
-      compare_at_price: compare_at_price,
-      // نستخدم ImageHelper لضمان أن الرابط صالح (يضيف الدومين إذا كان ناقصاً)
-      imageUrl: ImageHelper.getValidUrl(imageUrl),
+      imageUrl: ImageHelper.getValidUrl(displayImage),
       rating: double.tryParse(json['rating'].toString()) ?? 0.0,
       reviewCount: int.tryParse(json['reviewCount'].toString()) ?? 0,
       merchantName: merchant,
       isNew: isNewProduct,
+      brand: brandName,
+      status: json['status'] ?? 'active',
+      price: displayPrice,
+      compareAtPrice: displayComparePrice,
+      stock: totalStock,
+      variants: variantsList,
+      categoryIds: catIds,
     );
   }
 }

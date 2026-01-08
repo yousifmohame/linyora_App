@@ -94,7 +94,7 @@ class _RelatedProductsSectionState extends State<RelatedProductsSection> {
       name: detail.name,
       description: detail.description,
       price: price,
-      compare_at_price: compareAtPrice,
+      compareAtPrice: compareAtPrice,
       imageUrl: image,
       rating: rating,
       reviewCount: detail.reviews.length,

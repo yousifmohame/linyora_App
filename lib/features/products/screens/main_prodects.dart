@@ -85,7 +85,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       name: detail.name,
       description: detail.description,
       price: firstVariant?.price ?? 0.0,
-      compare_at_price: firstVariant?.compareAtPrice,
+      compareAtPrice: firstVariant?.compareAtPrice,
       imageUrl:
           (firstVariant != null && firstVariant.images.isNotEmpty)
               ? firstVariant.images.first

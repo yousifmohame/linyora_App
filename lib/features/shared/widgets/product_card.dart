@@ -16,11 +16,11 @@ class ProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     // 1. حساب نسبة الخصم
     int discountPercent = 0;
-    if (product.compare_at_price != null &&
-        product.compare_at_price! > product.price) {
+    if (product.compareAtPrice != null &&
+        product.compareAtPrice! > product.price) {
       discountPercent =
-          ((product.compare_at_price! - product.price) /
-                  product.compare_at_price! *
+          ((product.compareAtPrice! - product.price) /
+                  product.compareAtPrice! *
                   100)
               .round();
     }
@@ -223,10 +223,10 @@ class ProductCard extends StatelessWidget {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (product.compare_at_price != null &&
-                                product.compare_at_price! > product.price)
+                            if (product.compareAtPrice != null &&
+                                product.compareAtPrice! > product.price)
                               Text(
-                                "${product.compare_at_price!.toInt()} ﷼",
+                                "${product.compareAtPrice!.toInt()} ﷼",
                                 style: const TextStyle(
                                   fontSize: 11,
                                   decoration: TextDecoration.lineThrough,
