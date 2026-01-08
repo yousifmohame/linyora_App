@@ -194,7 +194,7 @@ class _ModelReelsViewerState extends State<ModelReelsViewer> {
                     // تمرير الدوال هنا
                     onLike: () => _handleLike(index),
                     onComment: () => _showComments(context, index),
-                    onShare: () => _handleShare(index), onFollow: () {  }, onProfileTap: () {  },
+                    onShare: () => _handleShare(index), onFollow: () {  }, onProfileTap: () {  }, isLoading: true,
                   ),
                 ],
               );

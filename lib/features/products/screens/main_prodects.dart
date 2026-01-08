@@ -313,7 +313,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
     int crossAxisCount = screenWidth > 900 ? 4 : (screenWidth > 600 ? 4 : 2);
 
     // نسبة الأبعاد: تعديل بسيط للتابلت ليكون الكارت متناسقاً
-    double childAspectRatio = screenWidth > 600 ? 0.55 : 0.55;
+    double childAspectRatio = screenWidth > 600 ? 0.55 : 0.53;
 
     if (_isGridView) {
       return GridView.builder(
