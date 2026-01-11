@@ -1,4 +1,27 @@
-// تعريف الأدوار
+// ✅ حالة الاشتراك (منقولة من كودك)
+class SubscriptionState {
+  final String status; // 'active', 'inactive'
+  final bool hasDropshippingAccess;
+  final String? planName;
+
+  SubscriptionState({
+    this.status = 'inactive',
+    this.hasDropshippingAccess = false,
+    this.planName,
+  });
+
+  factory SubscriptionState.fromJson(Map<String, dynamic> json) {
+    return SubscriptionState(
+      status: json['status'] ?? 'inactive',
+      // التعامل مع الهيكل المتداخل permissions كما في React
+      hasDropshippingAccess:
+          json['permissions']?['hasDropshippingAccess'] ?? false,
+      planName: json['plan']?['name'],
+    );
+  }
+}
+
+// ✅ أدوار المستخدم
 enum UserRole {
   admin, // 1
   merchant, // 2
@@ -8,6 +31,7 @@ enum UserRole {
   unknown,
 }
 
+// ✅ مودل المستخدم الموحد (مدمج)
 class UserModel {
   final int id;
   final String name;
@@ -23,6 +47,9 @@ class UserModel {
   final String verificationStatus;
   final bool hasAcceptedAgreement;
 
+  // ✅ الحقل الجديد: حالة الاشتراك
+  final SubscriptionState? subscription;
+
   UserModel({
     required this.id,
     required this.name,
@@ -33,9 +60,10 @@ class UserModel {
     this.roleId = 5, // الافتراضي عميل
     this.verificationStatus = 'not_submitted',
     this.hasAcceptedAgreement = false,
+    this.subscription,
   });
 
-  // --- أهم جزء: Getter يحول الرقم لـ Enum ---
+  // --- Getter لتحويل الرقم لـ Enum ---
   UserRole get role {
     switch (roleId) {
       case 1:
@@ -43,9 +71,9 @@ class UserModel {
       case 2:
         return UserRole.merchant;
       case 3:
-        return UserRole.model; // المودل
+        return UserRole.model;
       case 4:
-        return UserRole.supplier; // المورد (أو الانفلونسر حسب التسمية لديك)
+        return UserRole.supplier;
       case 5:
         return UserRole.customer;
       default:
@@ -57,6 +85,9 @@ class UserModel {
   bool get isMerchant => role == UserRole.merchant;
   bool get isModel => role == UserRole.model;
   bool get isAdmin => role == UserRole.admin;
+
+  // ✅ هل المستخدم مشترك؟
+  bool get isSubscribed => subscription?.status == 'active';
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
@@ -70,16 +101,23 @@ class UserModel {
       avatar: json['profile_picture_url'] ?? json['avatar'],
       token: json['access_token'] ?? json['token'],
 
-      // قراءة الـ role_id بمرونة (سواء جاء كنص أو رقم)
+      // قراءة الـ role_id بمرونة
       roleId:
           json['role_id'] is int
               ? json['role_id']
               : int.tryParse(json['role_id']?.toString() ?? '5') ?? 5,
 
       verificationStatus: json['verification_status'] ?? 'not_submitted',
+
       hasAcceptedAgreement:
           json['has_accepted_agreement'] == 1 ||
           json['has_accepted_agreement'] == true,
+
+      // ✅ قراءة الاشتراك
+      subscription:
+          json['subscription'] != null
+              ? SubscriptionState.fromJson(json['subscription'])
+              : null,
     );
   }
 
@@ -94,6 +132,7 @@ class UserModel {
       'token': token,
       'verification_status': verificationStatus,
       'has_accepted_agreement': hasAcceptedAgreement,
+      // لا نحتاج لإرسال الاشتراك للباك إند غالباً، لكن يمكن إضافته إذا لزم
     };
   }
 
@@ -106,6 +145,7 @@ class UserModel {
     int? roleId,
     String? verificationStatus,
     bool? hasAcceptedAgreement,
+    SubscriptionState? subscription,
   }) {
     return UserModel(
       id: this.id,
@@ -117,6 +157,7 @@ class UserModel {
       roleId: roleId ?? this.roleId,
       verificationStatus: verificationStatus ?? this.verificationStatus,
       hasAcceptedAgreement: hasAcceptedAgreement ?? this.hasAcceptedAgreement,
+      subscription: subscription ?? this.subscription,
     );
   }
 }

@@ -2,7 +2,7 @@ class ImageHelper {
   static String getValidUrl(String? url) {
     if (url == null || url.isEmpty) {
       // صورة افتراضية في حالة عدم وجود صورة
-      return "https://via.placeholder.com/300"; 
+      return "https://placehold.co/400"; 
     }
 
     // 1. إصلاح الشرطات المائلة المعكوسة (مشكلة ويندوز)
