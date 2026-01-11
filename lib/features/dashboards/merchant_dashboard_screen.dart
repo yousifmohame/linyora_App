@@ -1,7 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:linyora_project/features/agreements/screens/merchant_agreements_screen.dart';
+import 'package:linyora_project/features/bank/screens/bank_settings_screen.dart';
+import 'package:linyora_project/features/browse/screens/browse_models_screen.dart';
+import 'package:linyora_project/features/chat/screens/chat_screen.dart';
+import 'package:linyora_project/features/dropshipping/screens/merchant_dropshipping_screen.dart';
+import 'package:linyora_project/features/settings/screens/settings_screen.dart';
+import 'package:linyora_project/features/shipping/screens/merchant_shipping_screen.dart';
+import 'package:linyora_project/features/subscriptions/screens/my_subscription_screen.dart';
+import 'package:linyora_project/features/wallet/screens/merchant_wallet_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:linyora_project/features/auth/providers/auth_provider.dart';
-import 'package:linyora_project/models/user_model.dart'; // ✅ تأكد من استخدام UserModel الجديد
+import 'package:linyora_project/models/user_model.dart';
 
 // Services & Models
 import 'package:linyora_project/features/dashboards/services/merchant_service.dart';
@@ -12,10 +21,10 @@ import 'package:linyora_project/features/dashboards/screens/verification_screen.
 import 'package:linyora_project/features/products/screens/merchant_products_screen.dart';
 import 'package:linyora_project/features/dashboards/orders/screens/merchant_orders_screen.dart';
 import 'package:linyora_project/features/dashboards/stories/screens/merchant_stories_screen.dart';
-import 'package:linyora_project/features/subscriptions/screens/subscription_plans_screen.dart'; // ✅ شاشة الاشتراكات
+import 'package:linyora_project/features/subscriptions/screens/subscription_plans_screen.dart';
 
 // Widgets
-import 'widgets/agreement_modal.dart'; // ✅ المودال المتطور
+import 'widgets/agreement_modal.dart';
 import 'widgets/stat_card.dart';
 import 'widgets/sales_chart.dart';
 import 'widgets/recent_orders_list.dart';
@@ -34,30 +43,31 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // الحصول على المستخدم من البروفايدر (بنوع UserModel)
     final user = Provider.of<AuthProvider>(context).user;
-
     if (user == null)
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     // ============================================================
-    // 1️⃣ المنطق (Logic) للتحكم في ظهور العناصر
+    // 1️⃣ منطق الأقفال (Lock Logic)
     // ============================================================
 
+    // هل الحساب موثق؟
     final bool isVerified = user.verificationStatus == 'approved';
-    final bool isSubscribed = user.isSubscribed; // استخدمنا Getter من UserModel
-    final bool canAccessDropshipping =
-        user.subscription?.hasDropshippingAccess ?? false;
 
-    // عنصر الاشتراك المتغير (مثل React)
+    // هل المستخدم مشترك؟
+    final bool isSubscribed = user.isSubscribed;
+
+    // هل لديه صلاحية الدروب شيبينج؟ (يجب أن يكون مشتركاً + الباقة تدعم الدروب شيبينج)
+    final bool hasDropshippingAccess =
+        isSubscribed && (user.subscription?.hasDropshippingAccess ?? false);
+
     final Map<String, dynamic> subscriptionNavItem =
         isSubscribed
             ? {
               'title': 'اشتراكي',
               'icon': Icons.credit_card,
-              'page': const Scaffold(
-                body: Center(child: Text("تفاصيل الباقة الحالية")),
-              ),
+              // ✅ ربط الصفحة الجديدة هنا
+              'page': const MySubscriptionScreen(),
               'show': isVerified,
             }
             : {
@@ -68,7 +78,7 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
             };
 
     // ============================================================
-    // 2️⃣ تعريف القائمة الكاملة
+    // 2️⃣ تعريف القائمة مع حالة القفل (isLocked)
     // ============================================================
     final List<Map<String, dynamic>> allNavLinks = [
       {
@@ -76,75 +86,117 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
         'icon': Icons.dashboard_outlined,
         'page': const _MerchantHomeView(),
         'show': true,
+        'isLocked': false, // دائماً مفتوحة
       },
       {
         'title': 'توثيق الحساب',
         'icon': Icons.verified_user_outlined,
         'page': const VerificationScreen(),
-        'show': !isVerified, // يختفي بعد الموافقة
+        'show': !isVerified, // تختفي بعد التوثيق
+        'isLocked': false,
       },
       {
         'title': 'إدارة المنتجات',
         'icon': Icons.inventory_2_outlined,
         'page': const MerchantProductsScreen(),
-        'show': isVerified, // 🔒 يتطلب توثيق
+        'show': isVerified,
+        'isLocked': !isSubscribed, // 🔒 مقفل إذا لم يكن مشتركاً
       },
       {
         'title': 'الطلبات',
         'icon': Icons.shopping_bag_outlined,
         'page': const MerchantOrdersScreen(),
-        'show': isVerified, // 🔒 يتطلب توثيق
+        'show': isVerified,
+        'isLocked': !isSubscribed, // 🔒 مقفل
       },
       {
         'title': 'قصص المتجر',
         'icon': Icons.history_edu_outlined,
         'page': const MerchantStoriesScreen(),
         'show': isVerified,
+        'isLocked': !isSubscribed, // 🔒 مقفل
       },
-
-      // 👇 عنصر الاشتراك الديناميكي
-      subscriptionNavItem,
-
+      {
+        'title': 'العارضات و المؤثرات',
+        'icon': Icons.history_edu_outlined,
+        'page': const BrowseModelsScreen(),
+        'show': isVerified,
+        'isLocked': !isSubscribed, // 🔒 مقفل
+      },
+      {
+        'title': 'المحادثات',
+        'icon': Icons.history_edu_outlined,
+        'page': ChatScreen(currentUserId: user.id),
+        'show': isVerified,
+        'isLocked': !isSubscribed, // 🔒 مقفل
+      },
+      {
+        'title': 'الإتفاقيات',
+        'icon': Icons.history_edu_outlined,
+        'page': MerchantAgreementsScreen(),
+        'show': isVerified,
+        'isLocked': !isSubscribed, // 🔒 مقفل
+      },
+      {
+        'title': 'المعلومات البنكيه',
+        'icon': Icons.history_edu_outlined,
+        'page': BankSettingsScreen(),
+        'show': isVerified,
+        'isLocked': !isSubscribed, // 🔒 مقفل
+      },
       {
         'title': 'الدروب شيبينج',
         'icon': Icons.cloud_download_outlined,
-        'page': const Scaffold(body: Center(child: Text("الدروب شيبينج"))),
-        'show': isVerified && canAccessDropshipping, // 🔒 يتطلب صلاحية خاصة
+        'page': const MerchantDropshippingScreen(),
+        'show': isVerified, // يظهر دائماً للموثقين
+        'isLocked':
+            !hasDropshippingAccess, // 🔒 مقفل إذا لم يكن لديه الصلاحية الخاصة
       },
+      subscriptionNavItem,
       {
         'title': 'الشحن',
         'icon': Icons.local_shipping_outlined,
-        'page': const Scaffold(body: Center(child: Text("الشحن"))),
+        'page': const MerchantShippingScreen(),
         'show': isVerified,
+        'isLocked': !isSubscribed, // 🔒 مقفل
       },
       {
         'title': 'المحفظة',
         'icon': Icons.account_balance_wallet_outlined,
-        'page': const Scaffold(body: Center(child: Text("المحفظة"))),
+        'page': const MerchantWalletScreen(),
         'show': isVerified,
+        'isLocked': !isSubscribed, // 🔒 مقفل
       },
       {
         'title': 'الإعدادات',
         'icon': Icons.settings_outlined,
-        'page': const Scaffold(body: Center(child: Text("الإعدادات"))),
+        'page': const SettingsScreen(),
         'show': true,
+        'isLocked': false, // الإعدادات دائماً مفتوحة
       },
     ];
 
-    // تصفية القائمة
+    // عنصر الاشتراك في القائمة (اختياري، للوصول السريع)
+    if (isVerified) {
+      allNavLinks.insert(5, {
+        'title': isSubscribed ? 'تفاصيل اشتراكي' : 'اشترك الآن',
+        'icon': isSubscribed ? Icons.credit_card : Icons.star_border,
+        'page': const SubscriptionPlansScreen(),
+        'show': true,
+        'isLocked': false,
+        'isSubscriptionAction': true, // علامة لتمييزه
+      });
+    }
+
+    // تصفية العناصر المخفية (مثل التوثيق بعد الانتهاء منه)
     final visibleNavItems =
         allNavLinks.where((item) => item['show'] == true).toList();
 
-    // حماية المؤشر من الخطأ عند تغير القائمة
-    if (_currentIndex >= visibleNavItems.length) {
-      _currentIndex = 0;
-    }
+    if (_currentIndex >= visibleNavItems.length) _currentIndex = 0;
 
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: const Color(0xFFF9FAFB),
-
-      // App Bar
       appBar: AppBar(
         title: Text(
           visibleNavItems[_currentIndex]['title'],
@@ -161,22 +213,20 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
           onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
         actions: [
-          if (_currentIndex == 0) // زر تحديث فقط في الرئيسية
+          if (_currentIndex == 0)
             IconButton(
               icon: const Icon(Icons.refresh, color: Colors.black),
-              onPressed:
-                  () => setState(
-                    () {},
-                  ), // إعادة بناء الـ Widget لإعادة تحميل الابن
+              onPressed: () => setState(() {}),
             ),
         ],
       ),
 
-      // Drawer
+      // ============================================================
+      // 3️⃣ القائمة الجانبية (Drawer) مع القفل
+      // ============================================================
       drawer: Drawer(
         child: Column(
           children: [
-            // Header
             UserAccountsDrawerHeader(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
@@ -212,72 +262,101 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  if (isVerified)
+                  if (isVerified) ...[
+                    const SizedBox(width: 5),
                     const Icon(Icons.verified, color: Colors.white, size: 16),
+                  ],
                   if (isSubscribed) ...[
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 5),
                     const Icon(Icons.star, color: Colors.amber, size: 16),
                   ],
                 ],
               ),
             ),
 
-            // Menu Items
             Expanded(
               child: ListView.builder(
                 padding: EdgeInsets.zero,
                 itemCount: visibleNavItems.length + 1,
                 itemBuilder: (context, index) {
-                  // زر الخروج
                   if (index == visibleNavItems.length) {
-                    return Column(
-                      children: [
-                        const Divider(),
-                        ListTile(
-                          leading: const Icon(Icons.logout, color: Colors.red),
-                          title: const Text(
-                            'تسجيل الخروج',
-                            style: TextStyle(color: Colors.red),
-                          ),
-                          onTap: () async {
-                            await Provider.of<AuthProvider>(
-                              context,
-                              listen: false,
-                            ).logout();
-                          },
-                        ),
-                      ],
+                    return ListTile(
+                      leading: const Icon(Icons.logout, color: Colors.red),
+                      title: const Text(
+                        'تسجيل الخروج',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                      onTap:
+                          () async =>
+                              await Provider.of<AuthProvider>(
+                                context,
+                                listen: false,
+                              ).logout(),
                     );
                   }
 
                   final item = visibleNavItems[index];
                   final bool isSelected = _currentIndex == index;
+                  final bool isLocked = item['isLocked'] == true;
 
                   return ListTile(
                     leading: Icon(
                       item['icon'],
                       color:
-                          isSelected
-                              ? const Color(0xFF9333EA)
-                              : Colors.grey[600],
+                          isLocked
+                              ? Colors.grey
+                              : (isSelected
+                                  ? const Color(0xFF9333EA)
+                                  : Colors.grey[600]),
                     ),
-                    title: Text(
-                      item['title'],
-                      style: TextStyle(
-                        color:
-                            isSelected
-                                ? const Color(0xFF9333EA)
-                                : Colors.grey[800],
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.normal,
-                      ),
+                    title: Row(
+                      children: [
+                        Text(
+                          item['title'],
+                          style: TextStyle(
+                            color:
+                                isLocked
+                                    ? Colors.grey
+                                    : (isSelected
+                                        ? const Color(0xFF9333EA)
+                                        : Colors.grey[800]),
+                            fontWeight:
+                                isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                          ),
+                        ),
+                        if (isLocked) ...[
+                          const Spacer(),
+                          const Icon(
+                            Icons.lock_outline,
+                            size: 16,
+                            color: Colors.grey,
+                          ),
+                        ],
+                      ],
                     ),
                     selected: isSelected,
                     selectedTileColor: Colors.purple.withOpacity(0.05),
                     onTap: () {
-                      setState(() => _currentIndex = index);
-                      Navigator.pop(context);
+                      Navigator.pop(context); // إغلاق القائمة أولاً
+
+                      if (isLocked) {
+                        // ⛔️ إذا كان مقفلاً، وجهه للاشتراك
+                        _showSubscriptionLockedDialog(context, item['title']);
+                      } else {
+                        // ✅ إذا كان مفتوحاً، انتقل للصفحة
+                        if (item['isSubscriptionAction'] == true) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const SubscriptionPlansScreen(),
+                            ),
+                          );
+                        } else {
+                          setState(() => _currentIndex = index);
+                        }
+                      }
                     },
                   );
                 },
@@ -286,15 +365,49 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
           ],
         ),
       ),
-
-      // Body
       body: visibleNavItems[_currentIndex]['page'] as Widget,
+    );
+  }
+
+  // نافذة تنبيه عند الضغط على عنصر مقفل
+  void _showSubscriptionLockedDialog(BuildContext context, String featureName) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text("الميزة مغلقة 🔒"),
+            content: Text(
+              "عذراً، ميزة ($featureName) تتطلب اشتراكاً فعالاً للوصول إليها.",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("إلغاء"),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SubscriptionPlansScreen(),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF43F5E),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text("اشترك الآن"),
+              ),
+            ],
+          ),
     );
   }
 }
 
 // -----------------------------------------------------------------------------
-// ✅ محتوى الصفحة الرئيسية (يحتوي على منطق البوابة Gate Logic)
+// ✅ محتوى الصفحة الرئيسية (بدون فرض الاشتراك، فقط الاتفاقية)
 // -----------------------------------------------------------------------------
 
 class _MerchantHomeView extends StatefulWidget {
@@ -314,73 +427,39 @@ class _MerchantHomeViewState extends State<_MerchantHomeView> {
   @override
   void initState() {
     super.initState();
-    // ✅ تنفيذ التحقق فور تحميل الشاشة
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkUserStatusAndFetchData();
+      _checkAgreementAndFetchData();
     });
   }
 
-  // ✅ [بوابة التحقق]: اتفاقية -> اشتراك -> بيانات
-  Future<void> _checkUserStatusAndFetchData() async {
+  // ✅ التحقق من الاتفاقية فقط، وعدم إجبار الاشتراك هنا
+  Future<void> _checkAgreementAndFetchData() async {
     if (!mounted) return;
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.user;
 
     if (user == null) return;
 
-    // 1️⃣ التحقق من الاتفاقية
     if (user.hasAcceptedAgreement == false) {
       await showDialog(
         context: context,
-        barrierDismissible: false, // إجباري
+        barrierDismissible: false,
         barrierColor: Colors.black87,
         builder:
             (context) => AgreementModal(
               agreementKey: "merchant_agreement",
               onAgreed: () async {
-                // تحديث المستخدم محلياً بعد الموافقة
                 await authProvider.refreshUser();
-
-                // الانتقال للخطوة التالية (الاشتراك)
-                if (mounted) _checkSubscription(authProvider.user!);
+                if (mounted) _fetchDashboardData();
               },
             ),
       );
     } else {
-      // المستخدم موافق مسبقاً، ننتقل للخطوة التالية
-      _checkSubscription(user);
-    }
-  }
-
-  // 2️⃣ التحقق من الاشتراك
-  Future<void> _checkSubscription(UserModel user) async {
-    if (!mounted) return;
-
-    // إذا كان الحساب موثقاً ولكنه غير مشترك (أو اشتراكه غير فعال)
-    if (user.verificationStatus == 'approved' && !user.isSubscribed) {
-      // توجيه إجباري لصفحة الاشتراكات
-      final result = await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const SubscriptionPlansScreen(),
-        ),
-      );
-
-      // إذا عاد بنجاح (تم الاشتراك)
-      if (result == true) {
-        _fetchDashboardData();
-      } else {
-        // إذا عاد بدون اشتراك (ضغط رجوع)، نعيد تحميل الصفحة ليعيد التحقق
-        // أو يمكننا تحميل البيانات ولكن مع تقييد الوصول
-        _fetchDashboardData();
-      }
-    } else {
-      // كل شيء تمام، حمل البيانات
+      // ✅ المستخدم وافق على الشروط -> حمل البيانات مباشرة (سواء مشترك أو لا)
       _fetchDashboardData();
     }
   }
 
-  // 3️⃣ جلب البيانات
   Future<void> _fetchDashboardData() async {
     if (!mounted) return;
     setState(() {
@@ -410,7 +489,6 @@ class _MerchantHomeViewState extends State<_MerchantHomeView> {
     final isVerified = user?.verificationStatus == 'approved';
 
     if (_isLoading) return const Center(child: CircularProgressIndicator());
-
     if (_error != null) {
       return Center(
         child: Column(
@@ -488,8 +566,7 @@ class _MerchantHomeViewState extends State<_MerchantHomeView> {
     );
   }
 
-  // --- Widgets المساعدة ---
-
+  // --- Widgets المساعدة (نفس الكود السابق) ---
   Widget _buildPeriodButton(String label, String value) {
     final isSelected = _salesPeriod == value;
     return GestureDetector(

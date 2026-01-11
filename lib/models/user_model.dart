@@ -1,22 +1,30 @@
 // ✅ حالة الاشتراك (منقولة من كودك)
 class SubscriptionState {
-  final String status; // 'active', 'inactive'
+  final String status;
   final bool hasDropshippingAccess;
   final String? planName;
+  // ✅ الحقول الجديدة من اللوج
+  final String? startDate;
+  final String? endDate;
 
   SubscriptionState({
     this.status = 'inactive',
     this.hasDropshippingAccess = false,
     this.planName,
+    this.startDate,
+    this.endDate,
   });
 
   factory SubscriptionState.fromJson(Map<String, dynamic> json) {
     return SubscriptionState(
       status: json['status'] ?? 'inactive',
-      // التعامل مع الهيكل المتداخل permissions كما في React
       hasDropshippingAccess:
           json['permissions']?['hasDropshippingAccess'] ?? false,
+      // قراءة الاسم من داخل الكائن المتداخل plan
       planName: json['plan']?['name'],
+      // قراءة التواريخ
+      startDate: json['startDate'],
+      endDate: json['endDate'],
     );
   }
 }
@@ -90,6 +98,21 @@ class UserModel {
   bool get isSubscribed => subscription?.status == 'active';
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
+    // 🔍 LOG 1: طباعة البيانات الخام القادمة من السيرفر
+    print("================ DEBUG USER MODEL ================");
+    print("User Name: ${json['name']}");
+    print("Raw Subscription Data: ${json['subscription']}");
+    print("Role ID: ${json['role_id']}");
+
+    // فحص محتوى الاشتراك بالتفصيل
+    if (json['subscription'] != null) {
+      print("Sub Status: ${json['subscription']['status']}");
+      print("Sub Permissions: ${json['subscription']['permissions']}");
+    } else {
+      print("❌ Subscription is NULL in JSON!");
+    }
+    print("==================================================");
+
     return UserModel(
       id:
           json['id'] is int
@@ -101,7 +124,6 @@ class UserModel {
       avatar: json['profile_picture_url'] ?? json['avatar'],
       token: json['access_token'] ?? json['token'],
 
-      // قراءة الـ role_id بمرونة
       roleId:
           json['role_id'] is int
               ? json['role_id']
@@ -113,7 +135,7 @@ class UserModel {
           json['has_accepted_agreement'] == 1 ||
           json['has_accepted_agreement'] == true,
 
-      // ✅ قراءة الاشتراك
+      // قراءة الاشتراك
       subscription:
           json['subscription'] != null
               ? SubscriptionState.fromJson(json['subscription'])

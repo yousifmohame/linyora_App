@@ -39,4 +39,19 @@ class SubscriptionService {
       throw Exception('فشل إنشاء رابط الدفع');
     }
   }
+
+  Future<bool> cancelSubscription() async {
+    try {
+      // تأكد من الرابط الصحيح في الباك إند
+      final response = await _apiClient.post(
+        '/payments/cancel-subscription',
+        data: {},
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print("Error canceling subscription: $e");
+      throw Exception('فشل إلغاء الاشتراك');
+    }
+  }
 }
