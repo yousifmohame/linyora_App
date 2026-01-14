@@ -292,4 +292,72 @@ class ProductService {
       throw e.toString();
     }
   }
+
+  Future<List<PromotionTier>> getPromotionTiers() async {
+    try {
+      final response = await _apiClient.get('/merchants/promotion-tiers');
+      if (response.statusCode == 200) {
+        return (response.data as List)
+            .map((e) => PromotionTier.fromJson(e))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching tiers: $e');
+      return [];
+    }
+  }
+
+  // جلب تفاصيل منتج واحد (يحتوي على تفاصيل الدروب شيبينج الدقيقة)
+  Future<ProductModel?> getProductById(int id) async {
+    try {
+      // ✅ هذا الرابط يستدعي الدالة getProductById في الباك إند
+      final response = await _apiClient.get('/products/$id'); 
+      
+      if (response.statusCode == 200 && response.data != null) {
+        // تحويل البيانات باستخدام المودل الذي قمنا بتحديثه
+        return ProductModel.fromJson(response.data);
+      }
+      return null;
+    } catch (e) {
+      print('❌ Error fetching single product: $e');
+      return null;
+    }
+  }
+
+  // بدء عملية الترويج (إنشاء رابط دفع)
+  Future<String?> promoteProduct(int productId, int tierId) async {
+    try {
+      final response = await _apiClient.post(
+        '/merchants/products/$productId/promote',
+        data: {'tierId': tierId},
+      );
+      return response.data['checkoutUrl'];
+    } catch (e) {
+      throw Exception('فشل إنشاء رابط الدفع');
+    }
+  }
+}
+
+class PromotionTier {
+  final int id;
+  final String name;
+  final int durationDays;
+  final double price;
+
+  PromotionTier({
+    required this.id,
+    required this.name,
+    required this.durationDays,
+    required this.price,
+  });
+
+  factory PromotionTier.fromJson(Map<String, dynamic> json) {
+    return PromotionTier(
+      id: json['id'],
+      name: json['name'],
+      durationDays: json['duration_days'],
+      price: double.tryParse(json['price'].toString()) ?? 0.0,
+    );
+  }
 }

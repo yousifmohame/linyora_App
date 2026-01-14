@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // للنسخ
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import '../models/merchant_order_details_model.dart';
@@ -63,6 +64,9 @@ class _MerchantOrderDetailsScreenState
       context: context,
       builder:
           (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
             title: const Text('تغيير حالة الطلب'),
             content: Text(
               'هل أنت متأكد من تغيير الحالة إلى ${_translateStatus(newStatus)}؟',
@@ -70,11 +74,23 @@ class _MerchantOrderDetailsScreenState
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('إلغاء'),
+                child: const Text(
+                  'إلغاء',
+                  style: TextStyle(color: Colors.grey),
+                ),
               ),
-              TextButton(
+              ElevatedButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('تأكيد'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF105C6),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'تأكيد',
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
             ],
           ),
@@ -87,7 +103,10 @@ class _MerchantOrderDetailsScreenState
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) => const Center(child: CircularProgressIndicator()),
+        builder:
+            (_) => const Center(
+              child: CircularProgressIndicator(color: Color(0xFFF105C6)),
+            ),
       );
 
       await _orderService.updateOrderStatus(widget.orderId, newStatus);
@@ -97,84 +116,163 @@ class _MerchantOrderDetailsScreenState
         _fetchDetails(); // تحديث البيانات
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              'تم تحديث الحالة بنجاح',
-              style: TextStyle(color: Colors.white),
-            ),
+            content: Text('تم تحديث الحالة بنجاح ✅'),
             backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
         Navigator.pop(context); // إغلاق Loading
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('فشل التحديث: $e')));
+        String errorMsg = 'فشل التحديث';
+        // معالجة خطأ 403 القادم من السيرفر كاحتياط
+        if (e.toString().contains('403')) {
+          errorMsg = 'غير مسموح بتعديل هذا الطلب (دروب شيبينج)';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMsg), backgroundColor: Colors.red),
+        );
       }
     }
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            title: Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                const SizedBox(width: 8),
+                Text(title),
+              ],
+            ),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  'حسناً',
+                  style: TextStyle(color: Colors.black),
+                ),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _copyToClipboard(String text) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('تم النسخ للحافظة'),
+        duration: Duration(seconds: 1),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF3F4F6), // خلفية هادئة وعصرية
       appBar: AppBar(
-        title: Text('طلب #${widget.orderId}'),
+        title: Text(
+          'طلب #${widget.orderId}',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
       ),
       body:
           _isLoading
-              ? const Center(child: CircularProgressIndicator())
+              ? const Center(
+                child: CircularProgressIndicator(color: Color(0xFFF105C6)),
+              )
               : _error != null
-              ? Center(child: Text('حدث خطأ: $_error'))
+              ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: Colors.grey,
+                    ),
+                    const SizedBox(height: 16),
+                    Text('حدث خطأ: $_error'),
+                    TextButton(
+                      onPressed: _fetchDetails,
+                      child: const Text('إعادة المحاولة'),
+                    ),
+                  ],
+                ),
+              )
               : SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // 1. بطاقة الحالة والإجراءات
-                    _buildStatusCard(),
+                    _buildHeaderCard(),
                     const SizedBox(height: 16),
 
-                    // 2. معلومات العميل والشحن
+                    // 2. قائمة المنتجات
+                    _buildItemsCard(),
+                    const SizedBox(height: 16),
+
+                    // 3. معلومات العميل
                     _buildCustomerCard(),
                     const SizedBox(height: 16),
 
-                    // 3. قائمة المنتجات
-                    _buildItemsList(),
-                    const SizedBox(height: 16),
-
-                    // 4. ملخص الدفع
-                    _buildPaymentSummary(),
+                    // 4. ملخص الدفع والشحن
+                    _buildPaymentAndShippingCard(),
+                    const SizedBox(height: 30),
                   ],
                 ),
               ),
     );
   }
 
-  Widget _buildStatusCard() {
+  // --- البطاقات ---
+
+  Widget _buildHeaderCard() {
     final status = _orderDetails!.info.status;
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'حالة الطلب',
-                style: TextStyle(fontWeight: FontWeight.bold),
+              Text(
+                'تاريخ الطلب: ${_orderDetails!.info.createdAt}', // تنسيق التاريخ
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
               ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -184,7 +282,7 @@ class _MerchantOrderDetailsScreenState
                   color: _getStatusColor(status).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: _getStatusColor(status).withOpacity(0.5),
+                    color: _getStatusColor(status).withOpacity(0.3),
                   ),
                 ),
                 child: Text(
@@ -197,28 +295,44 @@ class _MerchantOrderDetailsScreenState
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          const Divider(),
-          const SizedBox(height: 8),
+          const SizedBox(height: 20),
           const Text(
             'تحديث الحالة:',
-            style: TextStyle(fontSize: 12, color: Colors.grey),
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
+
+          // إذا كان دروب شيبينج، نخفي أزرار التحديث أو نظهر رسالة
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children:
                   _statuses.map((s) {
-                    if (s == status)
-                      return const SizedBox(); // لا تعرض الحالة الحالية
+                    bool isSelected = s == status;
                     return Padding(
                       padding: const EdgeInsets.only(left: 8),
-                      child: ActionChip(
+                      child: ChoiceChip(
                         label: Text(_translateStatus(s)),
-                        backgroundColor: Colors.white,
-                        side: BorderSide(color: Colors.grey.shade300),
-                        onPressed: () => _changeStatus(s),
+                        selected: isSelected,
+                        onSelected:
+                            isSelected ? null : (selected) => _changeStatus(s),
+                        backgroundColor: Colors.grey[50],
+                        selectedColor: _getStatusColor(s).withOpacity(0.2),
+                        labelStyle: TextStyle(
+                          color: isSelected ? _getStatusColor(s) : Colors.black,
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                        side: BorderSide(
+                          color:
+                              isSelected
+                                  ? _getStatusColor(s)
+                                  : Colors.grey.shade300,
+                        ),
                       ),
                     );
                   }).toList(),
@@ -232,63 +346,100 @@ class _MerchantOrderDetailsScreenState
   Widget _buildCustomerCard() {
     final info = _orderDetails!.info;
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'معلومات العميل',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          const Row(
+            children: [
+              Icon(Icons.person_outline, color: Colors.black54),
+              SizedBox(width: 8),
+              Text(
+                'معلومات العميل',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          _buildInfoRow(Icons.person, 'الاسم', info.customerName),
-          const SizedBox(height: 8),
-          _buildInfoRow(Icons.email, 'البريد', info.customerEmail),
-          const SizedBox(height: 8),
+          const Divider(height: 24),
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: const Color(0xFFF105C6).withOpacity(0.1),
+                child: Text(
+                  info.customerName[0].toUpperCase(),
+                  style: const TextStyle(color: Color(0xFFF105C6)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    info.customerName,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    info.customerEmail,
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
           _buildInfoRow(
-            Icons.phone,
-            'الجوال',
+            Icons.phone_outlined,
+            'رقم الهاتف',
             info.customerPhone ?? 'غير متوفر',
-          ),
-          const SizedBox(height: 8),
-          const Divider(),
-          const SizedBox(height: 8),
-          _buildInfoRow(
-            Icons.location_on,
-            'العنوان',
-            info.shippingAddress ?? 'لا يوجد عنوان شحن',
+            isCopyable: true,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildItemsList() {
+  Widget _buildItemsCard() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'المنتجات (${_orderDetails!.items.length})',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          Row(
+            children: [
+              const Icon(Icons.inventory_2_outlined, color: Colors.black54),
+              const SizedBox(width: 8),
+              Text(
+                'المنتجات (${_orderDetails!.items.length})',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
+          const Divider(height: 24),
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -298,19 +449,26 @@ class _MerchantOrderDetailsScreenState
               final item = _orderDetails!.items[index];
               return Row(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: CachedNetworkImage(
-                      imageUrl: item.image ?? '',
-                      width: 60,
-                      height: 60,
-                      fit: BoxFit.cover,
-                      placeholder: (c, u) => Container(color: Colors.grey[200]),
-                      errorWidget:
-                          (c, u, e) => const Icon(
-                            Icons.broken_image,
-                            color: Colors.grey,
-                          ),
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: CachedNetworkImage(
+                        imageUrl: item.image ?? '',
+                        fit: BoxFit.cover,
+                        placeholder:
+                            (c, u) => Container(color: Colors.grey[100]),
+                        errorWidget:
+                            (c, u, e) => const Icon(
+                              Icons.image_not_supported,
+                              color: Colors.grey,
+                            ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -320,21 +478,41 @@ class _MerchantOrderDetailsScreenState
                       children: [
                         Text(
                           item.name,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
+
                         const SizedBox(height: 4),
-                        Text(
-                          '${item.price} ر.س × ${item.quantity}',
-                          style: const TextStyle(color: Colors.grey),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'الكمية: ${item.quantity}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[700],
+                            ),
+                          ),
                         ),
                       ],
                     ),
                   ),
                   Text(
                     '${(item.price * item.quantity).toStringAsFixed(2)} ر.س',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
                   ),
                 ],
               );
@@ -345,35 +523,114 @@ class _MerchantOrderDetailsScreenState
     );
   }
 
-  Widget _buildPaymentSummary() {
+  Widget _buildPaymentAndShippingCard() {
     final info = _orderDetails!.info;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'ملخص الدفع',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          const SizedBox(height: 12),
-          _buildSummaryRow('طريقة الدفع', info.paymentMethod),
-          const SizedBox(height: 8),
-          _buildSummaryRow(
-            'حالة الدفع',
-            info.paymentStatus == 'paid' ? 'مدفوع' : 'غير مدفوع',
-            isBold: true,
-            valueColor:
-                info.paymentStatus == 'paid' ? Colors.green : Colors.red,
+          const Row(
+            children: [
+              Icon(Icons.local_shipping_outlined, color: Colors.black54),
+              SizedBox(width: 8),
+              Text(
+                'الشحن والدفع',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ],
           ),
           const Divider(height: 24),
+
+          if (info.shippingAddress != null) ...[
+            const Text(
+              "عنوان الشحن",
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 4),
+            Text(info.shippingAddress!, style: const TextStyle(height: 1.4)),
+            const SizedBox(height: 16),
+          ],
+
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "طريقة الدفع",
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.credit_card,
+                          size: 16,
+                          color: Colors.black54,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          info.paymentMethod,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "حالة الدفع",
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: (info.paymentStatus == 'paid'
+                                ? Colors.green
+                                : Colors.red)
+                            .withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        info.paymentStatus == 'paid' ? 'مدفوع' : 'غير مدفوع',
+                        style: TextStyle(
+                          color:
+                              info.paymentStatus == 'paid'
+                                  ? Colors.green
+                                  : Colors.red,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const Divider(height: 30),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -384,9 +641,9 @@ class _MerchantOrderDetailsScreenState
               Text(
                 '${info.totalAmount.toStringAsFixed(2)} ر.س',
                 style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Color(0xFF9333EA),
+                  fontWeight: FontWeight.w900,
+                  fontSize: 20,
+                  color: Color(0xFFF105C6),
                 ),
               ),
             ],
@@ -396,50 +653,51 @@ class _MerchantOrderDetailsScreenState
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value) {
+  Widget _buildInfoRow(
+    IconData icon,
+    String label,
+    String value, {
+    bool isCopyable = false,
+  }) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 18, color: Colors.grey),
-        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 18, color: Colors.grey[600]),
+        ),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 label,
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                style: const TextStyle(fontSize: 11, color: Colors.grey),
               ),
-              Text(value, style: const TextStyle(fontSize: 14)),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ],
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildSummaryRow(
-    String label,
-    String value, {
-    bool isBold = false,
-    Color? valueColor,
-  }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: const TextStyle(color: Colors.grey)),
-        Text(
-          value,
-          style: TextStyle(
-            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-            color: valueColor ?? Colors.black,
+        if (isCopyable)
+          IconButton(
+            icon: const Icon(Icons.copy, size: 18, color: Colors.grey),
+            onPressed: () => _copyToClipboard(value),
+            tooltip: "نسخ",
           ),
-        ),
       ],
     );
   }
 
-  // دوال مساعدة للألوان والترجمة
   String _translateStatus(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
@@ -466,6 +724,8 @@ class _MerchantOrderDetailsScreenState
       case 'cancelled':
         return Colors.red;
       case 'shipped':
+        return Colors.indigo;
+      case 'processing':
         return Colors.blue;
       default:
         return Colors.grey;

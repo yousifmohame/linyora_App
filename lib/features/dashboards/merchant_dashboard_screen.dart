@@ -3,6 +3,7 @@ import 'package:linyora_project/features/agreements/screens/merchant_agreements_
 import 'package:linyora_project/features/bank/screens/bank_settings_screen.dart';
 import 'package:linyora_project/features/browse/screens/browse_models_screen.dart';
 import 'package:linyora_project/features/chat/screens/chat_screen.dart';
+import 'package:linyora_project/features/dashboards/MyStore/my_store_screen.dart';
 import 'package:linyora_project/features/dropshipping/screens/merchant_dropshipping_screen.dart';
 import 'package:linyora_project/features/settings/screens/settings_screen.dart';
 import 'package:linyora_project/features/shipping/screens/merchant_shipping_screen.dart';
@@ -110,6 +111,13 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
         'isLocked': !isSubscribed, // 🔒 مقفل
       },
       {
+        'title': 'معاينه المتجر',
+        'icon': Icons.shopping_bag_outlined,
+        'page': const MyStoreScreen(),
+        'show': isVerified,
+        'isLocked': !isSubscribed, // 🔒 مقفل
+      },
+      {
         'title': 'قصص المتجر',
         'icon': Icons.history_edu_outlined,
         'page': const MerchantStoriesScreen(),
@@ -175,18 +183,6 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
         'isLocked': false, // الإعدادات دائماً مفتوحة
       },
     ];
-
-    // عنصر الاشتراك في القائمة (اختياري، للوصول السريع)
-    if (isVerified) {
-      allNavLinks.insert(5, {
-        'title': isSubscribed ? 'تفاصيل اشتراكي' : 'اشترك الآن',
-        'icon': isSubscribed ? Icons.credit_card : Icons.star_border,
-        'page': const SubscriptionPlansScreen(),
-        'show': true,
-        'isLocked': false,
-        'isSubscriptionAction': true, // علامة لتمييزه
-      });
-    }
 
     // تصفية العناصر المخفية (مثل التوثيق بعد الانتهاء منه)
     final visibleNavItems =

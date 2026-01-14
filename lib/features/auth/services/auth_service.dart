@@ -58,12 +58,14 @@ class AuthService {
   }) async {
     try {
       final response = await _apiClient.post(
-        '/auth/register', // تأكد من المسار في الباك إند
+        '/auth/register',
         data: {
           'name': name,
           'email': email,
-          'phone': phone,
+          'phoneNumber':
+              phone, // تأكد: هل الباك إند يتوقع phone أو phoneNumber؟
           'password': password,
+          'role_id': roleId, // تأكد: هل الباك إند يتوقع roleId أو role_id؟
         },
       );
 
@@ -72,31 +74,39 @@ class AuthService {
       }
       return false;
     } on DioException catch (e) {
-      // رسالة افتراضية
       String errorMessage = 'فشل إنشاء الحساب';
 
-      if (e.response != null && e.response!.data != null) {
-        final data = e.response!.data;
+      if (e.response != null) {
+        // طباعة الخطأ في الكونسول للمطور
+        print("🚨 Server Error Data: ${e.response?.data}");
 
-        // الحالة 1: السيرفر أرسل كائن JSON (Map)
-        if (data is Map) {
-          // أو Map<String, dynamic>
-          errorMessage = data['message'] ?? data['error'] ?? data.toString();
-        }
-        // الحالة 2: السيرفر أرسل قائمة أخطاء (List)
-        else if (data is List) {
-          // دمج الأخطاء في نص واحد للعرض
-          errorMessage = data.join('\n');
-        }
-        // الحالة 3: السيرفر أرسل نصاً مباشراً
-        else {
-          errorMessage = data.toString();
+        final data = e.response?.data;
+
+        if (data is Map<String, dynamic>) {
+          // جلب الرسالة إذا كانت موجودة، أو تجميع الأخطاء إذا كانت داخل حقل errors
+          if (data.containsKey('message')) {
+            errorMessage = data['message'].toString();
+          } else if (data.containsKey('errors')) {
+            // معالجة الأخطاء القادمة من Laravel مثلاً
+            final errors = data['errors'];
+            if (errors is Map) {
+              errorMessage = errors.values.join('\n');
+            } else {
+              errorMessage = errors.toString();
+            }
+          } else {
+            errorMessage = data.toString();
+          }
+        } else if (data is String) {
+          errorMessage = data;
         }
       }
 
-      throw errorMessage; // إرسال الرسالة النظيفة للواجهة
+      // رمي نص الخطأ فقط
+      throw errorMessage;
     } catch (e) {
-      throw 'حدث خطأ غير متوقع';
+      print("🚨 Unknown Error: $e");
+      throw 'حدث خطأ غير متوقع: $e';
     }
   }
 
@@ -111,6 +121,51 @@ class AuthService {
       return response.statusCode == 200;
     } on DioException catch (e) {
       throw e.response?.data['message'] ?? 'حدث خطأ، تأكد من البريد';
+    }
+  }
+
+  // --- إعادة تعيين كلمة المرور (بعد الضغط على الرابط) ---
+  Future<bool> resetPassword(String token, String newPassword) async {
+    try {
+      final response = await _apiClient.post(
+        '/auth/reset-password/$token', // يتم تمرير التوكن في الرابط
+        data: {'password': newPassword},
+      );
+
+      return response.statusCode == 200;
+    } on DioException catch (e) {
+      throw e.response?.data['message'] ?? 'فشل إعادة تعيين كلمة المرور';
+    }
+  }
+
+  // في ملف AuthService.dart
+
+  // --- إعادة إرسال كود التحقق ---
+  // في ملف AuthService.dart
+
+  Future<bool> resendVerificationCode(String email) async {
+    // 1. تأكد من أن هذا المسار يطابق الموجود في الباك إند تماماً
+    const String endpoint = '/auth/resend-verification';
+
+    print(
+      "📡 Attempting to POST to: ${_apiClient}$endpoint",
+    ); // طباعة الرابط للمراقبة
+
+    try {
+      final response = await _apiClient.post(endpoint, data: {'email': email});
+
+      if (response.statusCode == 200) {
+        return true;
+      }
+      return false;
+    } on DioException catch (e) {
+      print("❌ Error 404: الرابط غير موجود. تأكد من صحة المسار: $endpoint");
+      print("تفاصيل الخطأ: ${e.response?.data}");
+
+      if (e.response?.statusCode == 404) {
+        throw 'خطأ في الاتصال: رابط الخدمة غير موجود (404)';
+      }
+      throw e.response?.data['message'] ?? 'فشل إعادة إرسال الكود';
     }
   }
 
@@ -283,7 +338,8 @@ class AuthService {
       );
 
       if (response.statusCode == 200) {
-        final data = response.data['user'] ?? response.data['data'] ?? response.data;
+        final data =
+            response.data['user'] ?? response.data['data'] ?? response.data;
         // دمج التوكن مع البيانات لأنه قد لا يأتي من بروفايل المستخدم
         _currentUser = UserModel.fromJson(data).copyWith(token: token);
         debugPrint("✅ User Auto-Logged in: ${_currentUser?.name}");
@@ -294,7 +350,7 @@ class AuthService {
     } catch (e) {
       debugPrint("❌ Auto login failed: $e");
       // في حالة 401 أو Timeout، نخرج المستخدم لكي يسجل دخول من جديد
-      await logout(); 
+      await logout();
     }
   }
 

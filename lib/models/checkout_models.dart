@@ -1,4 +1,6 @@
 // نموذج العنوان
+import 'package:linyora_project/models/cart_item_model.dart';
+
 class AddressModel {
   final int id;
   final String fullName;
@@ -29,28 +31,38 @@ class AddressModel {
       isDefault: json['is_default'] == true || json['is_default'] == 1,
     );
   }
-}
+}  
 
-// نموذج خيار الشحن
 class ShippingOption {
   final int id;
   final String name;
   final double cost;
   final String? estimatedDays;
 
-  ShippingOption({
-    required this.id,
-    required this.name,
-    required this.cost,
-    this.estimatedDays,
-  });
+  ShippingOption({required this.id, required this.name, required this.cost, this.estimatedDays});
 
   factory ShippingOption.fromJson(Map<String, dynamic> json) {
     return ShippingOption(
       id: json['id'],
       name: json['name'],
       cost: double.parse(json['shipping_cost'].toString()),
-      estimatedDays: json['estimated_days'],
+      estimatedDays: json['estimated_days']?.toString(),
     );
   }
+}
+
+class MerchantGroup {
+  final String groupId; // merchantId or supplierId
+  final String merchantName;
+  final List<CartItemModel> items;
+  List<ShippingOption> shippingOptions; // خيارات الشحن المتاحة لهذا التاجر
+  ShippingOption? selectedShipping; // الخيار الذي حدده المستخدم
+
+  MerchantGroup({
+    required this.groupId,
+    required this.merchantName,
+    required this.items,
+    this.shippingOptions = const [],
+    this.selectedShipping,
+  });
 }

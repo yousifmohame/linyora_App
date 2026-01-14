@@ -1,5 +1,6 @@
+import 'dart:async'; // 1. استيراد المؤقت
 import 'package:flutter/material.dart';
-import 'package:pinput/pinput.dart'; // تأكد من استيراد المكتبة
+import 'package:pinput/pinput.dart';
 import 'package:linyora_project/features/auth/screens/auth_dispatcher.dart';
 import '../services/auth_service.dart';
 
@@ -18,20 +19,70 @@ class _VerifyLoginScreenState extends State<VerifyLoginScreen> {
   final FocusNode _focusNode = FocusNode();
 
   bool _isLoading = false;
+  bool _isResending = false; // 2. حالة إعادة الإرسال
+  int _countdown = 0; // 3. العداد
+  Timer? _timer; // 4. كائن المؤقت
+
   final Color _brandColor = const Color(0xFFF105C6);
 
   @override
+  void initState() {
+    super.initState();
+    _startTimer(); // بدء المؤقت عند فتح الصفحة
+  }
+
+  @override
   void dispose() {
+    _timer?.cancel(); // إيقاف المؤقت عند الخروج
     _codeController.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  // 5. دالة بدء العداد
+  void _startTimer() {
+    setState(() => _countdown = 60); // 60 ثانية
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_countdown == 0) {
+        timer.cancel();
+      } else {
+        setState(() => _countdown--);
+      }
+    });
+  }
+
+  // 6. دالة إعادة الإرسال
+  Future<void> _handleResendCode() async {
+    if (_countdown > 0) return;
+
+    setState(() => _isResending = true);
+    try {
+      await _authService.resendVerificationCode(widget.email);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("تم إرسال كود جديد ✅"),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _startTimer(); // إعادة تشغيل العداد
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isResending = false);
+    }
   }
 
   Future<void> _handleVerification(String pin) async {
     if (pin.length < 6) return;
 
     setState(() => _isLoading = true);
-    // إخفاء الكيبورد
     FocusScope.of(context).unfocus();
 
     try {
@@ -46,10 +97,8 @@ class _VerifyLoginScreenState extends State<VerifyLoginScreen> {
       }
     } catch (e) {
       if (mounted) {
-        // تفريغ الحقل عند الخطأ لإعادة المحاولة
         _codeController.clear();
         _focusNode.requestFocus();
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(e.toString()),
@@ -65,7 +114,7 @@ class _VerifyLoginScreenState extends State<VerifyLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // إعدادات تصميم مربعات الكود
+    // ... (نفس تصميم PinTheme) ...
     final defaultPinTheme = PinTheme(
       width: 50,
       height: 55,
@@ -79,17 +128,6 @@ class _VerifyLoginScreenState extends State<VerifyLoginScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey[300]!),
       ),
-    );
-
-    final focusedPinTheme = defaultPinTheme.copyDecorationWith(
-      border: Border.all(color: _brandColor, width: 2),
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-    );
-
-    final errorPinTheme = defaultPinTheme.copyDecorationWith(
-      border: Border.all(color: Colors.redAccent),
-      color: Colors.red[50],
     );
 
     return Scaffold(
@@ -108,9 +146,8 @@ class _VerifyLoginScreenState extends State<VerifyLoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              // ... (نفس الكود السابق للأيقونة والعنوان) ...
               const SizedBox(height: 20),
-
-              // أيقونة متحركة (اختياري)
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -123,9 +160,7 @@ class _VerifyLoginScreenState extends State<VerifyLoginScreen> {
                   color: _brandColor,
                 ),
               ),
-
               const SizedBox(height: 30),
-
               const Text(
                 "تأكيد الدخول",
                 style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
@@ -151,17 +186,22 @@ class _VerifyLoginScreenState extends State<VerifyLoginScreen> {
                   ],
                 ),
               ),
-
               const SizedBox(height: 40),
 
-              // --- حقل الكود الاحترافي (Pinput) ---
               Pinput(
                 length: 6,
                 controller: _codeController,
                 focusNode: _focusNode,
                 defaultPinTheme: defaultPinTheme,
-                focusedPinTheme: focusedPinTheme,
-                errorPinTheme: errorPinTheme,
+                focusedPinTheme: defaultPinTheme.copyDecorationWith(
+                  border: Border.all(color: _brandColor, width: 2),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                errorPinTheme: defaultPinTheme.copyDecorationWith(
+                  border: Border.all(color: Colors.redAccent),
+                  color: Colors.red[50],
+                ),
                 pinputAutovalidateMode: PinputAutovalidateMode.onSubmit,
                 showCursor: true,
                 onCompleted: (pin) => _handleVerification(pin),
@@ -169,7 +209,6 @@ class _VerifyLoginScreenState extends State<VerifyLoginScreen> {
 
               const SizedBox(height: 40),
 
-              // زر التأكيد
               SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -201,28 +240,7 @@ class _VerifyLoginScreenState extends State<VerifyLoginScreen> {
 
               const SizedBox(height: 24),
 
-              // إعادة الإرسال
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    "لم يصلك الكود؟ ",
-                    style: TextStyle(color: Colors.grey[600]),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      // TODO: استدعاء دالة إعادة الإرسال
-                    },
-                    child: Text(
-                      "إعادة إرسال",
-                      style: TextStyle(
-                        color: _brandColor,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              // 7. زر إعادة الإرسال المحدث
             ],
           ),
         ),

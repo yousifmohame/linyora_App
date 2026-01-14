@@ -16,7 +16,6 @@ class PublicProfileService {
   }
 
   // جلب بروفايل المودل
-  // ملاحظة: تأكد من وجود المسار /models/public-profile/:id في الباك اند
   // أو استخدم المسار المناسب الذي يرجع نفس هيكل ModelProfileData في React
   Future<PublicModelProfile> getModelProfile(String id) async {
     try {

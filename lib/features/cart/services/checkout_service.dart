@@ -21,17 +21,19 @@ class CheckoutService {
   }
 
   // 2. جلب خيارات الشحن لمجموعة منتجات
+  // جلب خيارات الشحن لمجموعة منتجات محددة
   Future<List<ShippingOption>> getShippingOptions(List<int> productIds) async {
     try {
       final response = await _apiClient.post(
         '/products/shipping-options-for-cart',
-        data: {'productIds': productIds},
+        data: {'productIds': productIds}, // إرسال قائمة الآيديهات فقط
       );
+
       return (response.data as List)
           .map((e) => ShippingOption.fromJson(e))
           .toList();
     } catch (e) {
-      print('Error fetching shipping: $e');
+      print("Error fetching shipping: $e");
       return [];
     }
   }

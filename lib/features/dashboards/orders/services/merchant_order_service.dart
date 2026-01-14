@@ -22,7 +22,7 @@ class MerchantOrderService {
   Future<bool> updateOrderStatus(int orderId, String newStatus) async {
     try {
       final response = await _apiClient.put(
-        '/merchants/orders/$orderId/status',
+        '/orders/$orderId/status',
         data: {'status': newStatus},
       );
       return response.statusCode == 200;

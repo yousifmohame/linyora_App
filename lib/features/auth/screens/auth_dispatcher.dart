@@ -26,7 +26,7 @@ class AuthDispatcher extends StatelessWidget {
         return const ModelDashboard();
 
       case UserRole.supplier:
-        return const SupplierDashboard();
+        return const SupplierDashboardScreen();
 
       case UserRole.customer:
       default:

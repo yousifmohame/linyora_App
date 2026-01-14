@@ -42,7 +42,7 @@ class AuthProvider extends ChangeNotifier {
       final subscriptionFuture = _apiClient
           .get('/subscriptions/status')
           .catchError((e) {
-            print("⚠️ Failed to fetch subscription (might be 404): $e");
+
             return null;
           });
 
@@ -59,24 +59,19 @@ class AuthProvider extends ChangeNotifier {
         // 3. ✅ دمج بيانات الاشتراك يدوياً
         if (subscriptionResponse != null &&
             subscriptionResponse.statusCode == 200) {
-          print("✅ Subscription Data Fetched: ${subscriptionResponse.data}");
+          
           // نضع استجابة الاشتراك داخل حقل 'subscription' في بيانات المستخدم
           userData['subscription'] = subscriptionResponse.data;
         } else {
-          print("ℹ️ No active subscription data found.");
+          
         }
 
         // 4. تحديث المودل بالبيانات الكاملة
         _user = UserModel.fromJson(userData);
 
-        // (اختياري) تحديث السيرفس إذا كان يدعم ذلك
-        // _authService.updateUser(_user!);
-
-        print("User Role: ${_user?.role}");
-        print("Subscription Status: ${_user?.subscription?.status}");
       }
     } catch (e) {
-      print("❌ Error refreshing user data: $e");
+      
     }
 
     notifyListeners();

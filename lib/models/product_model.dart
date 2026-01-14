@@ -1,5 +1,4 @@
 import 'package:linyora_project/models/product_details_model.dart';
-
 import '../core/utils/image_helper.dart';
 
 class ProductModel {
@@ -14,10 +13,15 @@ class ProductModel {
   final String? brand;
   final String status;
   final double price;
+  final String? promotionEndsAt;
   final double? compareAtPrice;
   final int stock;
   final List<ProductVariant>? variants;
   final List<int>? categoryIds;
+
+  // حقول الدروب شيبينج
+  final bool isDropshipping;
+  final int? originalProductId;
 
   ProductModel({
     required this.id,
@@ -35,10 +39,13 @@ class ProductModel {
     this.stock = 0,
     this.variants,
     this.categoryIds,
+    this.promotionEndsAt,
+    this.isDropshipping = false,
+    this.originalProductId,
   });
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
-    // ✅ 1. استخراج المتغيرات (Variants) بشكل آمن
+    // 1. استخراج المتغيرات (Variants)
     List<ProductVariant> variantsList = [];
     if (json['variants'] != null) {
       if (json['variants'] is List) {
@@ -46,16 +53,10 @@ class ProductModel {
             (json['variants'] as List)
                 .map((v) => ProductVariant.fromJson(v))
                 .toList();
-      } else if (json['variants'] is Map) {
-        // حالة نادرة: إذا جاءت المتغيرات كـ Map بدلاً من List
-        // (Map<String, dynamic> يتم تحويل قيمها إلى List)
-        (json['variants'] as Map<String, dynamic>).forEach((key, value) {
-          variantsList.add(ProductVariant.fromJson(value));
-        });
       }
     }
 
-    // 2. تحديد البيانات الرئيسية للعرض
+    // 2. تحديد البيانات الرئيسية
     double displayPrice = 0.0;
     double? displayComparePrice;
     String displayImage = '';
@@ -65,65 +66,86 @@ class ProductModel {
       final first = variantsList.first;
       displayPrice = first.price;
       displayComparePrice = first.compareAtPrice;
-      if (first.images.isNotEmpty) {
-        displayImage = first.images.first;
-      }
+      if (first.images.isNotEmpty) displayImage = first.images.first;
       totalStock = variantsList.fold(
         0,
         (sum, item) => sum + item.stockQuantity,
       );
     } else {
-      displayPrice = double.tryParse(json['price'].toString()) ?? 0.0;
+      displayPrice = (json['price'] as num?)?.toDouble() ?? 0.0;
       if (json['image_url'] != null) {
         displayImage = json['image_url'].toString();
       } else if (json['image'] != null) {
         displayImage = json['image'].toString();
       }
-      totalStock = int.tryParse(json['stock'].toString()) ?? 0;
+      totalStock = (json['stock'] as num?)?.toInt() ?? 0;
     }
 
-    String merchant = json['merchantName'] ?? json['brand'] ?? '';
-    String brandName = json['brand'] ?? '';
-
-    // ✅ 3. معالجة الفئات بشكل آمن
+    // -----------------------------------------------------------
+    // ✅ 3. الحل هنا: معالجة الفئات بذكاء (List أو Single Value)
+    // -----------------------------------------------------------
     List<int> catIds = [];
+
+    // الحالة أ: إذا جاءت كقائمة (categoryIds)
     if (json['categoryIds'] != null && json['categoryIds'] is List) {
       catIds =
           (json['categoryIds'] as List)
-              .map((e) => int.parse(e.toString()))
+              .map((e) => int.tryParse(e.toString()) ?? 0)
+              .where((e) => e > 0)
               .toList();
-    } else if (json['categories'] != null && json['categories'] is List) {
+    }
+    // الحالة ب: إذا جاءت ككائنات (categories)
+    else if (json['categories'] != null && json['categories'] is List) {
       catIds =
           (json['categories'] as List)
-              .map((e) => int.parse(e['id'].toString()))
+              .map((e) => int.tryParse(e['id']?.toString() ?? '0') ?? 0)
+              .where((e) => e > 0)
               .toList();
     }
 
-    // 4. حساب "جديد"
-    bool isNewProduct = false;
-    if (json['created_at'] != null) {
-      final createdAt = DateTime.tryParse(json['created_at'].toString());
-      if (createdAt != null) {
-        isNewProduct = DateTime.now().difference(createdAt).inDays < 7;
+    // ✅ الحالة ج (الحل لمشكلتك): إذا جاءت كقيمة مفردة (category_id)
+    // الباك إند يرسل MAX(category_id) كقيمة واحدة، لذا نلتقطها هنا
+    if (catIds.isEmpty && json['category_id'] != null) {
+      int? singleId = int.tryParse(json['category_id'].toString());
+      if (singleId != null && singleId > 0) {
+        catIds.add(singleId);
       }
+    }
+    // -----------------------------------------------------------
+
+    // 4. تحديد حالة الدروب شيبينج
+    bool isDropshippingProduct = false;
+    if (json['is_dropshipping'] != null) {
+      isDropshippingProduct =
+          json['is_dropshipping'] == true ||
+          json['is_dropshipping'] == 1 ||
+          json['is_dropshipping'].toString() == '1';
+    } else if (json['supplier_id'] != null) {
+      isDropshippingProduct = true;
     }
 
     return ProductModel(
-      id: int.tryParse(json['id'].toString()) ?? 0,
-      name: json['name'] ?? '',
-      description: json['description'] ?? '',
+      id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      name: json['name']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
       imageUrl: ImageHelper.getValidUrl(displayImage),
-      rating: double.tryParse(json['rating'].toString()) ?? 0.0,
-      reviewCount: int.tryParse(json['reviewCount'].toString()) ?? 0,
-      merchantName: merchant,
-      isNew: isNewProduct,
-      brand: brandName,
-      status: json['status'] ?? 'active',
+      rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
+      reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
+      merchantName:
+          json['merchantName']?.toString() ?? json['brand']?.toString() ?? '',
+      isNew: json['is_new'] == true,
+      promotionEndsAt: json['promotion_ends_at']?.toString(),
+      brand: json['brand']?.toString(),
+      status: json['status']?.toString() ?? 'active',
       price: displayPrice,
       compareAtPrice: displayComparePrice,
       stock: totalStock,
       variants: variantsList,
-      categoryIds: catIds,
+      categoryIds: catIds, // ✅ الآن ستحتوي على القيمة حتى لو جاءت مفردة
+      isDropshipping: isDropshippingProduct,
+      originalProductId:
+          int.tryParse(json['original_product_id']?.toString() ?? '') ??
+          int.tryParse(json['supplier_product_id']?.toString() ?? ''),
     );
   }
 }

@@ -27,10 +27,6 @@ void main() async {
       'pk_test_51QMVVaRprtRJ29NO563CM9I4Fj1p1xVaz5Dyvo6GBg5bxCvJlSQPOfCxa0KD7cBjL9MJcq8uQDUyPfkWgbOqNZZs00wlW9KrBI';
   await Stripe.instance.applySettings();
 
-  // محاولة تسجيل الدخول التلقائي قبل تشغيل الواجهة (للسرعة)
-  // ملاحظة: AuthProvider سيقوم بذلك أيضاً، لكن هذا جيد للتأكد
-  // await AuthService.instance.tryAutoLogin();
-
   runApp(
     MultiProvider(
       providers: [
@@ -103,7 +99,7 @@ class LinyoraApp extends StatelessWidget {
 
               // 2. حالة عدم التسجيل
               if (!auth.isLoggedIn || auth.user == null) {
-                return const LoginScreen();
+                return const MainLayoutScreen();
               }
 
               // 3. حالة التسجيل -> نرسل المستخدم للموجه

@@ -1,9 +1,8 @@
-// ✅ حالة الاشتراك (منقولة من كودك)
+// ✅ حالة الاشتراك (كما هي)
 class SubscriptionState {
   final String status;
   final bool hasDropshippingAccess;
   final String? planName;
-  // ✅ الحقول الجديدة من اللوج
   final String? startDate;
   final String? endDate;
 
@@ -20,26 +19,24 @@ class SubscriptionState {
       status: json['status'] ?? 'inactive',
       hasDropshippingAccess:
           json['permissions']?['hasDropshippingAccess'] ?? false,
-      // قراءة الاسم من داخل الكائن المتداخل plan
       planName: json['plan']?['name'],
-      // قراءة التواريخ
       startDate: json['startDate'],
       endDate: json['endDate'],
     );
   }
 }
 
-// ✅ أدوار المستخدم
+// ✅ أدوار المستخدم (تحديث التعليقات للتوضيح)
 enum UserRole {
   admin, // 1
   merchant, // 2
   model, // 3
-  supplier, // 4
   customer, // 5
+  supplier, // 6 ✅ (تم التحديث)
   unknown,
 }
 
-// ✅ مودل المستخدم الموحد (مدمج)
+// ✅ مودل المستخدم الموحد
 class UserModel {
   final int id;
   final String name;
@@ -48,14 +45,14 @@ class UserModel {
   final String? avatar;
   final String? token;
 
-  // نخزن الرقم كما يأتي من الباك إند
+  // رقم الدور من الباك إند
   final int roleId;
 
   // حقول التاجر
   final String verificationStatus;
   final bool hasAcceptedAgreement;
 
-  // ✅ الحقل الجديد: حالة الاشتراك
+  // حالة الاشتراك
   final SubscriptionState? subscription;
 
   UserModel({
@@ -71,7 +68,7 @@ class UserModel {
     this.subscription,
   });
 
-  // --- Getter لتحويل الرقم لـ Enum ---
+  // --- 🔄 Getter لتحويل الرقم لـ Enum (تم التعديل هنا) ---
   UserRole get role {
     switch (roleId) {
       case 1:
@@ -80,10 +77,11 @@ class UserModel {
         return UserRole.merchant;
       case 3:
         return UserRole.model;
-      case 4:
-        return UserRole.supplier;
+      // case 4: غالبًا محجوز لمندوب أو دور آخر، سنجعله عميل افتراضيًا
       case 5:
         return UserRole.customer;
+      case 6:
+        return UserRole.supplier; // ✅ تم تعيين رقم 6 للمورد
       default:
         return UserRole.customer;
     }
@@ -93,23 +91,20 @@ class UserModel {
   bool get isMerchant => role == UserRole.merchant;
   bool get isModel => role == UserRole.model;
   bool get isAdmin => role == UserRole.admin;
+  bool get isSupplier => role == UserRole.supplier; // ✅ دالة مساعدة للمورد
+  bool get isCustomer => role == UserRole.customer;
 
-  // ✅ هل المستخدم مشترك؟
+  // هل المستخدم مشترك؟
   bool get isSubscribed => subscription?.status == 'active';
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
-    // 🔍 LOG 1: طباعة البيانات الخام القادمة من السيرفر
+    // 🔍 LOG: طباعة البيانات للتأكد
     print("================ DEBUG USER MODEL ================");
     print("User Name: ${json['name']}");
-    print("Raw Subscription Data: ${json['subscription']}");
-    print("Role ID: ${json['role_id']}");
+    print("Role ID: ${json['role_id']}"); // تأكد أن هذا يطبع 6 للمورد
 
-    // فحص محتوى الاشتراك بالتفصيل
     if (json['subscription'] != null) {
       print("Sub Status: ${json['subscription']['status']}");
-      print("Sub Permissions: ${json['subscription']['permissions']}");
-    } else {
-      print("❌ Subscription is NULL in JSON!");
     }
     print("==================================================");
 
@@ -124,6 +119,7 @@ class UserModel {
       avatar: json['profile_picture_url'] ?? json['avatar'],
       token: json['access_token'] ?? json['token'],
 
+      // قراءة Role ID
       roleId:
           json['role_id'] is int
               ? json['role_id']
@@ -135,7 +131,6 @@ class UserModel {
           json['has_accepted_agreement'] == 1 ||
           json['has_accepted_agreement'] == true,
 
-      // قراءة الاشتراك
       subscription:
           json['subscription'] != null
               ? SubscriptionState.fromJson(json['subscription'])
@@ -154,7 +149,6 @@ class UserModel {
       'token': token,
       'verification_status': verificationStatus,
       'has_accepted_agreement': hasAcceptedAgreement,
-      // لا نحتاج لإرسال الاشتراك للباك إند غالباً، لكن يمكن إضافته إذا لزم
     };
   }
 

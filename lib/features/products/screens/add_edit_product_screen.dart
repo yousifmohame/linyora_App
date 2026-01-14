@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart'; // تأكد من وجود هذه المكتبة
 import 'package:linyora_project/models/product_model.dart';
 import 'package:linyora_project/features/products/services/product_service.dart';
-// ✅ استيراد خدمة ومودل التصنيفات
 import 'package:linyora_project/features/categories/services/category_service.dart';
 import 'package:linyora_project/models/category_model.dart';
 
@@ -33,8 +33,7 @@ class AddEditProductScreen extends StatefulWidget {
 class _AddEditProductScreenState extends State<AddEditProductScreen> {
   final _formKey = GlobalKey<FormState>();
   final ProductService _productService = ProductService();
-  final CategoryService _categoryService =
-      CategoryService(); // ✅ الخدمة لجلب التصنيفات
+  final CategoryService _categoryService = CategoryService();
   final ImagePicker _picker = ImagePicker();
 
   // Basic Info Controllers
@@ -43,6 +42,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
   late TextEditingController _brandController;
 
   bool _isActive = true;
+  bool _isDropshipping = false; // ✅ متغير التحكم في الدروب شيبينج
   List<int> _selectedCategoryIds = [];
 
   // Variants State
@@ -50,22 +50,29 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
 
   // UI State
   bool _isSubmitting = false;
-  bool _isLoadingCategories = true; // للتحميل
+  bool _isLoadingCategories = true;
 
-  // ✅ قائمة التصنيفات الحقيقية
   List<CategoryModel> _allCategories = [];
 
   @override
   void initState() {
     super.initState();
+
+    // 1. التحقق من نوع المنتج
+    if (widget.product != null) {
+      _isDropshipping = widget.product!.isDropshipping;
+    }
+
     _initializeData();
-    _fetchCategories(); // ✅ جلب التصنيفات عند البدء
+
+    // ✅ الحل: جلب الفئات دائماً لضمان عرض أسمائها (حتى لو كانت للقراءة فقط)
+    _fetchCategories();
   }
 
-  // جلب التصنيفات من السيرفر
   Future<void> _fetchCategories() async {
     try {
       final categories = await _categoryService.getAllCategories();
+
       if (mounted) {
         setState(() {
           _allCategories = categories;
@@ -75,21 +82,46 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoadingCategories = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('فشل جلب التصنيفات: $e')));
       }
     }
   }
 
+  String _getCategoryNameById(int id) {
+    // دالة مساعدة للبحث داخل الشجرة
+    CategoryModel? findRecursive(List<CategoryModel> list) {
+      for (var cat in list) {
+        if (cat.id == id) return cat; // وجدناه في هذا المستوى
+
+        if (cat.children.isNotEmpty) {
+          final foundInChild = findRecursive(cat.children);
+          if (foundInChild != null) return foundInChild; // وجدناه في الابن
+        }
+      }
+      return null;
+    }
+
+    final cat = findRecursive(_allCategories);
+    return cat?.name ?? 'Unknown ($id)';
+  }
+
   void _initializeData() {
+    if (widget.product != null) {
+      if (widget.product!.categoryIds != null) {
+        // ✅ التأكد من تحويل القيم إلى int بشكل صريح
+        _selectedCategoryIds =
+            widget.product!.categoryIds!
+                .map((e) => int.tryParse(e.toString()) ?? 0)
+                .where((e) => e > 0)
+                .toList();
+      }
+    } else {}
+
     _nameController = TextEditingController(text: widget.product?.name ?? '');
     _descController = TextEditingController(
       text: widget.product?.description ?? '',
     );
     _brandController = TextEditingController(text: widget.product?.brand ?? '');
 
-    // استعادة الفئات إذا كان تعديل
     if (widget.product?.categoryIds != null) {
       _selectedCategoryIds = List.from(widget.product!.categoryIds!);
     }
@@ -180,7 +212,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_selectedCategoryIds.isEmpty) {
+    if (!_isDropshipping && _selectedCategoryIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('يرجى اختيار فئة واحدة على الأقل')),
       );
@@ -190,19 +222,19 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      // تجميع الصور الجديدة (للتبسيط سنجمعها كلها)
       List<File> allNewImages = [];
-      for (var v in _variants) {
-        allNewImages.addAll(v['new_images'] as List<File>);
+      if (!_isDropshipping) {
+        for (var v in _variants) {
+          allNewImages.addAll(v['new_images'] as List<File>);
+        }
       }
 
-      // ✅ تصحيح أسماء الحقول لتطابق الباك إند تماماً
       final Map<String, dynamic> productData = {
         'name': _nameController.text,
         'description': _descController.text,
         'brand': _brandController.text,
         'status': _isActive ? 'active' : 'draft',
-        'categoryIds': _selectedCategoryIds, // يجب أن تكون IDs حقيقية الآن
+        'categoryIds': _selectedCategoryIds,
         'variants':
             _variants.map((v) {
               final priceText = (v['price'] as TextEditingController).text;
@@ -211,18 +243,19 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
               final stockText = (v['stock'] as TextEditingController).text;
 
               return {
+                // ✅✅✅ هذا هو التعديل الهام جداً: إرسال الـ ID
+                'id': v['id'],
+
                 'color': (v['color'] as TextEditingController).text,
                 'price': double.tryParse(priceText) ?? 0,
-                // ✅ إرسال null إذا فارغ
                 'compare_at_price':
                     compareText.isEmpty ? null : double.tryParse(compareText),
-                // ✅ الاسم الصحيح: stock_quantity
                 'stock_quantity': int.tryParse(stockText) ?? 0,
                 'sku':
                     (v['sku'] as TextEditingController).text.isEmpty
                         ? _generateSku(_variants.indexOf(v))
                         : (v['sku'] as TextEditingController).text,
-                'images': v['images'], // الروابط القديمة
+                'images': v['images'],
               };
             }).toList(),
       };
@@ -264,8 +297,35 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: Text(
-          widget.product == null ? 'إضافة منتج جديد' : 'تعديل المنتج',
+        title: Row(
+          children: [
+            Text(widget.product == null ? 'إضافة منتج' : 'تعديل المنتج'),
+            if (_isDropshipping) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.cloud_download, size: 12, color: Colors.blue),
+                    SizedBox(width: 4),
+                    Text(
+                      "Dropshipping",
+                      style: TextStyle(
+                        color: Colors.blue,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
@@ -280,9 +340,13 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                   key: _formKey,
                   child: Column(
                     children: [
+                      if (_isDropshipping) _buildDropshippingAlert(),
+
                       _buildBasicInfoCard(),
                       const SizedBox(height: 24),
+
                       _buildVariantsCard(),
+
                       const SizedBox(height: 32),
                       _buildActionButtons(),
                     ],
@@ -292,9 +356,36 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // 1. بطاقة المعلومات الأساسية
-  // ---------------------------------------------------------------------------
+  // --- Widgets ---
+
+  Widget _buildDropshippingAlert() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        border: Border.all(color: Colors.blue.shade200),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info, color: Colors.blue),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              "هذا منتج مستورد. يمكنك تعديل السعر والوصف فقط، بينما يتم مزامنة المخزون والصور تلقائياً من المورد.",
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.blueAccent,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBasicInfoCard() {
     return Container(
       decoration: BoxDecoration(
@@ -313,19 +404,14 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            children: [
-              const Icon(Icons.verified, color: Colors.pink),
-              const SizedBox(width: 8),
-              const Text(
+            children: const [
+              Icon(Icons.verified, color: Colors.pink),
+              SizedBox(width: 8),
+              Text(
                 'المعلومات الأساسية',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'قم بإدخال تفاصيل المنتج الأساسية',
-            style: TextStyle(color: Colors.grey[600], fontSize: 12),
           ),
           const Divider(height: 30),
 
@@ -337,6 +423,8 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                   label: 'اسم المنتج',
                   icon: Icons.auto_awesome,
                   color: Colors.pink,
+                  readOnly: _isDropshipping, // 🔒 قفل الاسم
+                  hint: _isDropshipping ? "الاسم الأصلي من المورد" : null,
                 ),
               ),
               const SizedBox(width: 16),
@@ -346,15 +434,19 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                   label: 'الماركة',
                   icon: Icons.trending_up,
                   color: Colors.purple,
+                  readOnly: _isDropshipping, // 🔒 قفل الماركة
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          // عرض التصنيفات (مع مؤشر تحميل)
-          _isLoadingCategories
-              ? const Center(child: LinearProgressIndicator())
-              : _buildCategorySelector(),
+
+          if (!_isDropshipping) ...[
+            const SizedBox(height: 16),
+            _isLoadingCategories
+                ? const LinearProgressIndicator()
+                : _buildCategorySelector(),
+          ],
+
           const SizedBox(height: 16),
           _buildInputField(
             controller: _descController,
@@ -362,7 +454,9 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
             icon: Icons.description,
             color: Colors.blue,
             maxLines: 4,
+            // الوصف عادة مسموح تعديله حتى في الدروب شيبينج لتحسين الـ SEO
           ),
+
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(12),
@@ -391,9 +485,6 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // 2. بطاقة المتغيرات
-  // ---------------------------------------------------------------------------
   Widget _buildVariantsCard() {
     return Container(
       decoration: BoxDecoration(
@@ -411,8 +502,8 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
-            children: [
+          Row(
+            children: const [
               Icon(Icons.style, color: Colors.orange),
               SizedBox(width: 8),
               Text(
@@ -439,7 +530,8 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                 ),
                 child: Column(
                   children: [
-                    if (_variants.length > 1)
+                    // زر الحذف يظهر فقط إذا لم يكن دروب شيبينج
+                    if (!_isDropshipping && _variants.length > 1)
                       Align(
                         alignment: Alignment.centerLeft,
                         child: IconButton(
@@ -454,65 +546,52 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                     Row(
                       children: [
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildInputField(
-                                controller: variant['color'],
-                                label: 'اللون',
-                                icon: Icons.palette,
-                                color: Colors.amber,
-                                onChanged: (_) => setState(() {}),
-                              ),
-                              const SizedBox(height: 8),
-                              SizedBox(
-                                height: 30,
-                                child: ListView(
-                                  scrollDirection: Axis.horizontal,
-                                  children:
-                                      kPredefinedColors
-                                          .map(
-                                            (c) => InkWell(
-                                              onTap: () {
-                                                (variant['color']
-                                                        as TextEditingController)
-                                                    .text = c['name'];
-                                                setState(() {});
-                                              },
-                                              child: Container(
-                                                width: 24,
-                                                height: 24,
-                                                margin:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 4,
-                                                    ),
-                                                decoration: BoxDecoration(
-                                                  color: c['value'],
-                                                  shape: BoxShape.circle,
-                                                  border: Border.all(
-                                                    color: Colors.grey.shade300,
-                                                  ),
-                                                ),
+                          child: _buildInputField(
+                            controller: variant['color'],
+                            label: 'اللون',
+                            icon: Icons.palette,
+                            color: Colors.amber,
+                            readOnly: _isDropshipping, // 🔒 قفل اللون
+                          ),
+                        ),
+                        if (!_isDropshipping) ...[
+                          const SizedBox(width: 8),
+                          // إخفاء اختيار الألوان في حالة الدروب شيبينج
+                          SizedBox(
+                            height: 30,
+                            width: 100,
+                            child: ListView(
+                              scrollDirection: Axis.horizontal,
+                              children:
+                                  kPredefinedColors
+                                      .map(
+                                        (c) => InkWell(
+                                          onTap: () {
+                                            (variant['color']
+                                                    as TextEditingController)
+                                                .text = c['name'];
+                                            setState(() {});
+                                          },
+                                          child: Container(
+                                            width: 20,
+                                            height: 20,
+                                            margin: const EdgeInsets.symmetric(
+                                              horizontal: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: c['value'],
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: Colors.grey.shade300,
                                               ),
                                             ),
-                                          )
-                                          .toList(),
-                                ),
-                              ),
-                            ],
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildInputField(
-                            controller: variant['sku'],
-                            label: 'SKU',
-                            icon: Icons.qr_code,
-                            color: Colors.grey,
-                            hint: _generateSku(index),
-                            readOnly: true,
-                          ),
-                        ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -522,10 +601,11 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                         Expanded(
                           child: _buildInputField(
                             controller: variant['price'],
-                            label: 'السعر',
+                            label: _isDropshipping ? 'سعر البيع' : 'السعر',
                             icon: Icons.attach_money,
                             color: Colors.green,
                             keyboardType: TextInputType.number,
+                            // السعر دائماً قابل للتعديل
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -547,45 +627,110 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                       icon: Icons.inventory,
                       color: Colors.purple,
                       keyboardType: TextInputType.number,
+                      readOnly: _isDropshipping, // 🔒 قفل الكمية
+                      hint: _isDropshipping ? "تدار تلقائياً" : null,
                     ),
 
                     const SizedBox(height: 16),
-                    _buildImagesSection(index),
+
+                    // إذا دروب شيبينج، عرض الصور فقط (بدون تعديل)
+                    _isDropshipping
+                        ? _buildReadOnlyImages(variant['images'])
+                        : _buildImagesSection(index),
                   ],
                 ),
               );
             },
           ),
 
-          const SizedBox(height: 20),
-          InkWell(
-            onTap: _addVariant,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.amber.shade300),
-                borderRadius: BorderRadius.circular(12),
-                color: Colors.amber.shade50,
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.add_circle_outline, color: Colors.amber),
-                  SizedBox(width: 8),
-                  Text(
-                    'إضافة خيار جديد',
-                    style: TextStyle(
-                      color: Colors.amber,
-                      fontWeight: FontWeight.bold,
+          // زر إضافة متغير يختفي في حالة الدروب شيبينج
+          if (!_isDropshipping) ...[
+            const SizedBox(height: 20),
+            InkWell(
+              onTap: _addVariant,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.amber.shade300),
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.amber.shade50,
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add_circle_outline, color: Colors.amber),
+                    SizedBox(width: 8),
+                    Text(
+                      'إضافة خيار جديد',
+                      style: TextStyle(
+                        color: Colors.amber,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
+    );
+  }
+
+  // ويدجت صور للقراءة فقط (للدروب شيبينج)
+  Widget _buildReadOnlyImages(List images) {
+    if (images.isEmpty)
+      return const Align(
+        alignment: Alignment.centerRight,
+        child: Text(
+          "لا توجد صور متاحة من المورد.",
+          style: TextStyle(color: Colors.grey, fontSize: 12),
+        ),
+      );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'صور المنتج (للعرض فقط)',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+            color: Colors.grey,
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 80,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: images.length,
+            itemBuilder:
+                (ctx, i) => Container(
+                  width: 80,
+                  margin: const EdgeInsets.only(left: 8),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: CachedNetworkImage(
+                      imageUrl: images[i],
+                      fit: BoxFit.cover,
+                      placeholder: (c, u) => Container(color: Colors.grey[100]),
+                      errorWidget:
+                          (c, u, e) => const Icon(
+                            Icons.broken_image,
+                            color: Colors.grey,
+                          ),
+                    ),
+                  ),
+                ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -685,9 +830,7 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // 3. قسم التصنيفات (تم تحديثه لعرض البيانات الحقيقية)
-  // ---------------------------------------------------------------------------
+  // (نفس كود التصنيفات السابق)
   Widget _buildCategorySelector() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -719,9 +862,9 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                   child: Text(
                     _selectedCategoryIds.isEmpty
                         ? 'اختر الفئات...'
-                        : _allCategories
-                            .where((c) => _selectedCategoryIds.contains(c.id))
-                            .map((c) => c.name)
+                        // ✅ هنا التغيير الجذري: نستخدم الدالة التكرارية بدلاً من البحث السطحي
+                        : _selectedCategoryIds
+                            .map((id) => _getCategoryNameById(id))
                             .join(', '),
                     style: TextStyle(
                       color:
@@ -737,7 +880,6 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
             ),
           ),
         ),
-        // عرض الـ Chips للفئات المختارة
         if (_selectedCategoryIds.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 8.0),
@@ -746,19 +888,17 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
               runSpacing: 4,
               children:
                   _selectedCategoryIds.map((id) {
-                    // البحث الآمن (قد تكون الفئة غير موجودة في القائمة المحملة إذا كانت القائمة مجزأة)
                     final cat = _allCategories.firstWhere(
                       (c) => c.id == id,
                       orElse:
                           () => CategoryModel(
                             id: id,
                             name: 'Unknown',
-                            imageUrl: '',
                             slug: '',
+                            imageUrl: '',
                           ),
                     );
                     if (cat.name == 'Unknown') return const SizedBox();
-
                     return Chip(
                       label: Text(
                         cat.name,
@@ -786,15 +926,20 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
         String searchQuery = '';
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            // فلترة القائمة الحقيقية
-            final filteredCats =
-                _allCategories
-                    .where(
-                      (c) => c.name.toLowerCase().contains(
-                        searchQuery.toLowerCase(),
-                      ),
-                    )
-                    .toList();
+            List<CategoryModel> displayList = [];
+            if (searchQuery.isNotEmpty) {
+              void searchRecursive(List<CategoryModel> list) {
+                for (var item in list) {
+                  if (item.name.toLowerCase().contains(
+                    searchQuery.toLowerCase(),
+                  ))
+                    displayList.add(item);
+                  if (item.children.isNotEmpty) searchRecursive(item.children);
+                }
+              }
+
+              searchRecursive(_allCategories);
+            }
 
             return Dialog(
               shape: RoundedRectangleBorder(
@@ -813,8 +958,6 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                       ),
                     ),
                   ),
-
-                  // حقل البحث
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: TextField(
@@ -827,46 +970,24 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                         ),
                         filled: true,
                         fillColor: Colors.grey[100],
-                        contentPadding: const EdgeInsets.symmetric(vertical: 0),
                       ),
                       onChanged: (v) => setDialogState(() => searchQuery = v),
                     ),
                   ),
-
                   const SizedBox(height: 8),
                   const Divider(height: 1),
-
                   SizedBox(
-                    height: 300,
+                    height: 350,
                     child:
-                        filteredCats.isEmpty
-                            ? const Center(child: Text("لا توجد فئات"))
-                            : ListView.builder(
-                              itemCount: filteredCats.length,
-                              itemBuilder: (ctx, i) {
-                                final cat = filteredCats[i];
-                                final isSelected = _selectedCategoryIds
-                                    .contains(cat.id);
-                                return ListTile(
-                                  title: Text(cat.name),
-                                  trailing:
-                                      isSelected
-                                          ? const Icon(
-                                            Icons.check,
-                                            color: Colors.blue,
-                                          )
-                                          : null,
-                                  onTap: () {
-                                    setState(() {
-                                      if (isSelected)
-                                        _selectedCategoryIds.remove(cat.id);
-                                      else
-                                        _selectedCategoryIds.add(cat.id);
-                                    });
-                                    setDialogState(() {}); // لتحديث أيقونة الصح
-                                  },
-                                );
-                              },
+                        searchQuery.isNotEmpty
+                            ? _buildSearchResults(displayList, setDialogState)
+                            : ListView(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              children: _buildCategoryTree(
+                                _allCategories,
+                                0,
+                                setDialogState,
+                              ),
                             ),
                   ),
                   Padding(
@@ -874,6 +995,10 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                     child: SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.pink,
+                          foregroundColor: Colors.white,
+                        ),
                         onPressed: () => Navigator.pop(ctx),
                         child: const Text('تم'),
                       ),
@@ -882,6 +1007,117 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
                 ],
               ),
             );
+          },
+        );
+      },
+    );
+  }
+
+  List<Widget> _buildCategoryTree(
+    List<CategoryModel> categories,
+    int level,
+    StateSetter setDialogState,
+  ) {
+    List<Widget> widgets = [];
+    for (var cat in categories) {
+      final isSelected = _selectedCategoryIds.contains(cat.id);
+      widgets.add(
+        InkWell(
+          onTap: () {
+            setState(() {
+              if (isSelected)
+                _selectedCategoryIds.remove(cat.id);
+              else
+                _selectedCategoryIds.add(cat.id);
+            });
+            setDialogState(() {});
+          },
+          child: Padding(
+            padding: EdgeInsets.only(
+              right: 16.0 + (level * 24.0),
+              left: 16.0,
+              top: 12,
+              bottom: 12,
+            ),
+            child: Row(
+              children: [
+                if (level > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8.0),
+                    child: Icon(
+                      Icons.subdirectory_arrow_left,
+                      size: 16,
+                      color: Colors.grey.shade400,
+                    ),
+                  ),
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: isSelected ? Colors.blue : Colors.white,
+                    border: Border.all(
+                      color: isSelected ? Colors.blue : Colors.grey.shade400,
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child:
+                      isSelected
+                          ? const Icon(
+                            Icons.check,
+                            size: 14,
+                            color: Colors.white,
+                          )
+                          : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    cat.name,
+                    style: TextStyle(
+                      fontWeight:
+                          level == 0 ? FontWeight.bold : FontWeight.normal,
+                      color: Colors.black87,
+                      fontSize: level == 0 ? 14 : 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      if (cat.children.isNotEmpty)
+        widgets.addAll(
+          _buildCategoryTree(cat.children, level + 1, setDialogState),
+        );
+    }
+    return widgets;
+  }
+
+  Widget _buildSearchResults(
+    List<CategoryModel> list,
+    StateSetter setDialogState,
+  ) {
+    if (list.isEmpty) return const Center(child: Text("لا توجد نتائج"));
+    return ListView.builder(
+      itemCount: list.length,
+      itemBuilder: (ctx, i) {
+        final cat = list[i];
+        final isSelected = _selectedCategoryIds.contains(cat.id);
+        return ListTile(
+          title: Text(cat.name),
+          leading: Icon(
+            isSelected ? Icons.check_box : Icons.check_box_outline_blank,
+            color: isSelected ? Colors.blue : Colors.grey,
+          ),
+          onTap: () {
+            setState(() {
+              if (isSelected)
+                _selectedCategoryIds.remove(cat.id);
+              else
+                _selectedCategoryIds.add(cat.id);
+            });
+            setDialogState(() {});
           },
         );
       },
@@ -910,6 +1146,11 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
               label,
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
             ),
+            if (readOnly)
+              const Padding(
+                padding: EdgeInsets.only(right: 4),
+                child: Icon(Icons.lock, size: 12, color: Colors.grey),
+              ),
           ],
         ),
         const SizedBox(height: 8),
@@ -919,10 +1160,14 @@ class _AddEditProductScreenState extends State<AddEditProductScreen> {
           keyboardType: keyboardType,
           readOnly: readOnly,
           onChanged: onChanged,
+          style: TextStyle(color: readOnly ? Colors.grey[700] : Colors.black),
           decoration: InputDecoration(
             hintText: hint,
             filled: true,
-            fillColor: Colors.white,
+            fillColor:
+                readOnly
+                    ? Colors.grey.shade200
+                    : Colors.white, // ✅ تغيير لون الخلفية للمقفل
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: Colors.grey.shade300),
