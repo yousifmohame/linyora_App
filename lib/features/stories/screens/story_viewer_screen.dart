@@ -91,11 +91,14 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
 
   List<StoryItem> _buildStoryItems(List<StoryModel> stories) {
     return stories.map((story) {
-      // 1. نص
-      if (story.mediaType == MediaType.text) {
+      
+      // ✅ تحديد رابط الصورة: الأولوية للصورة المرفقة، ثم صورة المنتج
+      final String? imageToDisplay = story.mediaUrl ?? story.productImage;
+
+      // 1. نص فقط (إذا لم يوجد ميديا ولا صورة منتج)
+      if (story.mediaType == MediaType.text && imageToDisplay == null) {
         return StoryItem(
           _mirrorContentIfRtl(
-            // عكس المحتوى ليعود طبيعياً
             Container(
               color: _parseColor(story.backgroundColor),
               width: double.infinity,
@@ -106,7 +109,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
                   story.textContent ?? '',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                    fontFamily: 'Cairo',
+                    fontFamily: 'Cairo', // تأكد من وجود الخط أو احذفه
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -120,65 +123,64 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
           duration: const Duration(seconds: 5),
         );
       }
+      
       // 2. فيديو
       else if (story.mediaType == MediaType.video && story.mediaUrl != null) {
         return StoryItem.pageVideo(
           story.mediaUrl!,
           controller: controller,
-          // الفيديو عادة لا يحتاج عكس إلا إذا كان فيه نص مدمج
-          caption:
-              story.textContent != null
-                  ? _mirrorContentIfRtl(
-                    Text(
-                      story.textContent!,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        backgroundColor: Colors.black54,
-                      ),
+          caption: story.textContent != null
+              ? _mirrorContentIfRtl(
+                  Text(
+                    story.textContent!,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      backgroundColor: Colors.black54,
                     ),
-                  )
-                  : null,
+                  ),
+                )
+              : null,
           shown: story.isViewed,
         );
       }
-      // 3. صورة
-      else if (story.mediaUrl != null) {
+      
+      // 3. صورة (سواء كانت صورة مرفقة أو صورة منتج) ✅
+      else if (imageToDisplay != null) {
         return StoryItem(
           _mirrorContentIfRtl(
-            // عكس المحتوى
             Stack(
               children: [
+                // خلفية ملونة (تظهر إذا كانت الصورة لا تغطي الشاشة بالكامل)
+                Container(color: _parseColor(story.backgroundColor)),
+                
+                // الصورة
                 CachedNetworkImage(
-                  imageUrl: story.mediaUrl!,
-                  fit: BoxFit.cover,
+                  imageUrl: imageToDisplay, // ✅ استخدام المتغير الجديد
+                  fit: BoxFit.cover, // يمكنك تغييرها لـ contain إذا أردت عدم قص صورة المنتج
                   width: double.infinity,
                   height: double.infinity,
-                  placeholder:
-                      (c, u) => const Center(
-                        child: CircularProgressIndicator(color: Colors.white),
-                      ),
-                  errorWidget:
-                      (c, u, e) => Container(
-                        color: Colors.grey[900],
-                        child: const Center(
-                          child: Icon(
-                            Icons.broken_image,
-                            color: Colors.white,
-                            size: 50,
-                          ),
-                        ),
-                      ),
+                  placeholder: (c, u) => const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  ),
+                  errorWidget: (c, u, e) => Container(
+                    color: Colors.grey[900],
+                    child: const Center(
+                      child: Icon(Icons.broken_image, color: Colors.white, size: 50),
+                    ),
+                  ),
                 ),
-                if (story.textContent != null)
+                
+                // النص المضاف (Caption)
+                if (story.textContent != null && story.textContent!.trim().isNotEmpty)
                   Positioned(
-                    bottom: 100,
+                    bottom: 100, // مرفوع قليلاً لكي لا يغطي زر المنتج
                     left: 20,
                     right: 20,
                     child: Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.black54,
-                        borderRadius: BorderRadius.circular(8),
+                        color: Colors.black.withOpacity(0.6),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         story.textContent!,
@@ -186,6 +188,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
@@ -197,6 +200,8 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
           duration: const Duration(seconds: 5),
         );
       }
+      
+      // حالة احتياطية
       return StoryItem.text(title: "", backgroundColor: Colors.black);
     }).toList();
   }

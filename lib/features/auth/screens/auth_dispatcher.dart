@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:linyora_project/features/dashboards/Influencer_dashboard.dart';
 import '../../../models/user_model.dart';
 
 // استيراد الشاشات (تأكد من صحة المسارات في مشروعك)
@@ -17,13 +18,16 @@ class AuthDispatcher extends StatelessWidget {
     // التوجيه بناءً على الـ Getter (role) الذي أنشأناه في المودل
     switch (user.role) {
       case UserRole.admin:
-        return const Scaffold(body: Center(child: Text("لوحة تحكم الإدارة")));
+        return const MainLayoutScreen();
 
       case UserRole.merchant:
         return const MerchantDashboardScreen();
 
       case UserRole.model:
-        return const ModelDashboard();
+        return const ModelDashboardScreen();
+
+      case UserRole.influencer:
+        return const InfluencerDashboardScreen();
 
       case UserRole.supplier:
         return const SupplierDashboardScreen();

@@ -31,6 +31,7 @@ enum UserRole {
   admin, // 1
   merchant, // 2
   model, // 3
+  influencer, //4
   customer, // 5
   supplier, // 6 ✅ (تم التحديث)
   unknown,
@@ -77,7 +78,8 @@ class UserModel {
         return UserRole.merchant;
       case 3:
         return UserRole.model;
-      // case 4: غالبًا محجوز لمندوب أو دور آخر، سنجعله عميل افتراضيًا
+      case 4:
+        return UserRole.influencer;
       case 5:
         return UserRole.customer;
       case 6:
@@ -90,6 +92,7 @@ class UserModel {
   // دوال مساعدة للاستخدام السريع
   bool get isMerchant => role == UserRole.merchant;
   bool get isModel => role == UserRole.model;
+  bool get isInfluencer => role == UserRole.influencer;
   bool get isAdmin => role == UserRole.admin;
   bool get isSupplier => role == UserRole.supplier; // ✅ دالة مساعدة للمورد
   bool get isCustomer => role == UserRole.customer;

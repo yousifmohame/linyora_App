@@ -2,14 +2,20 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
+
+// --- Providers & Screens ---
 import 'package:linyora_project/features/cart/providers/cart_provider.dart';
+import 'package:linyora_project/features/auth/providers/auth_provider.dart';
 import 'package:linyora_project/features/cart/screens/cart_screen.dart';
 import 'package:linyora_project/features/categories/screens/categories_screen.dart';
 import 'package:linyora_project/features/categories/screens/category_products_screen.dart';
 import 'package:linyora_project/features/home/screens/notifications_screen.dart';
+
 // --- Services & Models ---
 import 'package:linyora_project/features/home/services/section_service.dart';
 import 'package:linyora_project/features/home/services/home_service.dart';
+import 'package:linyora_project/features/home/services/layout_service.dart'; // ✅ تأكد من وجود هذا الملف
 import 'package:linyora_project/features/home/widgets/marquee_widget.dart';
 import 'package:linyora_project/features/home/widgets/search_screen.dart';
 import 'package:linyora_project/models/product_model.dart';
@@ -17,7 +23,6 @@ import 'package:linyora_project/models/section_model.dart';
 import 'package:linyora_project/models/banner_model.dart';
 import 'package:linyora_project/models/category_model.dart';
 import 'package:linyora_project/models/top_user_model.dart';
-import 'package:provider/provider.dart';
 
 // --- Widgets ---
 import 'package:linyora_project/features/home/widgets/flash_sale_section.dart';
@@ -35,9 +40,10 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // 1. Services & Controllers
+  // 1. Services
   final HomeService _homeService = HomeService();
   final SectionService _sectionService = SectionService();
+  final LayoutService _layoutService = LayoutService(); // ✅ خدمة التخطيط
   final CarouselSliderController _carouselController =
       CarouselSliderController();
 
@@ -51,25 +57,20 @@ class _HomeScreenState extends State<HomeScreen> {
   List<ProductModel> _bestSellers = [];
   List<ProductModel> _topRated = [];
 
+  // ✅ القائمة الرئيسية التي تتحكم في ترتيب الصفحة بالكامل
+  List<HomeLayoutItem> _layoutItems = [];
+
   // 3. State Variables
   bool _isLoading = true;
   int _currentBannerIndex = 0;
   Timer? _sliderTimer;
-
-  // متغير لحفظ عدد الإشعارات غير المقروءة
   int _unreadNotificationsCount = 0;
+  bool _isReorderingMode = false;
 
-  // دالة لحساب الإشعارات غير المقروءة
-  Future<void> _updateUnreadCount() async {
-    // نجلب الإشعارات (التي أضفناها للسيرفس سابقاً)
-    final notifications = await _homeService.getNotifications();
-    if (mounted) {
-      setState(() {
-        // نحسب فقط العناصر التي فيها isRead == false
-        _unreadNotificationsCount =
-            notifications.where((n) => !n.isRead).length;
-      });
-    }
+  // ✅ التحقق من الأدمن (تأكد أن roleId 1 هو الأدمن في الداتابيز لديك)
+  bool get _isAdmin {
+    final user = Provider.of<AuthProvider>(context, listen: false).user;
+    return user != null && user.roleId == 1;
   }
 
   @override
@@ -77,7 +78,6 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _fetchData();
     _updateUnreadCount();
-
     Future.microtask(() => Provider.of<CartProvider>(context, listen: false));
   }
 
@@ -87,19 +87,29 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  // --- Logic Methods ---
+  Future<void> _updateUnreadCount() async {
+    final notifications = await _homeService.getNotifications();
+    if (mounted) {
+      setState(
+        () =>
+            _unreadNotificationsCount =
+                notifications.where((n) => !n.isRead).length,
+      );
+    }
+  }
 
   Future<void> _fetchData() async {
     try {
+      // 1. جلب البيانات الخام أولاً
       final results = await Future.wait([
-        _homeService.getBanners(), // 0
-        _homeService.getCategories(), // 1
-        _sectionService.getActiveSections(), // 2
-        _homeService.getTopModels(), // 3
-        _homeService.getTopMerchants(), // 4
-        _homeService.getProductsByType('new'), // 5
-        _homeService.getProductsByType('best'), // 6
-        _homeService.getProductsByType('top'), // 7
+        _homeService.getBanners(),
+        _homeService.getCategories(),
+        _sectionService.getActiveSections(),
+        _homeService.getTopModels(),
+        _homeService.getTopMerchants(),
+        _homeService.getProductsByType('new'),
+        _homeService.getProductsByType('best'),
+        _homeService.getProductsByType('top'),
       ]);
 
       if (mounted) {
@@ -112,10 +122,16 @@ class _HomeScreenState extends State<HomeScreen> {
           _newArrivals = results[5] as List<ProductModel>;
           _bestSellers = results[6] as List<ProductModel>;
           _topRated = results[7] as List<ProductModel>;
+        });
+
+        // 2. بعد توفر البيانات، نجلب الترتيب من السيرفر ونبني القائمة
+        final layout = await _layoutService.getHomeLayout(_sections);
+
+        setState(() {
+          _layoutItems = layout;
           _isLoading = false;
         });
 
-        // تشغيل المنطق الذكي للبانرات
         if (_banners.isNotEmpty) _handleAutoPlay(0);
       }
     } catch (e) {
@@ -126,38 +142,268 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _handleAutoPlay(int index) {
     _sliderTimer?.cancel();
-    // إذا كان فيديو ننتظر انتهاءه، إذا صورة ننتظر 5 ثواني
-    if (!_banners[index].isVideo) {
+    if (_banners.isNotEmpty && !_banners[index].isVideo) {
       _sliderTimer = Timer(const Duration(seconds: 5), () {
         _carouselController.nextPage();
       });
     }
   }
 
-  // --- UI Builder Methods (لتقسيم الكود) ---
+  // --- Logic for Reordering ---
+
+  void _moveItemUp(int index) {
+    if (index > 0) {
+      setState(() {
+        final item = _layoutItems.removeAt(index);
+        _layoutItems.insert(index - 1, item);
+      });
+    }
+  }
+
+  void _moveItemDown(int index) {
+    if (index < _layoutItems.length - 1) {
+      setState(() {
+        final item = _layoutItems.removeAt(index);
+        _layoutItems.insert(index + 1, item);
+      });
+    }
+  }
+
+  Future<void> _saveLayout() async {
+    try {
+      await _layoutService.saveLayoutOrder(_layoutItems);
+      setState(() => _isReorderingMode = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ تم حفظ ترتيب الصفحة الرئيسية بنجاح!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('فشل الحفظ: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  // --- UI Builder Methods ---
+
+  // ✅ المصنع الذي يحول العنصر (Item) إلى ويدجت (Widget)
+  Widget _mapLayoutItemToWidget(HomeLayoutItem item) {
+    switch (item.type) {
+      case HomeItemType.marquee:
+        return const MarqueeWidget();
+      case HomeItemType.stories:
+        return const StoriesSection();
+      case HomeItemType.banners:
+        return _buildBannersSection();
+      case HomeItemType.flashSale:
+        return const FlashSaleSection();
+      case HomeItemType.categories:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Text(
+                'تسوق حسب الفئة',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.2,
+                  height: 1.3,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+            _buildCategoriesScroller(),
+            _buildDivider(),
+          ],
+        );
+      case HomeItemType.newArrivals:
+        return Column(
+          children: [
+            HorizontalProductList(
+              title: "وصل حديثاً 🆕",
+              products: _newArrivals,
+              onSeeAll: () {},
+            ),
+            _buildDivider(),
+          ],
+        );
+      case HomeItemType.bestSellers:
+        return Column(
+          children: [
+            HorizontalProductList(
+              title: "الأكثر مبيعاً 🔥",
+              products: _bestSellers,
+              onSeeAll: () {},
+            ),
+            _buildDivider(),
+          ],
+        );
+      case HomeItemType.topRated:
+        return Column(
+          children: [
+            HorizontalProductList(
+              title: "الأعلى تقييماً ⭐",
+              products: _topRated,
+              onSeeAll: () {},
+            ),
+            _buildDivider(),
+          ],
+        );
+      case HomeItemType.topModels:
+        if (_topModels.isEmpty) return const SizedBox.shrink();
+        return Column(
+          children: [
+            _buildSectionTitleWrapper("أشهر العارضات ✨", () {}),
+            _buildTopUsersList(_topModels, isModel: true),
+            _buildDivider(),
+          ],
+        );
+      case HomeItemType.topMerchants:
+        if (_topMerchants.isEmpty) return const SizedBox.shrink();
+        return Column(
+          children: [
+            _buildSectionTitleWrapper("متاجر مميزة 🛍️", () {}),
+            _buildTopUsersList(_topMerchants, isModel: false),
+            _buildDivider(),
+          ],
+        );
+      case HomeItemType.dynamicSection:
+        if (item.data is SectionModel) {
+          return Column(
+            children: [
+              SectionDisplay(section: item.data),
+              Container(height: 8, color: Colors.grey[100]),
+            ],
+          );
+        }
+        return const SizedBox.shrink();
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  // ✅ ودجت التغليف: تضيف أدوات التحكم فوق العنصر إذا كان وضع التعديل مفعلاً
+  Widget _buildReorderableWrapper(int index, Widget child) {
+    // إذا لم يكن أدمن أو الوضع غير مفعل، ارجع العنصر كما هو
+    if (!_isReorderingMode || !_isAdmin) return child;
+
+    // تحديد اسم العنصر للعرض
+    String label = itemTypeToLabel(_layoutItems[index]);
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: Colors.amber.shade300,
+          width: 2,
+        ), // حدود لتمييز العنصر
+      ),
+      child: Column(
+        children: [
+          // شريط التحكم العلوي
+          Container(
+            color: Colors.amber.shade100,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                const Icon(Icons.drag_indicator, color: Colors.amber, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(
+                    Icons.arrow_circle_up,
+                    size: 28,
+                    color: index > 0 ? Colors.blue : Colors.grey,
+                  ),
+                  onPressed: index > 0 ? () => _moveItemUp(index) : null,
+                ),
+                IconButton(
+                  icon: Icon(
+                    Icons.arrow_circle_down,
+                    size: 28,
+                    color:
+                        index < _layoutItems.length - 1
+                            ? Colors.blue
+                            : Colors.grey,
+                  ),
+                  onPressed:
+                      index < _layoutItems.length - 1
+                          ? () => _moveItemDown(index)
+                          : null,
+                ),
+              ],
+            ),
+          ),
+          // المحتوى
+          child,
+        ],
+      ),
+    );
+  }
+
+  String itemTypeToLabel(HomeLayoutItem item) {
+    switch (item.type) {
+      case HomeItemType.marquee:
+        return "شريط الأخبار";
+      case HomeItemType.stories:
+        return "القصص (Stories)";
+      case HomeItemType.banners:
+        return "البنرات الإعلانية";
+      case HomeItemType.flashSale:
+        return "فلاش سيل";
+      case HomeItemType.categories:
+        return "الأقسام (Categories)";
+      case HomeItemType.newArrivals:
+        return "وصل حديثاً";
+      case HomeItemType.bestSellers:
+        return "الأكثر مبيعاً";
+      case HomeItemType.topRated:
+        return "الأعلى تقييماً";
+      case HomeItemType.topModels:
+        return "أشهر العارضات";
+      case HomeItemType.topMerchants:
+        return "متاجر مميزة";
+      case HomeItemType.dynamicSection:
+        return "قسم خاص: ${(item.data as SectionModel).title}";
+      default:
+        return item.id;
+    }
+  }
+
+  // --- Standard Widgets Implementation ---
 
   Widget _buildAppBar() {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final isRealAdmin =
+        authProvider.user != null && authProvider.user!.roleId == 1;
+
     return SliverAppBar(
-      // 1. الخصائص الأساسية
-      floating: true, // يظهر عند السحب لأعلى
-      pinned: true, // يبقى الجزء العلوي ثابتاً (اللوجو)
-      snap: true, // يظهر بسرعة عند أدنى حركة
+      floating: true,
+      pinned: true,
+      snap: true,
       backgroundColor: Colors.white,
-      elevation: 0, // إزالة الظل الافتراضي لجعله مسطحاً
-      surfaceTintColor:
-          Colors.white, // منع تغيير اللون عند السكرول في Material 3
-      // 2. الجزء الأيسر (القائمة أو اللوجو)
+      elevation: 0,
+      surfaceTintColor: Colors.white,
       leading: IconButton(
         icon: const Icon(Icons.grid_view_outlined, color: Colors.black),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => CategoriesScreen()),
-          );
-        },
+        onPressed:
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (c) => CategoriesScreen()),
+            ),
       ),
-
-      // 3. العنوان (اسم التطبيق)
       title: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -171,41 +417,50 @@ class _HomeScreenState extends State<HomeScreen> {
               letterSpacing: 2.0,
             ),
           ),
-          const SizedBox(width: 2),
-          Stack(
-            alignment: Alignment.topRight,
-            children: [
-              const Text(
-                "L",
+          if (isRealAdmin)
+            Container(
+              margin: const EdgeInsets.only(left: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Text(
+                "ADMIN",
                 style: TextStyle(
-                  color: Colors.black,
-                  fontFamily: 'Playfair Display',
-                  fontWeight: FontWeight.w900,
-                  fontSize: 32,
-                  height: 0.8,
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              Transform.translate(
-                offset: const Offset(4, -4),
-                child: const Icon(
-                  Icons.star,
-                  color: Colors.pinkAccent,
-                  size: 18,
-                ),
-              ),
-            ],
-          ),
+            ),
         ],
       ),
-      // centerTitle: true, // تمت إزالته ليكون الشعار في البداية
       centerTitle: true,
-
-      // 4. الأيقونات (تنبيهات + سلة)
       actions: [
-        // أيقونة البحث (اختياري هنا لأننا سنضع شريط بحث بالأسفل)
-        // IconButton(icon: const Icon(Icons.search, color: Colors.black), onPressed: () {}),
+        // ✅ زر التعديل للأدمن
+        if (isRealAdmin)
+          IconButton(
+            tooltip: _isReorderingMode ? "حفظ الترتيب" : "تعديل ترتيب الصفحة",
+            icon: CircleAvatar(
+              radius: 18,
+              backgroundColor:
+                  _isReorderingMode ? Colors.green : Colors.grey[200],
+              child: Icon(
+                _isReorderingMode ? Icons.save : Icons.tune,
+                color: _isReorderingMode ? Colors.white : Colors.black,
+                size: 20,
+              ),
+            ),
+            onPressed: () {
+              if (_isReorderingMode) {
+                _saveLayout();
+              } else {
+                setState(() => _isReorderingMode = true);
+              }
+            },
+          ),
 
-        // أيقونة التنبيهات مع نقطة حمراء
         Stack(
           alignment: Alignment.center,
           children: [
@@ -219,40 +474,35 @@ class _HomeScreenState extends State<HomeScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const NotificationsScreen(),
+                    builder: (c) => const NotificationsScreen(),
                   ),
                 );
                 _updateUnreadCount();
               },
             ),
-            // يظهر فقط إذا كان هناك إشعارات غير مقروءة
             if (_unreadNotificationsCount > 0)
               Positioned(
-                top: 8, // تعديل بسيط للموقع ليكون فوق الأيقونة
+                top: 8,
                 right: 8,
                 child: Container(
-                  padding: const EdgeInsets.all(4), // مساحة داخلية للنص
+                  padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     color: Colors.red,
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 1.5),
                   ),
-                  // تحديد حد أدنى للعرض ليكون دائرياً حتى مع الأرقام الصغيرة
                   constraints: const BoxConstraints(
                     minWidth: 15,
                     minHeight: 15,
                   ),
                   child: Center(
                     child: Text(
-                      // إذا كان العدد أكبر من 9 نعرض 9+
-                      _unreadNotificationsCount > 9
-                          ? "9+"
-                          : "$_unreadNotificationsCount",
+                      "$_unreadNotificationsCount",
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
-                        height: 1, // لضبط توسيط النص عمودياً
+                        height: 1,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -262,8 +512,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
 
-        // أيقونة السلة (مهمة جداً)
-        // أيقونة السلة (تم التعديل لتكون حقيقية)
         Consumer<CartProvider>(
           builder: (context, cart, child) {
             return Stack(
@@ -271,27 +519,20 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 IconButton(
                   icon: const Icon(
-                    Icons
-                        .shopping_cart_outlined, // يفضل outlined ليتناسق مع التنبيهات
+                    Icons.shopping_cart_outlined,
                     color: Colors.black,
                     size: 28,
                   ),
-                  onPressed: () {
-                    // ✅ الانتقال لصفحة السلة
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const CartScreen(),
+                  onPressed:
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (c) => const CartScreen()),
                       ),
-                    );
-                  },
                 ),
-
-                // ✅ عرض الشارة فقط إذا كان هناك منتجات
                 if (cart.itemCount > 0)
                   Positioned(
                     top: 3,
-                    right: 4, // تعديل الموضع قليلاً
+                    right: 4,
                     child: Container(
                       padding: const EdgeInsets.all(5),
                       decoration: const BoxDecoration(
@@ -304,7 +545,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       child: Center(
                         child: Text(
-                          "${cart.itemCount}", // ✅ العدد الحقيقي
+                          "${cart.itemCount}",
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 10,
@@ -322,28 +563,22 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(width: 8),
       ],
-
-      // 5. الجزء السفلي (شريط البحث) - هذا ما يجعله احترافياً
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(70.0), // ارتفاع شريط البحث
+        preferredSize: const Size.fromHeight(70.0),
         child: Container(
           height: 70,
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
           alignment: Alignment.center,
           child: GestureDetector(
-            onTap: () {
-              // ==========================================
-              // التعديل هنا: الانتقال لشاشة البحث
-              // ==========================================
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SearchScreen()),
-              );
-            },
+            onTap:
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (c) => const SearchScreen()),
+                ),
             child: Container(
               height: 45,
               decoration: BoxDecoration(
-                color: Colors.grey[100], // لون خلفية خفيف جداً
+                color: Colors.grey[100],
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.grey.shade300),
               ),
@@ -357,19 +592,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(color: Colors.grey[600], fontSize: 14),
                   ),
                   const Spacer(),
-                  // أيقونة الكاميرا أو الفلتر (حركة احترافية)
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: const Icon(
-                      Icons.camera_alt_outlined,
-                      size: 18,
-                      color: Colors.grey,
-                    ),
+                  const Icon(
+                    Icons.camera_alt_outlined,
+                    size: 18,
+                    color: Colors.grey,
                   ),
                 ],
               ),
@@ -381,194 +607,152 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCategoriesScroller() {
-    if (_categories.isEmpty)
-      return const SliverToBoxAdapter(child: SizedBox.shrink());
-
-    // 1. حساب عرض الشاشة لتحديد القيم المتجاوبة
+    if (_categories.isEmpty) return const SizedBox.shrink();
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isTablet = screenWidth > 600;
 
-    return SliverToBoxAdapter(
-      child: Container(
-        height: isTablet ? 140 : 120, // زيادة الارتفاع قليلاً في التابلت
-        color: Colors.transparent,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: CarouselSlider.builder(
-          itemCount: _categories.length,
-          options: CarouselOptions(
-            height: isTablet ? 120 : 100, // ارتفاع العنصر
-            autoPlay: true,
-            autoPlayInterval: const Duration(seconds: 3),
-            autoPlayAnimationDuration: const Duration(milliseconds: 800),
-            autoPlayCurve: Curves.fastOutSlowIn,
+    return Container(
+      height: isTablet ? 140 : 120,
+      color: Colors.transparent,
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: CarouselSlider.builder(
+        itemCount: _categories.length,
+        options: CarouselOptions(
+          height: isTablet ? 120 : 100,
+          autoPlay: true,
+          viewportFraction: isTablet ? 0.15 : 0.22,
+          enableInfiniteScroll: true,
+          padEnds: false,
+        ),
+        itemBuilder: (context, index, realIndex) {
+          final category = _categories[index];
+          final double circleSize = isTablet ? 80 : 65;
+          final double fontSize = isTablet ? 14 : 12;
 
-            // 2. التعديل الجوهري هنا:
-            // في الموبايل: 0.22 (يعرض ~4.5 عنصر)
-            // في التابلت: 0.15 (يعرض ~6.5 عنصر) لأن الشاشة أعرض
-            viewportFraction: isTablet ? 0.15 : 0.22,
-
-            enableInfiniteScroll: true,
-            padEnds: false,
-          ),
-          itemBuilder: (context, index, realIndex) {
-            final category = _categories[index];
-
-            // تكبير العناصر قليلاً في التابلت
-            final double circleSize = isTablet ? 80 : 65;
-            final double fontSize = isTablet ? 14 : 12;
-
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 6.0),
-              child: GestureDetector(
-                onTap: () {
-                  Navigator.push(
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 6.0),
+            child: GestureDetector(
+              onTap:
+                  () => Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder:
-                          (context) => CategoryProductsScreen(
+                          (c) => CategoryProductsScreen(
                             slug: category.slug,
                             categoryName: category.name,
                           ),
                     ),
-                  );
-                },
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // دائرة الصورة (متجاوبة)
-                    Container(
-                      width: circleSize,
-                      height: circleSize,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.grey[100],
-                        border: Border.all(
-                          color: Colors.grey.shade300,
-                          width: 1,
-                        ),
-                      ),
-                      child: ClipOval(
-                        child:
-                            category.imageUrl.isNotEmpty
-                                ? CachedNetworkImage(
-                                  imageUrl: category.imageUrl,
-                                  fit: BoxFit.cover,
-                                  placeholder:
-                                      (_, __) => const Padding(
-                                        padding: EdgeInsets.all(15.0),
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
+                  ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: circleSize,
+                    height: circleSize,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.grey[100],
+                      border: Border.all(color: Colors.grey.shade300, width: 1),
+                    ),
+                    child: ClipOval(
+                      child:
+                          category.imageUrl.isNotEmpty
+                              ? CachedNetworkImage(
+                                imageUrl: category.imageUrl,
+                                fit: BoxFit.cover,
+                                placeholder:
+                                    (_, __) => const Padding(
+                                      padding: EdgeInsets.all(15.0),
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
                                       ),
-                                  errorWidget:
-                                      (_, __, ___) => const Icon(
-                                        Icons.category,
-                                        color: Colors.grey,
-                                      ),
-                                )
-                                : const Icon(
-                                  Icons.grid_view_rounded,
-                                  color: Colors.grey,
-                                ),
+                                    ),
+                                errorWidget:
+                                    (_, __, ___) => const Icon(
+                                      Icons.category,
+                                      color: Colors.grey,
+                                    ),
+                              )
+                              : const Icon(
+                                Icons.grid_view_rounded,
+                                color: Colors.grey,
+                              ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: circleSize + 10,
+                    child: Text(
+                      category.name,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
                       ),
                     ),
-
-                    const SizedBox(height: 8),
-
-                    // اسم القسم (متجاوب)
-                    SizedBox(
-                      width: circleSize + 10,
-                      child: Text(
-                        category.name,
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: fontSize,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
     );
   }
 
   Widget _buildBannersSection() {
-    if (_banners.isEmpty)
-      return const SliverToBoxAdapter(child: SizedBox.shrink());
-
-    return SliverToBoxAdapter(
-      // 1. حذفنا الـ Padding هنا ليأخذ العرض كاملاً
-      child: SizedBox(
-        // جعلنا الارتفاع يعتمد على حجم الشاشة ليكون متجاوباً (مثلاً 35% من طول الشاشة)
-        height: MediaQuery.of(context).size.height * 0.35,
-        child: CarouselSlider(
-          carouselController: _carouselController,
-          options: CarouselOptions(
-            height: double.infinity, // ليملأ الـ SizedBox الأب
-            // ============================================
-            // أهم التغييرات لجعل البانر يملأ الشاشة:
-            // ============================================
-            viewportFraction: 1.0, // يأخذ 100% من عرض الشاشة
-            enlargeCenterPage: false, // إلغاء تأثير التكبير والتبعيد
-            autoPlay: false, // تحكم يدوي (أو true حسب رغبتك)
-            enableInfiniteScroll: true,
-            scrollPhysics: const BouncingScrollPhysics(), // حركة ناعمة
-            onPageChanged: (index, reason) {
-              setState(() => _currentBannerIndex = index);
-              _handleAutoPlay(index);
-            },
-          ),
-          items:
-              _banners.asMap().entries.map((entry) {
-                int index = entry.key;
-                var banner = entry.value;
-                bool isActive = index == _currentBannerIndex;
-
-                return Builder(
-                  builder: (BuildContext context) {
-                    return Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        // 1. الخلفية (صورة أو فيديو)
-                        banner.isVideo
-                            ? BannerVideoPlayer(
-                              videoUrl: banner.imageUrl,
-                              isActive: isActive,
-                              onVideoFinished: () {
-                                if (isActive) _carouselController.nextPage();
-                              },
-                            )
-                            : CachedNetworkImage(
-                              imageUrl: banner.imageUrl,
-                              fit: BoxFit.cover, // يغطي المساحة بالكامل
-                              width: double.infinity,
-                              placeholder:
-                                  (_, __) => Container(
-                                    color: Colors.grey[200],
-                                    child: const Center(
-                                      child: CircularProgressIndicator(),
-                                    ),
-                                  ),
-                              errorWidget:
-                                  (_, __, ___) => const Icon(Icons.error),
-                            ),
-
-                        // 2. التظليل والنص (Overlay)
-                        _buildBannerOverlay(banner),
-                      ],
-                    );
-                  },
-                );
-              }).toList(),
+    if (_banners.isEmpty) return const SizedBox.shrink();
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.35,
+      child: CarouselSlider(
+        carouselController: _carouselController,
+        options: CarouselOptions(
+          height: double.infinity,
+          viewportFraction: 1.0,
+          enlargeCenterPage: false,
+          autoPlay: false,
+          enableInfiniteScroll: true,
+          scrollPhysics: const BouncingScrollPhysics(),
+          onPageChanged: (index, reason) {
+            setState(() => _currentBannerIndex = index);
+            _handleAutoPlay(index);
+          },
         ),
+        items:
+            _banners.asMap().entries.map((entry) {
+              var banner = entry.value;
+              bool isActive = entry.key == _currentBannerIndex;
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  banner.isVideo
+                      ? BannerVideoPlayer(
+                        videoUrl: banner.imageUrl,
+                        isActive: isActive,
+                        onVideoFinished: () {
+                          if (isActive) _carouselController.nextPage();
+                        },
+                      )
+                      : CachedNetworkImage(
+                        imageUrl: banner.imageUrl,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        placeholder:
+                            (_, __) => Container(
+                              color: Colors.grey[200],
+                              child: const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                            ),
+                        errorWidget: (_, __, ___) => const Icon(Icons.error),
+                      ),
+                  _buildBannerOverlay(banner),
+                ],
+              );
+            }).toList(),
       ),
     );
   }
@@ -576,39 +760,30 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildBannerOverlay(BannerModel banner) {
     return Stack(
       children: [
-        // تدرج لوني لضمان وضوح النص
         Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.bottomCenter,
               end: Alignment.topCenter,
-              colors: [
-                Colors.black.withOpacity(0.8), // زدت التغميق قليلاً في الأسفل
-                Colors.transparent,
-              ],
+              colors: [Colors.black.withOpacity(0.8), Colors.transparent],
             ),
           ),
         ),
-
-        // النصوص والزر
         Padding(
-          padding: const EdgeInsets.all(20), // حاشية أكبر قليلاً
+          padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.end,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. العنوان
               Text(
                 banner.title,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 20, // تكبير الخط
+                  fontSize: 20,
                   fontWeight: FontWeight.bold,
                   shadows: [Shadow(blurRadius: 4, color: Colors.black45)],
                 ),
               ),
-
-              // 2. الوصف
               if (banner.subtitle.isNotEmpty) ...[
                 const SizedBox(height: 4),
                 Text(
@@ -618,30 +793,23 @@ class _HomeScreenState extends State<HomeScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
-
-              // 3. الزر (يظهر فقط إذا كان هناك نص للزر)
               if (banner.buttonText.isNotEmpty) ...[
-                const SizedBox(height: 12), // مسافة قبل الزر
+                const SizedBox(height: 12),
                 SizedBox(
-                  height: 36, // ارتفاع الزر
+                  height: 36,
                   child: ElevatedButton(
-                    onPressed: () {
-                      // TODO: فتح الرابط هنا
-                      Navigator.pushNamed(context, banner.link);
-                      // print("Navigating to: ${banner.link}");
-                    },
+                    onPressed: () => Navigator.pushNamed(context, banner.link),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white, // خلفية بيضاء
-                      foregroundColor: Colors.black, // نص أسود
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8), // حواف دائرية
+                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
                     child: Row(
-                      mainAxisSize:
-                          MainAxisSize.min, // الزر يأخذ حجم المحتوى فقط
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           banner.buttonText,
@@ -651,10 +819,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         const SizedBox(width: 6),
-                        const Icon(
-                          Icons.arrow_forward_ios,
-                          size: 10,
-                        ), // سهم صغير
+                        const Icon(Icons.arrow_forward_ios, size: 10),
                       ],
                     ),
                   ),
@@ -667,76 +832,48 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // دالة مساعدة تعرض قسماً واحداً بناءً على رقمه (Index)
-  Widget _buildSectionSafe(int index) {
-    // إذا كان الاندكس غير موجود (مثلاً لدينا 3 أقسام فقط وطلبنا القسم رقم 5)، نرجع فراغ
-    if (index >= _sections.length) return const SizedBox.shrink();
-
-    return Column(
-      children: [
-        // عرض القسم
-        SectionDisplay(section: _sections[index]),
-        // الفاصل تحته
-        Container(height: 8, color: Colors.grey[100]),
-      ],
-    );
-  }
-
   Widget _buildSectionTitleWrapper(String title, VoidCallback onSeeAll) {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          GestureDetector(
+            onTap: onSeeAll,
+            child: const Text(
+              "عرض الكل",
+              style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
-            GestureDetector(
-              onTap: onSeeAll,
-              child: const Text(
-                "عرض الكل",
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildTopUsersList(List<TopUserModel> users, {required bool isModel}) {
-    return SliverToBoxAdapter(
-      child: SizedBox(
-        height: 220,
-        child: ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          scrollDirection: Axis.horizontal,
-          itemCount: users.length,
-          itemBuilder: (context, index) {
-            return TopUserCard(user: users[index], isModel: isModel);
-          },
-        ),
+    return SizedBox(
+      height: 220,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        scrollDirection: Axis.horizontal,
+        itemCount: users.length,
+        itemBuilder:
+            (context, index) =>
+                TopUserCard(user: users[index], isModel: isModel),
       ),
     );
   }
 
-  // دالة لإنشاء الفاصل
   Widget _buildDivider() {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        child: Container(
-          height:
-              2, // سمك الفاصل (يمكنك جعله 1 لخط رفيع، أو 8 لفصل الأقسام بوضوح)
-          color: Colors.pink, // لون رمادي فاتح جداً
-        ),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Container(height: 2, color: Colors.pink.withOpacity(0.1)),
     );
   }
-
-  // --- Main Build Method ---
 
   @override
   Widget build(BuildContext context) {
@@ -746,140 +883,18 @@ class _HomeScreenState extends State<HomeScreen> {
               ? const Center(child: CircularProgressIndicator())
               : CustomScrollView(
                 slivers: [
-                  // 1. App Bar
                   _buildAppBar(),
-
-                  const SliverToBoxAdapter(child: MarqueeWidget()),
-
-                  // 2. Stories
-                  const SliverToBoxAdapter(child: StoriesSection()),
-
-                  // 3. Banners Slider
-                  _buildBannersSection(),
-
-                  // 4. Flash Sale
-                  const SliverToBoxAdapter(child: FlashSaleSection()),
-
-                  const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
-                      child: Text(
-                        'تسوق حسب الفئة',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.2,
-                          height: 1.3,
-                          color: Colors.black87,
-                        ),
-                        textAlign: TextAlign.start,
-                      ),
-                    ),
-                  ),
-
-                  _buildCategoriesScroller(),
-
-                  _buildDivider(),
-
-                  // 5. Categories Header & Grid
-                  SliverToBoxAdapter(
-                    child: HorizontalProductList(
-                      title: "وصل حديثاً 🆕",
-                      products: _newArrivals,
-                      onSeeAll: () {},
-                    ),
-                  ),
-
-                  _buildDivider(),
-                  // 6. Dynamic Sections (قائمة الأقسام المتغيرة)
+                  // ✅ بناء القائمة ديناميكياً باستخدام SliverList
                   SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      // داخل SliverList delegate
-                      (context, index) {
-                        final sectionWidget = SectionDisplay(
-                          section: _sections[index],
-                        );
-                        Widget? injectedWidget;
-
-                        // حساب نقطة المنتصف (تجاهل الكسور باستخدام ~/ )
-                        // مثلاً لو العدد 15، المنتصف سيكون عند الاندكس 7
-                        int middleIndex = _sections.length ~/ 2;
-
-                        // 1. بعد القسم الأول مباشرة
-                        if (index == middleIndex) {
-                          injectedWidget = HorizontalProductList(
-                            title: "قد يعجبك أيضاً ❤️",
-                            products: _bestSellers,
-                            onSeeAll: () {},
-                          );
-                        }
-
-                        return Column(
-                          children: [
-                            sectionWidget,
-                            Container(height: 8, color: Colors.grey[100]),
-                            if (injectedWidget != null) ...[
-                              injectedWidget,
-                              Container(height: 8, color: Colors.grey[100]),
-                            ],
-                          ],
-                        );
-                      },
-                      // ======================================================
-                      // هذا الرقم يضمن عرض جميع الأقسام الـ 15 القادمة من الباك اند
-                      // ======================================================
-                      childCount: _sections.length,
-                    ),
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final item = _layoutItems[index];
+                      // تغليف كل عنصر بأدوات التحكم (للأدمن)
+                      return _buildReorderableWrapper(
+                        index,
+                        _mapLayoutItemToWidget(item),
+                      );
+                    }, childCount: _layoutItems.length),
                   ),
-
-                  // --- نضع تحته: الأكثر مبيعاً ---
-                  SliverToBoxAdapter(
-                    child: HorizontalProductList(
-                      title: "الأكثر مبيعاً 🔥",
-                      products: _bestSellers,
-                      onSeeAll: () {},
-                    ),
-                  ),
-                  _buildDivider(),
-
-                  // --- القسم الديناميكي الثالث (رقم 2) ---
-                  SliverToBoxAdapter(child: _buildSectionSafe(2)),
-
-                  _buildDivider(),
-
-                  // 7. Top Models
-                  if (_topModels.isNotEmpty) ...[
-                    _buildSectionTitleWrapper("أشهر العارضات ✨", () {}),
-                    _buildTopUsersList(_topModels, isModel: true),
-                  ],
-
-                  _buildDivider(),
-
-                  // 8. Top Merchants
-                  if (_topMerchants.isNotEmpty) ...[
-                    _buildSectionTitleWrapper("متاجر مميزة 🛍️", () {}),
-                    _buildTopUsersList(_topMerchants, isModel: false),
-                  ],
-
-                  _buildDivider(),
-
-                  // 9. Horizontal Product Lists (وصل حديثاً، الأكثر مبيعاً، الأعلى تقييماً)
-                  SliverToBoxAdapter(
-                    child: HorizontalProductList(
-                      title: "الأكثر مبيعاً 🔥",
-                      products: _bestSellers,
-                      onSeeAll: () {},
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: HorizontalProductList(
-                      title: "الأعلى تقييماً ⭐",
-                      products: _topRated,
-                      onSeeAll: () {},
-                    ),
-                  ),
-
-                  // Spacer at bottom
                   const SliverToBoxAdapter(child: SizedBox(height: 100)),
                 ],
               ),

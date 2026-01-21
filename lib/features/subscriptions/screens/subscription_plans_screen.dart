@@ -50,14 +50,14 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
       final String? checkoutUrl = await _service.createCheckoutSession(planId);
 
       if (checkoutUrl != null && checkoutUrl.isNotEmpty) {
-        
         if (!mounted) return;
 
         // ✅ 2. فتح صفحة الدفع الداخلية وانتظار النتيجة
         final bool? result = await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => PaymentWebViewScreen(checkoutUrl: checkoutUrl),
+            builder:
+                (context) => PaymentWebViewScreen(checkoutUrl: checkoutUrl),
           ),
         );
 
@@ -66,22 +66,26 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
           // الدفع ناجح! نحدث البيانات ونغلق الصفحة
           setState(() => _isLoading = true);
           await Provider.of<AuthProvider>(context, listen: false).refreshUser();
-          
+
           if (mounted) {
-             ScaffoldMessenger.of(context).showSnackBar(
-               const SnackBar(content: Text('✅ تم الاشتراك بنجاح!'), backgroundColor: Colors.green),
-             );
-             Navigator.pop(context, true); // العودة للداشبورد مع نجاح
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('✅ تم الاشتراك بنجاح!'),
+                backgroundColor: Colors.green,
+              ),
+            );
           }
         } else {
           // الدفع فشل أو تم إلغاؤه
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('تم إلغاء عملية الدفع'), backgroundColor: Colors.orange),
+              const SnackBar(
+                content: Text('تم إلغاء عملية الدفع'),
+                backgroundColor: Colors.orange,
+              ),
             );
           }
         }
-
       } else {
         throw Exception('لم يتم استلام رابط الدفع');
       }
