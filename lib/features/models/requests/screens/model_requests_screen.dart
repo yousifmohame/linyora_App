@@ -74,27 +74,61 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
     String successMessage,
   ) async {
     try {
-      // إظهار Loading
+      // ✅ 1. تحسين عرض Loading Dialog لتجنب الشاشة السوداء
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) => const Center(child: CircularProgressIndicator()),
+        builder:
+            (_) => Center(
+              // Center مهم لتوسط الشاشة
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white, // خلفية بيضاء للمربع
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min, // لتصغير الحجم
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text(
+                      "جاري المعالجة...",
+                      style: TextStyle(
+                        decoration: TextDecoration.none,
+                        color: Colors.black,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
       );
 
       await action();
 
-      Navigator.pop(context); // إغلاق Loading
+      // ✅ 2. التأكد من إغلاق الـ Dialog فقط إذا كانت الشاشة لا تزال موجودة
+      if (mounted) {
+        Navigator.pop(context); // إغلاق Loading
+      }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(successMessage), backgroundColor: Colors.green),
-      );
-
-      _fetchRequests(); // تحديث القائمة
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(successMessage),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _fetchRequests(); // تحديث القائمة
+      }
     } catch (e) {
-      Navigator.pop(context); // إغلاق Loading
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("حدث خطأ: $e"), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        Navigator.pop(context); // إغلاق Loading عند الخطأ
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("حدث خطأ: $e"), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
