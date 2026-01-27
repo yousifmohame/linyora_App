@@ -1,7 +1,8 @@
-// ✅ حالة الاشتراك (كما هي)
+// ✅ حالة الاشتراك (محدث)
 class SubscriptionState {
   final String status;
   final bool hasDropshippingAccess;
+  final int? planId; // ✅ 1. الحقل الجديد
   final String? planName;
   final String? startDate;
   final String? endDate;
@@ -9,6 +10,7 @@ class SubscriptionState {
   SubscriptionState({
     this.status = 'inactive',
     this.hasDropshippingAccess = false,
+    this.planId, // ✅ إضافته للكونستركتور
     this.planName,
     this.startDate,
     this.endDate,
@@ -19,6 +21,10 @@ class SubscriptionState {
       status: json['status'] ?? 'inactive',
       hasDropshippingAccess:
           json['permissions']?['hasDropshippingAccess'] ?? false,
+      
+      // ✅ 2. قراءة الـ ID من داخل كائن 'plan' بشكل آمن
+      planId: int.tryParse(json['plan']?['id']?.toString() ?? ''),
+      
       planName: json['plan']?['name'],
       startDate: json['startDate'],
       endDate: json['endDate'],

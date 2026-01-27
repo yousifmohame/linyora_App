@@ -3,6 +3,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:chewie/chewie.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:linyora_project/features/products/screens/product_details_screen.dart';
+import 'package:linyora_project/models/product_model.dart';
 import 'package:preload_page_view/preload_page_view.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -495,6 +497,9 @@ class ReelContentOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ نتحقق من قائمة المنتجات باستخدام الاسم الصحيح (products)
+    final hasProducts = reel.products != null && reel.products!.isNotEmpty;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -507,34 +512,85 @@ class ReelContentOverlay extends StatelessWidget {
               children: [
                 GestureDetector(
                   onTap: onProfileTap,
-                  child: Text(
-                    '@${reel.user?.name ?? 'Unknown'}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      shadows: [Shadow(color: Colors.black45, blurRadius: 4)],
-                    ),
+                  child: Row(
+                    children: [
+                      Text(
+                        '@${reel.user?.name ?? 'Unknown'}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          shadows: [
+                            Shadow(color: Colors.black45, blurRadius: 4),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 8),
                 if (reel.description != null)
                   Text(
                     reel.description!,
-                    maxLines: 3,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 15,
+                      fontSize: 14,
                       height: 1.3,
                       shadows: [Shadow(color: Colors.black45, blurRadius: 2)],
                     ),
                   ),
-                const SizedBox(height: 120),
+
+                // ✅ زر عرض المنتجات (يظهر فقط إذا كانت القائمة غير فارغة)
+                if (hasProducts) ...[
+                  const SizedBox(height: 12),
+                  GestureDetector(
+                    onTap: () => _showProductsSheet(context, reel.products!),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.6),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.shopping_bag_outlined,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            "عرض المنتجات (${reel.products!.length})",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.keyboard_arrow_up,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 100),
               ],
             ),
           ),
         ),
+
         const SizedBox(width: 10),
         Column(
           mainAxisSize: MainAxisSize.min,
@@ -566,12 +622,220 @@ class ReelContentOverlay extends StatelessWidget {
               label: 'مشاركة',
               onTap: onShare,
             ),
-            const SizedBox(height: 140),
+            // ✅ أيقونة التسوق الجانبية
+            if (hasProducts) ...[
+              const SizedBox(height: 16),
+              _GlassyActionButton(
+                icon: Icons.shopping_bag,
+                label: 'تسوق',
+                iconColor: Colors.amber,
+                onTap: () => _showProductsSheet(context, reel.products!),
+              ),
+            ],
+            const SizedBox(height: 120),
           ],
         ),
       ],
     );
   }
+}
+
+// ✅ دالة عرض قائمة المنتجات (متوافقة مع ProductModel الخاص بك)
+void _showProductsSheet(BuildContext context, List<ProductModel> products) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder:
+        (ctx) => DraggableScrollableSheet(
+          initialChildSize: 0.5,
+          minChildSize: 0.3,
+          maxChildSize: 0.8,
+          builder:
+              (_, controller) => Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.shopping_bag_outlined,
+                          color: Colors.black,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          "المنتجات في هذا الفيديو (${products.length})",
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: ListView.separated(
+                        controller: controller,
+                        itemCount: products.length,
+                        separatorBuilder: (_, __) => const Divider(height: 24),
+                        itemBuilder: (context, index) {
+                          final product = products[index];
+
+                          // 1. حساب الخصم (نفس المنطق في ProductDetailsScreen)
+                          bool hasDiscount = false;
+                          if (product.compareAtPrice != null &&
+                              product.compareAtPrice! > product.price) {
+                            hasDiscount = true;
+                          }
+
+                          return InkWell(
+                            onTap: () {
+                              // التوجيه لصفحة التفاصيل عند الضغط على المنتج كاملًا
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder:
+                                      (_) => ProductDetailsScreen(
+                                        productId: product.id.toString(),
+                                      ),
+                                ),
+                              );
+                            },
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // الصورة
+                                Container(
+                                  width: 80,
+                                  height: 80,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    color: Colors.grey[100],
+                                    border: Border.all(
+                                      color: Colors.grey.shade200,
+                                    ),
+                                    image:
+                                        product.imageUrl.isNotEmpty
+                                            ? DecorationImage(
+                                              image: NetworkImage(
+                                                product.imageUrl,
+                                              ),
+                                              fit: BoxFit.cover,
+                                            )
+                                            : null,
+                                  ),
+                                  child:
+                                      product.imageUrl.isEmpty
+                                          ? const Icon(
+                                            Icons.image_not_supported,
+                                            color: Colors.grey,
+                                          )
+                                          : null,
+                                ),
+                                const SizedBox(width: 12),
+
+                                // التفاصيل
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        product.name,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+
+                                      // ✅ عرض السعر بنفس تنسيق صفحة التفاصيل
+                                      // Row(
+                                      //   children: [
+                                      //     Text(
+                                      //       "${product.price.toStringAsFixed(0)} ر.س", // إزالة الكسور
+                                      //       style: const TextStyle(
+                                      //         color: Colors.black,
+                                      //         fontWeight: FontWeight.w800,
+                                      //         fontSize: 16,
+                                      //       ),
+                                      //     ),
+                                      //     if (hasDiscount) ...[
+                                      //       const SizedBox(width: 8),
+                                      //       Text(
+                                      //         "${product.compareAtPrice!.toStringAsFixed(0)}",
+                                      //         style: const TextStyle(
+                                      //           decoration: TextDecoration.lineThrough,
+                                      //           color: Colors.grey,
+                                      //           fontSize: 12,
+                                      //         ),
+                                      //       ),
+                                      //     ],
+                                      //   ],
+                                      // ),
+                                    ],
+                                  ),
+                                ),
+
+                                // زر الشراء
+                                ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder:
+                                            (_) => ProductDetailsScreen(
+                                              productId: product.id.toString(),
+                                            ),
+                                      ),
+                                    );
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.black,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    minimumSize: const Size(60, 36),
+                                  ),
+                                  child: const Text(
+                                    "شراء",
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+        ),
+  );
 }
 
 class _ProfileFollowButton extends StatelessWidget {

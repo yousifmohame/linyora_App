@@ -12,7 +12,10 @@ class SupplierWalletScreen extends StatefulWidget {
 
 class _SupplierWalletScreenState extends State<SupplierWalletScreen> {
   final SupplierWalletService _service = SupplierWalletService();
+
   SupplierWallet? _walletData;
+  List<WalletTransaction> _transactions = [];
+
   bool _isLoading = true;
   bool _isSubmitting = false;
   final TextEditingController _amountController = TextEditingController();
@@ -20,19 +23,32 @@ class _SupplierWalletScreenState extends State<SupplierWalletScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchWalletData();
+    _fetchAllData();
   }
 
-  Future<void> _fetchWalletData() async {
+  // دمج جلب الرصيد والمعاملات
+  Future<void> _fetchAllData() async {
+    setState(() => _isLoading = true);
     try {
-      final data = await _service.getWalletData();
-      if (mounted)
+      final results = await Future.wait([
+        _service.getWalletData(),
+        _service.getTransactions(),
+      ]);
+
+      if (mounted) {
         setState(() {
-          _walletData = data;
+          _walletData = results[0] as SupplierWallet;
+          _transactions = results[1] as List<WalletTransaction>;
           _isLoading = false;
         });
+      }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("فشل تحميل البيانات")));
+      }
     }
   }
 
@@ -45,10 +61,18 @@ class _SupplierWalletScreenState extends State<SupplierWalletScreen> {
       return;
     }
 
-    if (amount > (_walletData?.balance ?? 0)) {
+    // التحقق من الرصيد
+    if (_walletData != null && amount > _walletData!.balance) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text("رصيدك غير كافٍ")));
+      return;
+    }
+
+    if (amount < 50) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("الحد الأدنى للسحب 50 ر.س")));
       return;
     }
 
@@ -56,18 +80,25 @@ class _SupplierWalletScreenState extends State<SupplierWalletScreen> {
     try {
       await _service.requestPayout(amount);
       _amountController.clear();
-      _fetchWalletData(); // تحديث البيانات
-      if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("تم إرسال الطلب بنجاح ✅")));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("تم إرسال الطلب بنجاح ✅"),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context); // إغلاق النافذة المنبثقة إذا كانت مفتوحة
+        _fetchAllData(); // تحديث البيانات
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("خطأ: ${e.toString().replaceAll('Exception: ', '')}"),
+            backgroundColor: Colors.red,
           ),
         );
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -75,13 +106,15 @@ class _SupplierWalletScreenState extends State<SupplierWalletScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    // ✅ الحل الجذري للخطأ: التحقق قبل العرض
+    if (_isLoading || _walletData == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4F8),
       body: Stack(
         children: [
-          // الخلفية
           Positioned(
             top: -50,
             right: -50,
@@ -96,6 +129,13 @@ class _SupplierWalletScreenState extends State<SupplierWalletScreen> {
           CustomScrollView(
             slivers: [
               SliverAppBar(
+                title: const Text(
+                  "المحفظة",
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 centerTitle: true,
                 backgroundColor: Colors.transparent,
                 elevation: 0,
@@ -168,9 +208,10 @@ class _SupplierWalletScreenState extends State<SupplierWalletScreen> {
                             const SizedBox(height: 16),
                             TextField(
                               controller: _amountController,
-                              keyboardType: TextInputType.numberWithOptions(
-                                decimal: true,
-                              ),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
                               decoration: InputDecoration(
                                 labelText: "المبلغ المراد سحبه",
                                 suffixText: "ر.س",
@@ -215,44 +256,17 @@ class _SupplierWalletScreenState extends State<SupplierWalletScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.amber.shade50,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.info_outline,
-                                    color: Colors.amber.shade800,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      "يتم تحويل المبالغ خلال 24-48 ساعة عمل.",
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.amber.shade900,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
                           ],
                         ),
                       ),
 
                       const SizedBox(height: 24),
 
-                      // 3. سجل عمليات السحب
+                      // 3. سجل المعاملات
                       const Align(
                         alignment: Alignment.centerRight,
                         child: Text(
-                          "سجل عمليات السحب",
+                          "سجل المعاملات",
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -261,11 +275,11 @@ class _SupplierWalletScreenState extends State<SupplierWalletScreen> {
                       ),
                       const SizedBox(height: 12),
 
-                      if (_walletData!.payouts.isEmpty)
+                      if (_transactions.isEmpty)
                         const Padding(
                           padding: EdgeInsets.all(40),
                           child: Text(
-                            "لا توجد عمليات سحب سابقة",
+                            "لا توجد معاملات سابقة",
                             style: TextStyle(color: Colors.grey),
                           ),
                         )
@@ -273,12 +287,12 @@ class _SupplierWalletScreenState extends State<SupplierWalletScreen> {
                         ListView.separated(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _walletData!.payouts.length,
+                          itemCount: _transactions.length,
                           separatorBuilder:
                               (c, i) => const SizedBox(height: 12),
                           itemBuilder:
                               (ctx, i) =>
-                                  _buildPayoutTile(_walletData!.payouts[i]),
+                                  _buildTransactionTile(_transactions[i]),
                         ),
 
                       const SizedBox(height: 50),
@@ -343,7 +357,10 @@ class _SupplierWalletScreenState extends State<SupplierWalletScreen> {
     );
   }
 
-  Widget _buildPayoutTile(PayoutRequest payout) {
+  Widget _buildTransactionTile(WalletTransaction t) {
+    final isPayout = t.type == 'payout';
+    String formattedDate = t.date.split('T')[0]; // تنسيق بسيط للتاريخ
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -354,75 +371,86 @@ class _SupplierWalletScreenState extends State<SupplierWalletScreen> {
         ],
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color:
+                  isPayout
+                      ? Colors.red.withOpacity(0.1)
+                      : Colors.green.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isPayout ? Icons.arrow_upward : Icons.arrow_downward,
+              color: isPayout ? Colors.red : Colors.green,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  t.description,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  formattedDate,
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
           Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                "${payout.amount.toStringAsFixed(2)} ر.س",
-                style: const TextStyle(
+                "${isPayout ? '-' : '+'}${t.amount.toStringAsFixed(2)}",
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
+                  color: isPayout ? Colors.red : Colors.green,
                 ),
               ),
               const SizedBox(height: 4),
-              Text(
-                DateFormat(
-                  'yyyy/MM/dd',
-                ).format(DateTime.parse(payout.createdAt)),
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-              ),
+              _buildStatusText(t.status),
             ],
           ),
-          _buildStatusBadge(payout.status),
         ],
       ),
     );
   }
 
-  Widget _buildStatusBadge(String status) {
+  Widget _buildStatusText(String status) {
     Color color;
     String text;
-    IconData icon;
 
     switch (status) {
-      case 'approved':
+      case 'completed':
+      case 'paid':
+      case 'cleared':
         color = Colors.green;
-        text = "مقبول";
-        icon = Icons.check_circle;
+        text = "مكتمل";
         break;
       case 'rejected':
+      case 'failed':
         color = Colors.red;
         text = "مرفوض";
-        icon = Icons.cancel;
         break;
       default:
         color = Colors.amber;
         text = "قيد المعالجة";
-        icon = Icons.access_time;
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
+    return Text(
+      text,
+      style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
     );
   }
 

@@ -9,6 +9,8 @@ import 'package:linyora_project/features/settings/screens/settings_screen.dart';
 import 'package:linyora_project/features/shipping/screens/merchant_shipping_screen.dart';
 import 'package:linyora_project/features/subscriptions/screens/my_subscription_screen.dart';
 import 'package:linyora_project/features/wallet/screens/merchant_wallet_screen.dart';
+// ✅ 1. استيراد شاشة الإشعارات
+import 'package:linyora_project/features/home/screens/notifications_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:linyora_project/features/auth/providers/auth_provider.dart';
 import 'package:linyora_project/models/user_model.dart';
@@ -42,6 +44,35 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
   int _currentIndex = 0;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
+  // ✅ 2. متغيرات الإشعارات
+  int _unreadNotificationsCount = 0;
+  // سنستخدم MerchantService لجلب الإشعارات (تأكد من إضافة دالة getNotifications فيه)
+  final MerchantService _merchantService = MerchantService();
+
+  @override
+  void initState() {
+    super.initState();
+    // ✅ 3. جلب الإشعارات عند البدء
+    _fetchUnreadNotifications();
+  }
+
+  // ✅ 4. دالة جلب عدد الإشعارات غير المقروءة
+  Future<void> _fetchUnreadNotifications() async {
+    try {
+      // نفترض أن دالة getNotifications موجودة في MerchantService وتعيد List<NotificationModel>
+      // إذا لم تكن موجودة، يجب إضافتها لتستدعي '/api/notifications'
+      final notifications = await _merchantService.getNotifications();
+      if (mounted) {
+        setState(() {
+          _unreadNotificationsCount =
+              notifications.where((n) => !n.isRead).length;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching notifications: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = Provider.of<AuthProvider>(context).user;
@@ -52,13 +83,8 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
     // 1️⃣ منطق الأقفال (Lock Logic)
     // ============================================================
 
-    // هل الحساب موثق؟
     final bool isVerified = user.verificationStatus == 'approved';
-
-    // هل المستخدم مشترك؟
     final bool isSubscribed = user.isSubscribed;
-
-    // هل لديه صلاحية الدروب شيبينج؟ (يجب أن يكون مشتركاً + الباقة تدعم الدروب شيبينج)
     final bool hasDropshippingAccess =
         isSubscribed && (user.subscription?.hasDropshippingAccess ?? false);
 
@@ -67,7 +93,6 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
             ? {
               'title': 'اشتراكي',
               'icon': Icons.credit_card,
-              // ✅ ربط الصفحة الجديدة هنا
               'page': const MySubscriptionScreen(),
               'show': isVerified,
             }
@@ -78,22 +103,19 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
               'show': isVerified,
             };
 
-    // ============================================================
-    // 2️⃣ تعريف القائمة مع حالة القفل (isLocked)
-    // ============================================================
     final List<Map<String, dynamic>> allNavLinks = [
       {
         'title': 'لوحة التحكم',
         'icon': Icons.dashboard_outlined,
         'page': const _MerchantHomeView(),
         'show': true,
-        'isLocked': false, // دائماً مفتوحة
+        'isLocked': false,
       },
       {
         'title': 'توثيق الحساب',
         'icon': Icons.verified_user_outlined,
         'page': const VerificationScreen(),
-        'show': !isVerified, // تختفي بعد التوثيق
+        'show': !isVerified,
         'isLocked': false,
       },
       {
@@ -101,64 +123,63 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
         'icon': Icons.inventory_2_outlined,
         'page': const MerchantProductsScreen(),
         'show': isVerified,
-        'isLocked': !isSubscribed, // 🔒 مقفل إذا لم يكن مشتركاً
+        'isLocked': !isSubscribed,
       },
       {
         'title': 'الطلبات',
         'icon': Icons.shopping_bag_outlined,
         'page': const MerchantOrdersScreen(),
         'show': isVerified,
-        'isLocked': !isSubscribed, // 🔒 مقفل
+        'isLocked': !isSubscribed,
       },
       {
         'title': 'معاينه المتجر',
         'icon': Icons.shopping_bag_outlined,
         'page': const MyStoreScreen(),
         'show': isVerified,
-        'isLocked': !isSubscribed, // 🔒 مقفل
+        'isLocked': !isSubscribed,
       },
       {
         'title': 'قصص المتجر',
         'icon': Icons.history_edu_outlined,
         'page': const MerchantStoriesScreen(),
         'show': isVerified,
-        'isLocked': !isSubscribed, // 🔒 مقفل
+        'isLocked': !isSubscribed,
       },
       {
         'title': 'العارضات و المؤثرات',
         'icon': Icons.history_edu_outlined,
         'page': const BrowseModelsScreen(),
         'show': isVerified,
-        'isLocked': !isSubscribed, // 🔒 مقفل
+        'isLocked': !isSubscribed,
       },
       {
         'title': 'المحادثات',
         'icon': Icons.history_edu_outlined,
         'page': ChatScreen(currentUserId: user.id),
         'show': isVerified,
-        'isLocked': !isSubscribed, // 🔒 مقفل
+        'isLocked': !isSubscribed,
       },
       {
         'title': 'الإتفاقيات',
         'icon': Icons.history_edu_outlined,
         'page': MerchantAgreementsScreen(),
         'show': isVerified,
-        'isLocked': !isSubscribed, // 🔒 مقفل
+        'isLocked': !isSubscribed,
       },
       {
         'title': 'المعلومات البنكيه',
         'icon': Icons.history_edu_outlined,
         'page': BankSettingsScreen(),
         'show': isVerified,
-        'isLocked': !isSubscribed, // 🔒 مقفل
+        'isLocked': !isSubscribed,
       },
       {
         'title': 'الدروب شيبينج',
         'icon': Icons.cloud_download_outlined,
         'page': const MerchantDropshippingScreen(),
-        'show': isVerified, // يظهر دائماً للموثقين
-        'isLocked':
-            !hasDropshippingAccess, // 🔒 مقفل إذا لم يكن لديه الصلاحية الخاصة
+        'show': isVerified,
+        'isLocked': !hasDropshippingAccess,
       },
       subscriptionNavItem,
       {
@@ -166,25 +187,24 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
         'icon': Icons.local_shipping_outlined,
         'page': const MerchantShippingScreen(),
         'show': isVerified,
-        'isLocked': !isSubscribed, // 🔒 مقفل
+        'isLocked': !isSubscribed,
       },
       {
         'title': 'المحفظة',
         'icon': Icons.account_balance_wallet_outlined,
         'page': const MerchantWalletScreen(),
         'show': isVerified,
-        'isLocked': !isSubscribed, // 🔒 مقفل
+        'isLocked': !isSubscribed,
       },
       {
         'title': 'الإعدادات',
         'icon': Icons.settings_outlined,
         'page': const SettingsScreen(),
         'show': true,
-        'isLocked': false, // الإعدادات دائماً مفتوحة
+        'isLocked': false,
       },
     ];
 
-    // تصفية العناصر المخفية (مثل التوثيق بعد الانتهاء منه)
     final visibleNavItems =
         allNavLinks.where((item) => item['show'] == true).toList();
 
@@ -208,18 +228,78 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
           icon: const Icon(Icons.menu, color: Colors.black),
           onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
+        // ✅ 5. إضافة زر الإشعارات وزر التحديث
         actions: [
+          // زر الإشعارات
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(
+                  Icons.notifications_outlined,
+                  color: Colors.black,
+                  size: 28,
+                ),
+                onPressed: () async {
+                  // الذهاب لصفحة الإشعارات
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const NotificationsScreen(),
+                    ),
+                  );
+                  // تحديث العدد عند العودة
+                  _fetchUnreadNotifications();
+                },
+              ),
+              if (_unreadNotificationsCount > 0)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Center(
+                      child: Text(
+                        _unreadNotificationsCount > 9
+                            ? "+9"
+                            : "$_unreadNotificationsCount",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          height: 1,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+
+          // زر التحديث (فقط في لوحة التحكم الرئيسية)
           if (_currentIndex == 0)
             IconButton(
               icon: const Icon(Icons.refresh, color: Colors.black),
-              onPressed: () => setState(() {}),
+              onPressed: () {
+                setState(() {});
+                _fetchUnreadNotifications(); // تحديث الإشعارات أيضاً
+              },
             ),
+
+          const SizedBox(width: 8),
         ],
       ),
 
-      // ============================================================
-      // 3️⃣ القائمة الجانبية (Drawer) مع القفل
-      // ============================================================
       drawer: Drawer(
         child: Column(
           children: [
@@ -335,19 +415,17 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
                     selected: isSelected,
                     selectedTileColor: Colors.purple.withOpacity(0.05),
                     onTap: () {
-                      Navigator.pop(context); // إغلاق القائمة أولاً
+                      Navigator.pop(context);
 
                       if (isLocked) {
-                        // ⛔️ إذا كان مقفلاً، وجهه للاشتراك
                         _showSubscriptionLockedDialog(context, item['title']);
                       } else {
-                        // ✅ إذا كان مفتوحاً، انتقل للصفحة
-                        if (item['isSubscriptionAction'] == true) {
+                        if (item['title'] == 'اشترك الآن' ||
+                            item['title'] == 'اشتراكي') {
+                          // التعامل مع عنصر الاشتراك المخصص
                           Navigator.push(
                             context,
-                            MaterialPageRoute(
-                              builder: (_) => const SubscriptionPlansScreen(),
-                            ),
+                            MaterialPageRoute(builder: (_) => item['page']),
                           );
                         } else {
                           setState(() => _currentIndex = index);
@@ -365,7 +443,6 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
     );
   }
 
-  // نافذة تنبيه عند الضغط على عنصر مقفل
   void _showSubscriptionLockedDialog(BuildContext context, String featureName) {
     showDialog(
       context: context,
@@ -432,10 +509,21 @@ class _MerchantHomeViewState extends State<_MerchantHomeView> {
   Future<void> _checkAgreementAndFetchData() async {
     if (!mounted) return;
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    // 🔄 1. خطوة جديدة: إجبار التطبيق على تحديث بيانات المستخدم من السيرفر أولاً
+    try {
+      await authProvider.refreshUser();
+    } catch (e) {
+      debugPrint("Warning: Failed to refresh user data: $e");
+      // في حال فشل التحديث (مثلاً لا يوجد إنترنت)، سنعتمد على البيانات المحلية الحالية
+    }
+
+    // 2. الآن نقرأ بيانات المستخدم (بعد أن تم تحديثها من السيرفر)
     final user = authProvider.user;
 
     if (user == null) return;
 
+    // 3. التحقق الآن يتم بناءً على أحدث بيانات من قاعدة البيانات
     if (user.hasAcceptedAgreement == false) {
       await showDialog(
         context: context,
@@ -445,13 +533,20 @@ class _MerchantHomeViewState extends State<_MerchantHomeView> {
             (context) => AgreementModal(
               agreementKey: "merchant_agreement",
               onAgreed: () async {
+                // عند الموافقة، نحدث البيانات مرة أخرى للتأكيد
                 await authProvider.refreshUser();
-                if (mounted) _fetchDashboardData();
+                if (mounted) {
+                  // نغلق المودال يدوياً هنا لأنه داخل showDialog
+                  // (ملاحظة: AgreementModal عادة يغلق نفسه، لكن للتأكد)
+                  // Navigator.of(context).pop();
+
+                  _fetchDashboardData();
+                }
               },
             ),
       );
     } else {
-      // ✅ المستخدم وافق على الشروط -> حمل البيانات مباشرة (سواء مشترك أو لا)
+      // ✅ المستخدم وافق مسبقاً (والبيانات محدثة) -> حمل البيانات
       _fetchDashboardData();
     }
   }

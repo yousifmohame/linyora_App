@@ -15,6 +15,17 @@ class SupplierWalletService {
     }
   }
 
+  Future<List<WalletTransaction>> getTransactions() async {
+    try {
+      final response = await _apiClient.get('/wallet/transactions');
+      final List list = response.data;
+      return list.map((e) => WalletTransaction.fromJson(e)).toList();
+    } catch (e) {
+      // إرجاع قائمة فارغة في حال الخطأ بدلاً من إيقاف الشاشة
+      return [];
+    }
+  }
+
   // طلب سحب رصيد
   Future<void> requestPayout(double amount) async {
     try {

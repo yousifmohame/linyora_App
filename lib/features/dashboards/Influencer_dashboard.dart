@@ -11,6 +11,7 @@ import 'package:linyora_project/features/influencers/services/model_service.dart
 import 'package:linyora_project/features/influencers/stories/screens/stories_screen.dart';
 import 'package:linyora_project/features/influencers/verification/screens/verification_screen.dart';
 import 'package:linyora_project/features/models/analytics/screens/model_analytics_screen.dart';
+import 'package:linyora_project/features/models/reels/screens/model_reels_screen.dart';
 import 'package:linyora_project/features/models/wallet/screens/model_wallet_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -126,6 +127,13 @@ class _InfluencerDashboardScreenState extends State<InfluencerDashboardScreen> {
         'title': 'عروضي',
         'icon': Icons.local_offer_outlined,
         'page': const InfluencerOffersScreen(),
+        'show': isVerified,
+        'isLocked': !isSubscribed,
+      },
+      {
+        'title': 'الريلز',
+        'icon': Icons.video_call_outlined,
+        'page': const ModelReelsScreen(),
         'show': isVerified,
         'isLocked': !isSubscribed,
       },
@@ -522,10 +530,22 @@ class _InfluencerHomeViewState extends State<_InfluencerHomeView> {
   Future<void> _checkAgreementAndFetchData() async {
     if (!mounted) return;
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    // 🔄 1. خطوة إضافية هامة: تحديث بيانات المستخدم من السيرفر أولاً
+    // هذا يضمن أننا نقرأ أحدث حالة للاتفاقية من قاعدة البيانات
+    try {
+      await authProvider.refreshUser();
+    } catch (e) {
+      print("Failed to refresh user: $e");
+      // يمكننا الاستمرار حتى لو فشل التحديث ومحاولة استخدام البيانات المحلية
+    }
+
+    // 2. الآن نحصل على المستخدم (بعد التحديث المحتمل)
     final user = authProvider.user;
 
     if (user == null) return;
 
+    // 3. التحقق الآن سيكون دقيقاً
     if (user.hasAcceptedAgreement == false) {
       await showDialog(
         context: context,
@@ -536,14 +556,18 @@ class _InfluencerHomeViewState extends State<_InfluencerHomeView> {
               child: AgreementModal(
                 agreementKey: "influencer_agreement",
                 onAgreed: () async {
-                  await _service.acceptAgreement();
-                  await authProvider.refreshUser();
-                  if (mounted) _fetchDashboardData();
+                  await _service.acceptAgreement(); // إرسال الموافقة للباك إند
+                  await authProvider.refreshUser(); // تحديث البروفايدر مرة أخرى
+                  if (mounted) {
+                    Navigator.pop(context); // إغلاق المودال
+                    _fetchDashboardData();
+                  }
                 },
               ),
             ),
       );
     } else {
+      // المستخدم وافق مسبقاً، حمل البيانات مباشرة
       _fetchDashboardData();
     }
   }

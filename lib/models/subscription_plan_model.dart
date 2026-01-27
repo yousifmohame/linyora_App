@@ -17,14 +17,21 @@ class SubscriptionPlan {
 
   factory SubscriptionPlan.fromJson(Map<String, dynamic> json) {
     return SubscriptionPlan(
-      id: json['id'],
+      // ✅ تحسين: تحويل آمن للـ id مثل السعر
+      id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      
       name: json['name'] ?? '',
       description: json['description'] ?? '',
-      // تحويل السعر بأمان سواء جاء كنص أو رقم
-      price: double.tryParse(json['price'].toString()) ?? 0.0,
-      // تحويل قائمة الميزات
-      features:
-          json['features'] != null ? List<String>.from(json['features']) : [],
+      
+      // السعر (ممتاز)
+      price: double.tryParse(json['price']?.toString() ?? '0') ?? 0.0,
+      
+      // الميزات (ممتاز)
+      features: json['features'] != null 
+          ? List<String>.from(json['features']) 
+          : [],
+          
+      // الدروب شيبينج (ممتاز)
       includesDropshipping:
           json['includes_dropshipping'] == true ||
           json['includes_dropshipping'] == 1,

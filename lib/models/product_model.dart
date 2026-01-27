@@ -72,30 +72,30 @@ class ProductModel {
         (sum, item) => sum + item.stockQuantity,
       );
     } else {
-      displayPrice = (json['price'] as num?)?.toDouble() ?? 0.0;
+      // ✅ التعديل هنا: تحويل السعر بشكل آمن جداً
+      // يعمل سواء كان السعر قادماً كـ String "100.00" أو int 100 أو double 100.0
+      displayPrice = double.tryParse(json['price']?.toString() ?? '0') ?? 0.0;
+
       if (json['image_url'] != null) {
         displayImage = json['image_url'].toString();
       } else if (json['image'] != null) {
         displayImage = json['image'].toString();
       }
-      totalStock = (json['stock'] as num?)?.toInt() ?? 0;
+
+      // تحويل آمن للمخزون أيضاً
+      totalStock = int.tryParse(json['stock']?.toString() ?? '0') ?? 0;
     }
 
-    // -----------------------------------------------------------
-    // ✅ 3. الحل هنا: معالجة الفئات بذكاء (List أو Single Value)
-    // -----------------------------------------------------------
+    // 3. معالجة الفئات
     List<int> catIds = [];
 
-    // الحالة أ: إذا جاءت كقائمة (categoryIds)
     if (json['categoryIds'] != null && json['categoryIds'] is List) {
       catIds =
           (json['categoryIds'] as List)
               .map((e) => int.tryParse(e.toString()) ?? 0)
               .where((e) => e > 0)
               .toList();
-    }
-    // الحالة ب: إذا جاءت ككائنات (categories)
-    else if (json['categories'] != null && json['categories'] is List) {
+    } else if (json['categories'] != null && json['categories'] is List) {
       catIds =
           (json['categories'] as List)
               .map((e) => int.tryParse(e['id']?.toString() ?? '0') ?? 0)
@@ -103,15 +103,12 @@ class ProductModel {
               .toList();
     }
 
-    // ✅ الحالة ج (الحل لمشكلتك): إذا جاءت كقيمة مفردة (category_id)
-    // الباك إند يرسل MAX(category_id) كقيمة واحدة، لذا نلتقطها هنا
     if (catIds.isEmpty && json['category_id'] != null) {
       int? singleId = int.tryParse(json['category_id'].toString());
       if (singleId != null && singleId > 0) {
         catIds.add(singleId);
       }
     }
-    // -----------------------------------------------------------
 
     // 4. تحديد حالة الدروب شيبينج
     bool isDropshippingProduct = false;
@@ -129,11 +126,13 @@ class ProductModel {
       name: json['name']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
       imageUrl: ImageHelper.getValidUrl(displayImage),
-      rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
-      reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
+      // تحويل آمن للتقييم وعدد المراجعات
+      rating: double.tryParse(json['rating']?.toString() ?? '0') ?? 0.0,
+      reviewCount: int.tryParse(json['reviewCount']?.toString() ?? '0') ?? 0,
+
       merchantName:
           json['merchantName']?.toString() ?? json['brand']?.toString() ?? '',
-      isNew: json['is_new'] == true,
+      isNew: json['is_new'] == true || json['is_new'] == 1,
       promotionEndsAt: json['promotion_ends_at']?.toString(),
       brand: json['brand']?.toString(),
       status: json['status']?.toString() ?? 'active',
@@ -141,7 +140,7 @@ class ProductModel {
       compareAtPrice: displayComparePrice,
       stock: totalStock,
       variants: variantsList,
-      categoryIds: catIds, // ✅ الآن ستحتوي على القيمة حتى لو جاءت مفردة
+      categoryIds: catIds,
       isDropshipping: isDropshippingProduct,
       originalProductId:
           int.tryParse(json['original_product_id']?.toString() ?? '') ??

@@ -1,4 +1,6 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:linyora_project/features/models/notifications/models/notification_model.dart';
 import '../../../core/api/api_client.dart'; // تأكد من المسار
 
 // مودل الإحصائيات (مطابق للواجهة في React)
@@ -36,6 +38,22 @@ class SupplierService {
     } catch (e) {
       // إرجاع أصفار في حالة الخطأ لضمان عدم انهيار الواجهة
       return SupplierStatsModel(totalProducts: 0, totalStock: 0, totalOrders: 0, availableBalance: '0.00');
+    }
+  }
+
+  Future<List<NotificationModel>> getNotifications() async {
+    try {
+      // الـ ApiClient سيضيف التوكن تلقائياً في الهيدر
+      final response = await _apiClient.get('/notifications');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data;
+        return data.map((json) => NotificationModel.fromJson(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint("Error fetching notifications: $e");
+      return [];
     }
   }
 }

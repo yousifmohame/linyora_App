@@ -8,6 +8,7 @@ import 'package:linyora_project/features/models/notifications/screens/notificati
 import 'package:linyora_project/features/models/notifications/services/notifications_service.dart';
 import 'package:linyora_project/features/models/offers/screens/model_offers_screen.dart';
 import 'package:linyora_project/features/models/profile/screens/model_profile_settings.dart';
+import 'package:linyora_project/features/models/reels/screens/model_reels_screen.dart';
 import 'package:linyora_project/features/models/requests/screens/model_requests_screen.dart';
 import 'package:linyora_project/features/models/stories/screens/stories_screen.dart';
 import 'package:linyora_project/features/models/verification/screens/verification_screen.dart';
@@ -135,6 +136,13 @@ class _ModelDashboardScreenState extends State<ModelDashboardScreen> {
         'page': ModelOffersScreen(),
         'show': isVerified,
         'isLocked': !isSubscribed, // 🔒 مقفل لغير المشتركين
+      },
+      {
+        'title': 'الريلز',
+        'icon': Icons.video_call_outlined,
+        'page': const ModelReelsScreen(),
+        'show': isVerified,
+        'isLocked': !isSubscribed,
       },
       {
         'title': 'الطلبات',
@@ -499,23 +507,40 @@ class _ModelHomeViewState extends State<_ModelHomeView> {
   Future<void> _checkAgreementAndFetchData() async {
     if (!mounted) return;
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    // 🔄 1. خطوة جديدة: تحديث بيانات المستخدم من السيرفر لضمان دقة الحالة
+    try {
+      await authProvider.refreshUser();
+    } catch (e) {
+      debugPrint("Failed to refresh user data: $e");
+      // نستمر حتى لو فشل التحديث (اعتماداً على الكاش)
+    }
+
+    // 2. قراءة المستخدم بعد التحديث
     final user = authProvider.user;
 
     if (user == null) return;
 
+    // 3. الآن التحقق دقيق
     if (user.hasAcceptedAgreement == false) {
       // إظهار الاتفاقية الإجبارية
       await showDialog(
         context: context,
         barrierDismissible: false,
+        barrierColor: Colors.black87,
         builder:
             (context) => WillPopScope(
               onWillPop: () async => false,
               child: AgreementModal(
+                // تأكد من تمرير المفتاح الصحيح هنا إذا كان المودال يطلبه (مثلاً "model_agreement")
                 onAgreed: () async {
                   await _modelService.acceptAgreement();
-                  await authProvider.refreshUser(); // تحديث المستخدم
-                  if (mounted) _fetchDashboardData();
+                  await authProvider
+                      .refreshUser(); // تحديث مرة أخرى بعد الموافقة
+                  if (mounted) {
+                    // Navigator.pop(context); // قد تحتاج لإغلاق المودال يدوياً هنا
+                    _fetchDashboardData();
+                  }
                 },
               ),
             ),

@@ -45,3 +45,32 @@ class PayoutRequest {
     );
   }
 }
+
+class WalletTransaction {
+  final String id;
+  final double amount;
+  final String type; // 'earning' or 'payout'
+  final String status;
+  final String description;
+  final String date;
+
+  WalletTransaction({
+    required this.id,
+    required this.amount,
+    required this.type,
+    required this.status,
+    required this.description,
+    required this.date,
+  });
+
+  factory WalletTransaction.fromJson(Map<String, dynamic> json) {
+    return WalletTransaction(
+      id: json['id']?.toString() ?? '',
+      amount: double.tryParse(json['amount']?.toString() ?? '0') ?? 0.0,
+      type: json['type'] ?? 'earning',
+      status: json['status'] ?? 'pending',
+      description: json['description'] ?? '',
+      date: json['created_at'] ?? '',
+    );
+  }
+}

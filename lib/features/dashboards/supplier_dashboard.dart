@@ -8,6 +8,8 @@ import 'package:linyora_project/features/supplier/settings/screens/supplier_sett
 import 'package:linyora_project/features/supplier/shipping/screens/supplier_shipping_screen.dart';
 import 'package:linyora_project/features/supplier/stories/screens/stories_screen.dart';
 import 'package:linyora_project/features/supplier/wallet/screens/supplier_wallet_screen.dart';
+// ✅ 1. تأكد من استيراد شاشة الإشعارات
+import 'package:linyora_project/features/home/screens/notifications_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:linyora_project/features/auth/providers/auth_provider.dart';
 
@@ -26,28 +28,50 @@ class _SupplierDashboardScreenState extends State<SupplierDashboardScreen> {
   int _currentIndex = 0;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
+  // ✅ 2. متغير لحفظ عدد الإشعارات غير المقروءة
+  int _unreadNotificationsCount = 0;
+  final SupplierService _supplierService =
+      SupplierService(); // لاستخدامه في جلب الإشعارات
+
+  @override
+  void initState() {
+    super.initState();
+    // ✅ 3. جلب عدد الإشعارات عند بدء التطبيق
+    _fetchUnreadNotifications();
+  }
+
+  // ✅ 4. دالة جلب عدد الإشعارات (تتصل بالباك إند)
+  Future<void> _fetchUnreadNotifications() async {
+    try {
+      // نفترض أن لديك دالة في السيرفس تجلب الإشعارات، أو تجلب العدد مباشرة
+      // إذا لم تكن موجودة، يمكنك جلب كل الإشعارات وحساب الـ unread منها
+      final notifications = await _supplierService.getNotifications();
+      if (mounted) {
+        setState(() {
+          _unreadNotificationsCount =
+              notifications.where((n) => !n.isRead).length;
+        });
+      }
+    } catch (e) {
+      print("Error fetching notifications: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = Provider.of<AuthProvider>(context).user;
 
-    // حماية: إذا لم يكن هناك مستخدم، نعرض تحميل
     if (user == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    // ============================================================
-    // 1️⃣ منطق الأقفال (Lock Logic) للمورد
-    // ============================================================
-
-    // المورد يحتاج فقط للتوثيق للوصول للمميزات (غالباً لا يحتاج اشتراك مثل التاجر)
     final bool isVerified = user.verificationStatus == 'approved';
 
-    // قائمة الصفحات
     final List<Map<String, dynamic>> allNavLinks = [
       {
         'title': 'لوحة التحكم',
         'icon': Icons.dashboard_outlined,
-        'page': const _SupplierHomeView(), // ✅ الشاشة الرئيسية الملونة
+        'page': const _SupplierHomeView(),
         'show': true,
         'isLocked': false,
       },
@@ -55,7 +79,7 @@ class _SupplierDashboardScreenState extends State<SupplierDashboardScreen> {
         'title': 'توثيق الحساب',
         'icon': Icons.verified_user_outlined,
         'page': const VerificationScreen(),
-        'show': !isVerified, // تختفي بعد التوثيق
+        'show': !isVerified,
         'isLocked': false,
       },
       {
@@ -63,42 +87,42 @@ class _SupplierDashboardScreenState extends State<SupplierDashboardScreen> {
         'icon': Icons.inventory_2_outlined,
         'page': const SupplierProductsScreen(),
         'show': true,
-        'isLocked': !isVerified, // 🔒 مقفل حتى يتم التوثيق
+        'isLocked': !isVerified,
       },
       {
         'title': 'القصص',
         'icon': Icons.image_outlined,
         'page': const StoriesScreen(),
         'show': true,
-        'isLocked': !isVerified, // 🔒 مقفل حتى يتم التوثيق
+        'isLocked': !isVerified,
       },
       {
         'title': 'الطلبات الواردة',
         'icon': Icons.shopping_bag_outlined,
         'page': const SupplierOrdersScreen(),
         'show': true,
-        'isLocked': !isVerified, // 🔒 مقفل
+        'isLocked': !isVerified,
       },
       {
         'title': 'المحفظة والأرباح',
         'icon': Icons.account_balance_wallet_outlined,
         'page': const SupplierWalletScreen(),
         'show': true,
-        'isLocked': !isVerified, // 🔒 مقفل
+        'isLocked': !isVerified,
       },
       {
         'title': 'شركات الشحن',
         'icon': Icons.local_shipping_outlined,
         'page': const SupplierShippingScreen(),
         'show': true,
-        'isLocked': !isVerified, // 🔒 مقفل
+        'isLocked': !isVerified,
       },
       {
         'title': 'التفاصيل البنكيه',
         'icon': Icons.account_balance_wallet_outlined,
         'page': const SupplierBankScreen(),
         'show': true,
-        'isLocked': !isVerified, // 🔒 مقفل
+        'isLocked': !isVerified,
       },
       {
         'title': 'الإعدادات',
@@ -109,19 +133,14 @@ class _SupplierDashboardScreenState extends State<SupplierDashboardScreen> {
       },
     ];
 
-    // تصفية العناصر الظاهرة
     final visibleNavItems =
         allNavLinks.where((item) => item['show'] == true).toList();
 
-    // تصحيح المؤشر إذا كان خارج النطاق
     if (_currentIndex >= visibleNavItems.length) _currentIndex = 0;
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: const Color(0xFFF0F4F8), // لون خلفية هادئ
-      // ============================================================
-      // 2️⃣ الشريط العلوي (App Bar)
-      // ============================================================
+      backgroundColor: const Color(0xFFF0F4F8),
       appBar: AppBar(
         title: Text(
           visibleNavItems[_currentIndex]['title'],
@@ -135,24 +154,76 @@ class _SupplierDashboardScreenState extends State<SupplierDashboardScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.menu, color: Colors.black),
-          onPressed:
-              () =>
-                  _scaffoldKey.currentState
-                      ?.openDrawer(), // فتح القائمة الجانبية
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
+        // ✅ 5. إضافة الأزرار (Actions) هنا
+        actions: [
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(
+                  Icons.notifications_outlined,
+                  color: Colors.black,
+                  size: 28,
+                ),
+                onPressed: () async {
+                  // الانتقال لصفحة الإشعارات
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const NotificationsScreen(),
+                    ),
+                  );
+                  // عند العودة، نقوم بتحديث العدد (لأنه قد تمت قراءة الإشعارات)
+                  _fetchUnreadNotifications();
+                },
+              ),
+              // عرض الشارة الحمراء فقط إذا كان هناك إشعارات
+              if (_unreadNotificationsCount > 0)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Center(
+                      child: Text(
+                        _unreadNotificationsCount > 9
+                            ? "+9"
+                            : "$_unreadNotificationsCount",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          height: 1,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 8), // مسافة صغيرة من الحافة
+        ],
       ),
 
-      // ============================================================
-      // 3️⃣ القائمة الجانبية (Drawer) - نفس ستايل التاجر
-      // ============================================================
       drawer: Drawer(
         child: Column(
           children: [
-            // رأس القائمة (Header)
             UserAccountsDrawerHeader(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.blue, Colors.indigo], // ألوان خاصة بالمورد
+                  colors: [Colors.blue, Colors.indigo],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -179,7 +250,6 @@ class _SupplierDashboardScreenState extends State<SupplierDashboardScreen> {
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(width: 8),
-                  // شارة المورد
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 6,
@@ -211,14 +281,11 @@ class _SupplierDashboardScreenState extends State<SupplierDashboardScreen> {
                 ],
               ),
             ),
-
-            // قائمة العناصر
             Expanded(
               child: ListView.builder(
                 padding: EdgeInsets.zero,
                 itemCount: visibleNavItems.length + 1,
                 itemBuilder: (context, index) {
-                  // زر تسجيل الخروج في النهاية
                   if (index == visibleNavItems.length) {
                     return ListTile(
                       leading: const Icon(Icons.logout, color: Colors.red),
@@ -277,13 +344,10 @@ class _SupplierDashboardScreenState extends State<SupplierDashboardScreen> {
                     selected: isSelected,
                     selectedTileColor: Colors.blue.withOpacity(0.05),
                     onTap: () {
-                      Navigator.pop(context); // إغلاق القائمة
-
+                      Navigator.pop(context);
                       if (isLocked) {
-                        // ⛔️ إذا كان مقفلاً
                         _showLockedDialog(context);
                       } else {
-                        // ✅ الانتقال للصفحة
                         setState(() => _currentIndex = index);
                       }
                     },
@@ -294,8 +358,6 @@ class _SupplierDashboardScreenState extends State<SupplierDashboardScreen> {
           ],
         ),
       ),
-
-      // المحتوى الرئيسي
       body: visibleNavItems[_currentIndex]['page'] as Widget,
     );
   }
@@ -317,10 +379,7 @@ class _SupplierDashboardScreenState extends State<SupplierDashboardScreen> {
               ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  // الانتقال لصفحة التوثيق (يمكنك تحديد الـ index الخاص بها يدوياً)
-                  setState(
-                    () => _currentIndex = 1,
-                  ); // افتراض أن التوثيق هو العنصر الثاني
+                  setState(() => _currentIndex = 1);
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
                 child: const Text("توثيق الحساب"),
@@ -332,9 +391,8 @@ class _SupplierDashboardScreenState extends State<SupplierDashboardScreen> {
 }
 
 // -----------------------------------------------------------------------------
-// ✅ الشاشة الرئيسية للمورد (نفس تصميم الجراديانت المفضل لديك)
+// بقية الكود (SupplierHomeView) يبقى كما هو دون تغيير
 // -----------------------------------------------------------------------------
-
 class _SupplierHomeView extends StatefulWidget {
   const _SupplierHomeView({Key? key}) : super(key: key);
 
@@ -354,12 +412,19 @@ class _SupplierHomeViewState extends State<_SupplierHomeView> {
   }
 
   Future<void> _fetchStats() async {
-    final data = await _service.getDashboardStats();
-    if (mounted) {
-      setState(() {
-        _stats = data;
-        _isLoading = false;
-      });
+    try {
+      final data = await _service.getDashboardStats();
+      if (mounted) {
+        setState(() {
+          _stats = data;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      // التعامل مع الخطأ، ربما عرض بيانات فارغة أو زر إعادة المحاولة
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -367,9 +432,13 @@ class _SupplierHomeViewState extends State<_SupplierHomeView> {
   Widget build(BuildContext context) {
     if (_isLoading) return const Center(child: CircularProgressIndicator());
 
+    // في حالة فشل جلب البيانات، نعرض قيم افتراضية أو رسالة
+    if (_stats == null) {
+      return const Center(child: Text("فشل في تحميل البيانات"));
+    }
+
     return Stack(
       children: [
-        // الخلفية الجمالية
         Positioned(
           top: -50,
           right: -50,
@@ -386,14 +455,12 @@ class _SupplierHomeViewState extends State<_SupplierHomeView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // الترحيب
               const Text(
                 "نظرة عامة",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
 
-              // 1. شبكة البطاقات (Stats Grid)
               GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -429,7 +496,6 @@ class _SupplierHomeViewState extends State<_SupplierHomeView> {
 
               const SizedBox(height: 24),
 
-              // 2. الإجراءات السريعة (Quick Actions)
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -465,7 +531,6 @@ class _SupplierHomeViewState extends State<_SupplierHomeView> {
                       ),
                     ),
 
-                    // 1️⃣ زر إضافة منتج جديد
                     _buildActionTile(
                       "إضافة منتج جديد",
                       Icons.add_circle_outline,
@@ -474,15 +539,12 @@ class _SupplierHomeViewState extends State<_SupplierHomeView> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder:
-                                (_) =>
-                                    const SupplierProductFormScreen(), // صفحة إضافة المنتج
+                            builder: (_) => const SupplierProductFormScreen(),
                           ),
                         );
                       },
                     ),
 
-                    // 2️⃣ زر عرض الطلبات
                     _buildActionTile(
                       "عرض الطلبات الجديدة",
                       Icons.list_alt,
@@ -491,15 +553,12 @@ class _SupplierHomeViewState extends State<_SupplierHomeView> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder:
-                                (_) =>
-                                    const SupplierOrdersScreen(), // صفحة الطلبات
+                            builder: (_) => const SupplierOrdersScreen(),
                           ),
                         );
                       },
                     ),
 
-                    // 3️⃣ زر سحب الرصيد (المحفظة)
                     _buildActionTile(
                       "سحب الرصيد",
                       Icons.account_balance,
@@ -508,9 +567,7 @@ class _SupplierHomeViewState extends State<_SupplierHomeView> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder:
-                                (_) =>
-                                    const SupplierWalletScreen(), // صفحة المحفظة
+                            builder: (_) => const SupplierWalletScreen(),
                           ),
                         );
                       },
@@ -525,8 +582,6 @@ class _SupplierHomeViewState extends State<_SupplierHomeView> {
       ],
     );
   }
-
-  // --- Widgets مساعدة ---
 
   Widget _blurCircle(Color color) {
     return Container(
@@ -614,7 +669,7 @@ class _SupplierHomeViewState extends State<_SupplierHomeView> {
         size: 14,
         color: Colors.grey,
       ),
-      onTap: onTap, // ✅ هنا يتم تفعيل الضغط
+      onTap: onTap,
     );
   }
 }

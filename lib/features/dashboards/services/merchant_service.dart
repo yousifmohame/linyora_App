@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:linyora_project/features/models/notifications/models/notification_model.dart';
 
 import '../../../core/api/api_client.dart';
 import '../models/merchant_dashboard_model.dart';
@@ -71,6 +73,21 @@ class MerchantService {
         throw e.response?.data['message'] ?? 'فشل تقديم الطلب';
       }
       throw e.toString();
+    }
+  }
+  Future<List<NotificationModel>> getNotifications() async {
+    try {
+      // الـ ApiClient سيضيف التوكن تلقائياً في الهيدر
+      final response = await _apiClient.get('/notifications');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data;
+        return data.map((json) => NotificationModel.fromJson(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint("Error fetching notifications: $e");
+      return [];
     }
   }
 }
