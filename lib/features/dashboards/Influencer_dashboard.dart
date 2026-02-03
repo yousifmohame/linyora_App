@@ -13,6 +13,7 @@ import 'package:linyora_project/features/influencers/verification/screens/verifi
 import 'package:linyora_project/features/models/analytics/screens/model_analytics_screen.dart';
 import 'package:linyora_project/features/models/reels/screens/model_reels_screen.dart';
 import 'package:linyora_project/features/models/wallet/screens/model_wallet_screen.dart';
+import 'package:linyora_project/features/public_profiles/screens/model_profile_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
@@ -321,20 +322,92 @@ class _InfluencerDashboardScreenState extends State<InfluencerDashboardScreen> {
               ),
               accountEmail: Row(
                 children: [
-                  Flexible(
-                    child: Text(
-                      user.email ?? '',
-                      style: TextStyle(color: Colors.indigo[100]),
+                  // 1. قسم المعلومات (البريد + الأيقونات)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // البريد الإلكتروني
+                        Text(
+                          user.email ?? '',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.9),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+
+                        // الأيقونات (تظهر أسفل البريد بشكل مرتب)
+                        if (isVerified || isSubscribed) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              if (isVerified)
+                                const Padding(
+                                  padding: EdgeInsets.only(
+                                    left: 4,
+                                  ), // مسافة في حالة اللغة العربية
+                                  child: Icon(
+                                    Icons.verified,
+                                    color: Colors.blueAccent,
+                                    size: 14,
+                                  ),
+                                ),
+                              if (isSubscribed)
+                                const Icon(
+                                  Icons.star_rounded,
+                                  color: Colors.amber,
+                                  size: 16,
+                                ),
+                            ],
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  if (isVerified) ...[
-                    const SizedBox(width: 5),
-                    const Icon(
-                      Icons.verified,
-                      color: Colors.cyanAccent,
-                      size: 16,
+
+                  // 2. زر المعاينة (زر شفاف بإطار نحيف)
+                  Container(
+                    height: 32,
+                    margin: const EdgeInsets.only(right: 8),
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (context) => ModelProfileScreen(
+                                  modelId: user.id.toString(),
+                                ),
+                          ),
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(
+                          color: Colors.white.withOpacity(0.5),
+                          width: 1,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 0,
+                        ),
+                        foregroundColor: Colors.white,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Text('معاينة', style: TextStyle(fontSize: 11)),
+                          SizedBox(width: 4),
+                          Icon(Icons.arrow_forward_ios, size: 10),
+                        ],
+                      ),
                     ),
-                  ],
+                  ),
                 ],
               ),
             ),

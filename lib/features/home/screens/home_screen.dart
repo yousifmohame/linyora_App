@@ -417,6 +417,16 @@ class _HomeScreenState extends State<HomeScreen> {
               letterSpacing: 2.0,
             ),
           ),
+          const Text(
+            "L",
+            style: TextStyle(
+              color: Colors.pink,
+              fontFamily: 'Playfair Display',
+              fontWeight: FontWeight.w900,
+              fontSize: 30,
+              letterSpacing: 2.0,
+            ),
+          ),
           if (isRealAdmin)
             Container(
               margin: const EdgeInsets.only(left: 6),
@@ -841,13 +851,6 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(
             title,
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          GestureDetector(
-            onTap: onSeeAll,
-            child: const Text(
-              "عرض الكل",
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
           ),
         ],
       ),

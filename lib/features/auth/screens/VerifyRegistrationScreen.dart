@@ -1,20 +1,25 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pinput/pinput.dart';
-import 'package:linyora_project/features/auth/screens/auth_dispatcher.dart';
 import '../services/auth_service.dart';
+import 'verify_login_screen.dart'; // سنحتاجها للانتقال إليها
 
-class VerifyLoginScreen extends StatefulWidget {
+class VerifyRegistrationScreen extends StatefulWidget {
   final String email;
-  // لم نعد بحاجة للباسورد أو isRegistration هنا
+  final String password; // نحتاجها لطلب الدخول التلقائي بعد التفعيل
 
-  const VerifyLoginScreen({super.key, required this.email});
+  const VerifyRegistrationScreen({
+    super.key,
+    required this.email,
+    required this.password,
+  });
 
   @override
-  State<VerifyLoginScreen> createState() => _VerifyLoginScreenState();
+  State<VerifyRegistrationScreen> createState() =>
+      _VerifyRegistrationScreenState();
 }
 
-class _VerifyLoginScreenState extends State<VerifyLoginScreen> {
+class _VerifyRegistrationScreenState extends State<VerifyRegistrationScreen> {
   final _codeController = TextEditingController();
   final _authService = AuthService.instance;
 
@@ -23,7 +28,9 @@ class _VerifyLoginScreenState extends State<VerifyLoginScreen> {
   int _countdown = 0;
   Timer? _timer;
 
-  final Color _brandColor = const Color(0xFFF105C6);
+  final Color _brandColor = const Color(
+    0xFFE11D48,
+  ); // لون مختلف قليلاً لتمييز الشاشة (اختياري)
 
   @override
   void initState() {
@@ -49,28 +56,39 @@ class _VerifyLoginScreenState extends State<VerifyLoginScreen> {
     });
   }
 
-  Future<void> _handleLoginVerification(String pin) async {
+  Future<void> _handleActivation(String pin) async {
     if (pin.length < 6) return;
     setState(() => _isLoading = true);
 
     try {
-      // فقط نستدعي دالة الدخول
-      final user = await _authService.verifyLogin(widget.email, pin);
+      // 1. تفعيل الحساب
+      bool activated = await _authService.verifyAccount(widget.email, pin);
 
-      if (mounted && user != null) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => AuthDispatcher(user: user)),
-          (route) => false,
+      if (activated && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("تم تفعيل الحساب بنجاح! 🚀 جاري تسجيل الدخول..."),
+            backgroundColor: Colors.green,
+          ),
         );
+
+        // 2. طلب تسجيل الدخول تلقائياً (لإرسال كود الدخول)
+        await _authService.login(widget.email, widget.password);
+
+        if (mounted) {
+          // 3. التوجيه لشاشة التحقق من الدخول
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => VerifyLoginScreen(email: widget.email),
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: Colors.redAccent,
-          ),
+          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
         );
         _codeController.clear();
       }
@@ -83,11 +101,14 @@ class _VerifyLoginScreenState extends State<VerifyLoginScreen> {
     if (_countdown > 0) return;
     setState(() => _isResending = true);
     try {
+      // هنا نستخدم دالة إعادة إرسال كود التفعيل وليس الدخول
+      // ملاحظة: تأكد من الباك إند هل يستخدم نفس endpoint أو مختلف
+      // عادة resendVerification تعمل للاثنين
       await _authService.resendVerificationCode(widget.email);
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text("تم إرسال كود الدخول")));
+        ).showSnackBar(const SnackBar(content: Text("تم إرسال كود التفعيل")));
         _startTimer();
       }
     } catch (e) {
@@ -101,7 +122,7 @@ class _VerifyLoginScreenState extends State<VerifyLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ... (نفس تصميم UI السابق مع نصوص "تأكيد الدخول")
+    // ... (نفس تصميم UI السابق ولكن مع نصوص "تفعيل الحساب")
     final defaultPinTheme = PinTheme(
       width: 50,
       height: 55,
@@ -126,26 +147,19 @@ class _VerifyLoginScreenState extends State<VerifyLoginScreen> {
           child: Column(
             children: [
               const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: _brandColor.withOpacity(0.08),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.lock_open_rounded,
-                  size: 50,
-                  color: _brandColor,
-                ),
+              const Icon(
+                Icons.verified_user_outlined,
+                size: 60,
+                color: Colors.green,
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 20),
               const Text(
-                "تأكيد الدخول",
-                style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+                "تفعيل الحساب الجديد",
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
               Text(
-                "أدخل رمز الدخول المرسل إلى ${widget.email}",
+                "تم إرسال رمز التفعيل إلى ${widget.email}",
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey[600]),
               ),
@@ -155,10 +169,10 @@ class _VerifyLoginScreenState extends State<VerifyLoginScreen> {
                 length: 6,
                 controller: _codeController,
                 defaultPinTheme: defaultPinTheme,
+                onCompleted: _handleActivation,
                 focusedPinTheme: defaultPinTheme.copyDecorationWith(
-                  border: Border.all(color: _brandColor),
+                  border: Border.all(color: Colors.green),
                 ),
-                onCompleted: _handleLoginVerification,
               ),
 
               const SizedBox(height: 40),
@@ -169,10 +183,9 @@ class _VerifyLoginScreenState extends State<VerifyLoginScreen> {
                   onPressed:
                       _isLoading
                           ? null
-                          : () =>
-                              _handleLoginVerification(_codeController.text),
+                          : () => _handleActivation(_codeController.text),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
+                    backgroundColor: Colors.green,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -181,7 +194,7 @@ class _VerifyLoginScreenState extends State<VerifyLoginScreen> {
                       _isLoading
                           ? const CircularProgressIndicator(color: Colors.white)
                           : const Text(
-                            "دخول",
+                            "تفعيل الحساب",
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,

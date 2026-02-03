@@ -38,11 +38,12 @@ class _ModelAnalyticsScreenState extends State<ModelAnalyticsScreen> {
     setState(() => _isLoading = true);
     try {
       final data = await _service.getAnalytics();
-      if (mounted)
+      if (mounted) {
         setState(() {
           _data = data;
           _isLoading = false;
         });
+      }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -50,10 +51,12 @@ class _ModelAnalyticsScreenState extends State<ModelAnalyticsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading)
+    if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    if (_data == null)
+    }
+    if (_data == null) {
       return const Scaffold(body: Center(child: Text("خطأ في جلب البيانات")));
+    }
 
     return Scaffold(
       body: Stack(
@@ -295,22 +298,19 @@ class _ModelAnalyticsScreenState extends State<ModelAnalyticsScreen> {
   }
 
   Widget _buildChart() {
-    // ✅ إصلاح الخطأ: حساب maxY بأمان
-    double maxY = 20.0; // قيمة افتراضية إذا لم تكن هناك بيانات
+    double maxY = 20.0;
 
     if (_data!.requestsOverTime.isNotEmpty) {
-      // نحسب أعلى قيمة فقط إذا كانت القائمة تحتوي على عناصر
       int maxCount = _data!.requestsOverTime
           .map((e) => e['count'] as int)
-          .reduce((a, b) => a > b ? a : b); // مقارنة للعثور على الأكبر
-
-      maxY = (maxCount + 5).toDouble(); // إضافة هامش بسيط
+          .reduce((a, b) => a > b ? a : b);
+      maxY = (maxCount + 5).toDouble();
     }
 
     return BarChart(
       BarChartData(
         alignment: BarChartAlignment.spaceAround,
-        maxY: maxY, // ✅ استخدام المتغير الآمن
+        maxY: maxY,
         barTouchData: BarTouchData(
           enabled: true,
           touchTooltipData: BarTouchTooltipData(
@@ -331,7 +331,6 @@ class _ModelAnalyticsScreenState extends State<ModelAnalyticsScreen> {
             sideTitles: SideTitles(
               showTitles: true,
               getTitlesWidget: (value, meta) {
-                // التأكد من أن الإندكس موجود داخل القائمة لتجنب RangeError
                 if (value.toInt() >= 0 &&
                     value.toInt() < _data!.requestsOverTime.length) {
                   return Padding(
@@ -377,10 +376,14 @@ class _ModelAnalyticsScreenState extends State<ModelAnalyticsScreen> {
                 barRods: [
                   BarChartRodData(
                     toY: (entry.value['count'] as int).toDouble(),
+                    // ✅✅✅ تم التصحيح هنا: إضافة الألوان للتدرج
                     gradient: LinearGradient(
                       begin: Alignment.bottomCenter,
                       end: Alignment.topCenter,
-                      colors: [],
+                      colors: [
+                        _purpleColor,
+                        _roseColor,
+                      ], // تم إصلاح المصفوفة الفارغة
                     ),
                     width: 14,
                     borderRadius: const BorderRadius.vertical(

@@ -296,6 +296,35 @@ class AuthService {
     return false;
   }
 
+  // دالة تفعيل الحساب (بدون انتظار توكن من الباك إند)
+  Future<bool> verifyAccount(String email, String code) async {
+    try {
+      print("🚀 Activating account for: $email");
+
+      final response = await _apiClient.post(
+        '/auth/verify-email',
+        data: {'email': email, 'code': code},
+      );
+
+      if (response.statusCode == 200) {
+        print("✅ Account Activated Successfully in DB");
+        return true;
+      }
+      return false;
+    } on DioException catch (e) {
+      print("❌ Activation Error: ${e.response?.data}");
+      // إذا كان الخطأ "المستخدم مفعل بالفعل"، نعتبره نجاحاً لنسمح له بالدخول
+      if (e.response?.statusCode == 400 || e.response?.statusCode == 409) {
+        final msg = e.response?.data['message'] ?? '';
+        if (msg.toString().contains('already verified') ||
+            msg.toString().contains('مفعل')) {
+          return true;
+        }
+      }
+      throw e.response?.data['message'] ?? 'الكود غير صحيح أو انتهت صلاحيته';
+    }
+  }
+
   // --- الخطوة 2: التحقق من الكود واستلام التوكن ---
   Future<UserModel?> verifyLogin(String email, String code) async {
     try {

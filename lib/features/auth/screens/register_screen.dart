@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:linyora_project/core/api/api_client.dart';
+import 'package:linyora_project/features/auth/screens/VerifyRegistrationScreen.dart';
 import 'package:linyora_project/features/auth/screens/join_us.dart';
 import 'package:linyora_project/features/auth/screens/login_screen.dart';
 import 'package:linyora_project/features/auth/screens/verify_login_screen.dart';
@@ -54,10 +55,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         );
         Navigator.pushReplacement(
+          // أو push فقط إذا أردت السماح بالعودة لتصحيح الإيميل
           context,
           MaterialPageRoute(
             builder:
-                (_) => VerifyLoginScreen(email: _emailController.text.trim()),
+                (_) => VerifyRegistrationScreen(
+                  email: _emailController.text.trim(),
+                  password:
+                      _passwordController.text, // ✅ ضروري جداً للدخول التلقائي
+                ),
           ),
         );
       }

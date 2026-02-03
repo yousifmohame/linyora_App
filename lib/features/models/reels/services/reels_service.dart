@@ -23,6 +23,17 @@ class ReelsService {
     }
   }
 
+  Future<List<Map<String, dynamic>>> getPromotableProducts() async {
+    try {
+      final response = await _apiClient.get('/products/model-promotable');
+      return (response.data as List)
+          .map((e) => e as Map<String, dynamic>)
+          .toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
   // تعديل ريل (تحديث الوصف)
   // ملاحظة: الباك إند يقوم بمسح التاقات إذا لم نرسلها، لذا سنرسل الوصف فقط حالياً
   // لكي يعمل التعديل بشكل كامل مع التاقات يجب بناء واجهة اختيار المنتجات في شاشة التعديل أيضاً

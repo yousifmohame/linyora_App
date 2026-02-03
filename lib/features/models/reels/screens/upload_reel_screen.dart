@@ -500,90 +500,252 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor:
+          Colors.transparent, // لجعل الخلفية شفافة لرؤية الحواف المدورة
       builder: (context) {
         return DraggableScrollableSheet(
-          initialChildSize: 0.7,
-          minChildSize: 0.5,
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
           maxChildSize: 0.9,
-          expand: false,
           builder: (_, scrollController) {
-            return StatefulBuilder(
-              builder: (context, setStateSheet) {
-                return Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: const BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(color: Colors.black12),
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: const EdgeInsets.only(top: 20, left: 20, right: 20),
+              child: StatefulBuilder(
+                builder: (context, setStateSheet) {
+                  // ✅ التحقق: إذا لم تكن هناك اتفاقيات نشطة
+                  if (_activeAgreements.isEmpty) {
+                    return Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.handshake_outlined,
+                          size: 60,
+                          color: Colors.grey[300],
                         ),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          "اختر المنتجات",
+                        const SizedBox(height: 16),
+                        const Text(
+                          "لا توجد اتفاقيات نشطة حالياً",
                           style: TextStyle(
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            fontSize: 18,
+                            color: Colors.grey,
                           ),
                         ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "يجب عليك قبول اتفاقية تعاون مع تاجر أولاً",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                        const SizedBox(height: 30),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 30,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text("حسناً"),
+                        ),
+                      ],
+                    );
+                  }
+
+                  // ✅ العرض الطبيعي: قائمة منتجات الاتفاقيات فقط
+                  return Column(
+                    children: [
+                      // Header
+                      Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: ListView(
-                        controller: scrollController,
-                        padding: const EdgeInsets.all(16),
-                        children: [
-                          if (_activeAgreements.isNotEmpty) ...[
-                            Text(
-                              "اتفاقياتي النشطة",
-                              style: TextStyle(
-                                color: _roseColor,
-                                fontWeight: FontWeight.bold,
+                      const Text(
+                        "اختر منتجاً للترويج",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "يتم عرض المنتجات المرتبطة باتفاقياتك فقط",
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // List
+                      Expanded(
+                        child: ListView.separated(
+                          controller: scrollController,
+                          itemCount: _activeAgreements.length,
+                          separatorBuilder:
+                              (_, __) => const SizedBox(height: 12),
+                          itemBuilder: (ctx, index) {
+                            final product = _activeAgreements[index];
+                            final bool isSelected = _taggedProducts.any(
+                              (p) => p.id == product.id,
+                            );
+
+                            return InkWell(
+                              onTap: () {
+                                setStateSheet(() {
+                                  _toggleProductTag(
+                                    product,
+                                  ); // استخدام نفس دالة التبديل القديمة
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color:
+                                      isSelected
+                                          ? _purpleColor.withOpacity(0.05)
+                                          : Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color:
+                                        isSelected
+                                            ? _purpleColor
+                                            : Colors.grey.shade200,
+                                    width: isSelected ? 1.5 : 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    // صورة المنتج
+                                    Container(
+                                      width: 50,
+                                      height: 50,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(8),
+                                        color: Colors.grey[100],
+                                        image:
+                                            product.imageUrl != null
+                                                ? DecorationImage(
+                                                  image: NetworkImage(
+                                                    product.imageUrl!,
+                                                  ),
+                                                  fit: BoxFit.cover,
+                                                )
+                                                : null,
+                                      ),
+                                      child:
+                                          product.imageUrl == null
+                                              ? const Icon(
+                                                Icons.image,
+                                                color: Colors.grey,
+                                              )
+                                              : null,
+                                    ),
+                                    const SizedBox(width: 12),
+
+                                    // التفاصيل
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            product.name,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          if (product.storeName != null)
+                                            Text(
+                                              product.storeName!,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey[600],
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // Checkbox
+                                    Container(
+                                      width: 24,
+                                      height: 24,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color:
+                                            isSelected
+                                                ? _purpleColor
+                                                : Colors.transparent,
+                                        border: Border.all(
+                                          color:
+                                              isSelected
+                                                  ? _purpleColor
+                                                  : Colors.grey.shade400,
+                                        ),
+                                      ),
+                                      child:
+                                          isSelected
+                                              ? const Icon(
+                                                Icons.check,
+                                                size: 16,
+                                                color: Colors.white,
+                                              )
+                                              : null,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+
+                      // زر التأكيد
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.black,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            ..._activeAgreements.map(
-                              (p) => _buildProductCheckbox(p, setStateSheet),
-                            ),
-                            const SizedBox(height: 20),
-                          ],
-                          const Text(
-                            "جميع المنتجات",
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 8),
-                          ..._allProducts.map(
-                            (p) => _buildProductCheckbox(p, setStateSheet),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.black,
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size(double.infinity, 50),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            child: const Text("تأكيد الاختيار"),
                           ),
                         ),
-                        child: const Text("تم"),
                       ),
-                    ),
-                  ],
-                );
-              },
+                    ],
+                  );
+                },
+              ),
             );
           },
         );
       },
-    ).then((_) => setState(() {}));
+    ).then((_) => setState(() {})); // تحديث الشاشة الرئيسية عند الإغلاق
   }
 
   Widget _buildProductCheckbox(
