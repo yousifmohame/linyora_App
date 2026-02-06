@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:carousel_slider/carousel_slider.dart';
 import 'package:linyora_project/features/stories/screens/story_viewer_screen.dart';
 import '../services/stories_service.dart';
 import '../../../models/story_feed_item.dart';
@@ -34,40 +36,73 @@ class _StoriesSectionState extends State<StoriesSection> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading)
+    if (_isLoading) {
       return const SizedBox(
         height: 100,
         child: Center(child: CircularProgressIndicator()),
       );
-    if (_feedItems.isEmpty) return const SizedBox.shrink();
+    }
+
+    if (_feedItems.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // ✅ 1. حساب النسبة ديناميكياً
+    final double screenWidth = MediaQuery.of(context).size.width;
+
+    // عرض عنصر القصة التقريبي (الدائرة + الهوامش)
+    // الدائرة حوالي 75px + هوامش = نعتبرها 85px
+    const double storyItemWidth = 85.0;
+
+    // حساب الكسر: حجم العنصر / عرض الشاشة
+    double fraction = storyItemWidth / screenWidth;
 
     return Container(
-      height: 90,
-      margin: const EdgeInsets.only(top: 5, bottom: 0),
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        scrollDirection: Axis.horizontal,
-        itemCount: _feedItems.length + 1, // +1 لزر "قصتي"
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          if (index == 0) return _buildAddStoryItem(); // زر قصتي
-
-          final item = _feedItems[index - 1];
+      height: 110,
+      margin: const EdgeInsets.only(top: 10, bottom: 5),
+      child: CarouselSlider.builder(
+        itemCount: _feedItems.length,
+        itemBuilder: (context, index, realIndex) {
+          final item = _feedItems[index];
           return _buildFeedItem(item);
         },
+        options: CarouselOptions(
+          height: 100,
+          autoPlay: true,
+          autoPlayInterval: const Duration(seconds: 4),
+          autoPlayAnimationDuration: const Duration(seconds: 2),
+          autoPlayCurve: Curves.fastLinearToSlowEaseIn,
+
+          // ✅ 2. استخدام النسبة المحسوبة
+          // في الموبايل ستكون حوالي 0.21
+          // في التابلت ستكون حوالي 0.10 (فتعرض قصص أكثر بجانب بعضها)
+          viewportFraction: fraction,
+
+          enableInfiniteScroll: true,
+          padEnds: false, // لتبدأ القصص من اليمين/اليسار مباشرة
+          scrollDirection: Axis.horizontal,
+          pauseAutoPlayOnTouch: true,
+        ),
       ),
     );
   }
 
-  Widget _buildAddStoryItem() {
-    return Column(children: []);
-  }
-
+  // --- عنصر القصة (Feed Item) ---
   Widget _buildFeedItem(StoryFeedItem item) {
+    final bool isUnseen = !item.allViewed;
+
+    final Gradient borderGradient =
+        isUnseen
+            ? const LinearGradient(
+              colors: [Color(0xFFF9CE34), Color(0xFFEE2A7B), Color(0xFF6228D7)],
+              begin: Alignment.bottomLeft,
+              end: Alignment.topRight,
+            )
+            : const LinearGradient(colors: [Colors.grey]);
+
     return GestureDetector(
-      onTap: () {
-        // فتح العارض وتمرير الـ ID والنوع
-        Navigator.push(
+      onTap: () async {
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder:
@@ -75,48 +110,61 @@ class _StoriesSectionState extends State<StoriesSection> {
                   feedId: item.id,
                   title: item.title,
                   imageUrl: item.imageUrl,
-                  isSection: item.isAdminSection, // هنا نحدد النوع
+                  isSection: item.isAdminSection,
                 ),
           ),
         );
+        _fetchFeed();
       },
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(3),
+            width: 68,
+            height: 68,
+            padding: const EdgeInsets.all(2.5),
             decoration: BoxDecoration(
-              // الشكل: دائرة للمستخدمين، ومستطيل بحواف دائرية للأقسام
               shape: item.isAdminSection ? BoxShape.rectangle : BoxShape.circle,
               borderRadius:
-                  item.isAdminSection ? BorderRadius.circular(15) : null,
-
-              // لون الإطار: رمادي إذا شوهد، ملون إذا جديد
-              border:
-                  !item.allViewed
-                      ? Border.all(color: Colors.purple, width: 2.5)
-                      : Border.all(color: Colors.grey, width: 1.5),
+                  item.isAdminSection ? BorderRadius.circular(22) : null,
+              gradient: isUnseen ? borderGradient : null,
+              color: isUnseen ? null : Colors.grey[300],
             ),
             child: Container(
-              width: 50,
-              height: 50,
+              padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
+                color: Colors.white,
                 shape:
                     item.isAdminSection ? BoxShape.rectangle : BoxShape.circle,
                 borderRadius:
-                    item.isAdminSection ? BorderRadius.circular(12) : null,
-                image: DecorationImage(
-                  image: CachedNetworkImageProvider(item.imageUrl),
-                  fit: BoxFit.cover,
+                    item.isAdminSection ? BorderRadius.circular(19) : null,
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  shape:
+                      item.isAdminSection
+                          ? BoxShape.rectangle
+                          : BoxShape.circle,
+                  borderRadius:
+                      item.isAdminSection ? BorderRadius.circular(17) : null,
+                  image: DecorationImage(
+                    image: CachedNetworkImageProvider(item.imageUrl),
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 6),
           SizedBox(
             width: 70,
             child: Text(
               item.title,
-              style: const TextStyle(fontSize: 12),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isUnseen ? FontWeight.bold : FontWeight.normal,
+                color: Colors.black87,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,

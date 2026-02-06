@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/widgets/optimized_image.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../features/shared/widgets/product_card.dart';
 import '../../../models/public_profile_models.dart';
 import '../services/public_profile_service.dart';
@@ -52,6 +53,14 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
         _merchant!.isFollowedByMe = !_merchant!.isFollowedByMe;
       });
     }
+  }
+
+  void _shareProfile() {
+    if (_merchant == null) return;
+    final String profileUrl = "https://linyora.com/store/${_merchant!.id}";
+    final String shareText =
+        "🛍️ تسوق من متجر ${_merchant!.storeName} المميز على تطبيق لينيورا!\n\nاستكشف أحدث المنتجات والعروض الحصرية: 👇\n$profileUrl";
+    Share.share(shareText, subject: "متجر ${_merchant!.storeName} على لينيورا");
   }
 
   @override
@@ -188,11 +197,19 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            IconButton(
-                              onPressed: () {},
-                              icon: const Icon(Icons.share),
-                              style: IconButton.styleFrom(
-                                side: const BorderSide(color: Colors.grey),
+                            Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.grey[300]!),
+                              ),
+                              child: IconButton(
+                                onPressed: _shareProfile,
+                                icon: const Icon(
+                                  Icons.share_outlined,
+                                  size: 20,
+                                ),
+                                color: Colors.black87,
+                                tooltip: "مشاركة المتجر",
                               ),
                             ),
                           ],

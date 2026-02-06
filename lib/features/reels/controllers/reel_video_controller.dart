@@ -107,10 +107,12 @@ class ReelVideoController {
     }
   }
 
-  void pause() {
+  // ✅ التعديل: تحويل الدالة إلى Future<void> وإضافة async/await
+  Future<void> pause() async {
     if (isInitialized && _videoPlayerController != null) {
       _fadeController?.reverse();
-      _videoPlayerController!.pause();
+      // ننتظر حتى يتوقف الفيديو فعلياً
+      await _videoPlayerController!.pause();
     }
   }
 

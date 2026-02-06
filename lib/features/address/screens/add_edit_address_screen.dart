@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // لإضافة اهتزاز خفيف عند الضغط
 import 'package:provider/provider.dart';
 import 'package:latlong2/latlong.dart';
 import '../providers/address_provider.dart';
@@ -18,45 +19,45 @@ class AddEditAddressScreen extends StatefulWidget {
 class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // 1. تعريف المتحكمات القديمة والجديدة
+  // Controllers
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
   late TextEditingController _cityController;
   late TextEditingController _address1Controller;
-
-  // ✨ المتحكمات الجديدة للحقول الناقصة في قاعدة البيانات
-  late TextEditingController _stateController; // المنطقة
-  late TextEditingController _zipController; // الرمز البريدي
-  late TextEditingController _countryController; // الدولة
+  late TextEditingController _stateController;
+  late TextEditingController _zipController;
+  late TextEditingController _countryController;
 
   double? _lat;
   double? _long;
-
   bool _isDefault = false;
   bool _isLoading = false;
+
+  // الألوان المستخدمة
+  final Color _primaryColor = const Color(0xFFF105C6);
+  final Color _fillColor = const Color(0xFFF5F6FA); // لون خلفية الحقول
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(
-      text: widget.address?.fullName ?? '',
-    );
+    
+    // 1. ربط البيانات القديمة (الاسم، الجوال، المدينة، العنوان)
+    _nameController = TextEditingController(text: widget.address?.fullName ?? '');
     _phoneController = TextEditingController(text: widget.address?.phone ?? '');
     _cityController = TextEditingController(text: widget.address?.city ?? '');
-    _address1Controller = TextEditingController(
-      text: widget.address?.addressLine1 ?? '',
-    );
+    _address1Controller = TextEditingController(text: widget.address?.addressLine1 ?? '');
+    
+    // 2. ✅✅✅ التصحيح هنا: ربط الحقول الجديدة (المنطقة، الرمز البريدي)
+    // بدلاً من text: '' نضع القيمة القادمة من المودل
+    _stateController = TextEditingController(text: widget.address?.state ?? ''); 
+    _zipController = TextEditingController(text: widget.address?.postalCode ?? ''); 
+    _countryController = TextEditingController(text: widget.address?.country ?? 'السعودية');
+    
+    // 3. ✅✅✅ التصحيح هنا: ربط الإحداثيات
+    _lat = widget.address?.latitude;
+    _long = widget.address?.longitude;
+    
     _isDefault = widget.address?.isDefault ?? false;
-
-    // ✨ تهيئة الحقول الجديدة
-    // ملاحظة: إذا لم يكن المودل يحتوي على هذه الحقول بعد، نتركها فارغة
-    _stateController = TextEditingController(text: '');
-    _zipController = TextEditingController(text: '');
-    _countryController = TextEditingController(
-      text: 'المملكة العربية السعودية',
-    ); // قيمة افتراضية
-
-    // إذا كنت تريد دعم التعديل لاحقاً، يجب تحديث AddressModel ليشمل هذه الحقول
   }
 
   @override
@@ -72,6 +73,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
   }
 
   Future<void> _pickLocation() async {
+    HapticFeedback.mediumImpact(); // تأثير اهتزاز خفيف
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const OsmMapScreen()),
@@ -83,25 +85,18 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
         _lat = result.latitude;
         _long = result.longitude;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("تم تحديد الموقع بنجاح!"),
-          backgroundColor: Colors.green,
-        ),
-      );
     }
   }
 
   Future<void> _save() async {
-    // 1. التحقق من الحقول
     if (!_formKey.currentState!.validate()) return;
 
-    // التحقق من الخريطة
     if (_lat == null || _long == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("الرجاء تحديد الموقع على الخريطة أولاً"),
-          backgroundColor: Colors.red,
+          content: Text("⚠️ الرجاء تحديد موقع التوصيل على الخريطة"),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
@@ -109,36 +104,25 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
 
     setState(() => _isLoading = true);
 
-    // 2. تجهيز البيانات (تصحيح القيم لتناسب MySQL)
     final data = {
-      // ✅ الحقول الإجبارية (كما هي في req.body)
       "fullName": _nameController.text,
       "addressLine1": _address1Controller.text,
-      "addressLine2":
-          "", // يمكن تركه فارغاً لأنه ليس في شرط التحقق، لكنه مطلوب في الإدخال
+      "addressLine2": "",
       "city": _cityController.text,
       "state":
           _stateController.text.isEmpty
               ? "المنطقة الوسطى"
               : _stateController.text,
       "postalCode": _zipController.text.isEmpty ? "00000" : _zipController.text,
-      "country":
-          _countryController.text.isEmpty
-              ? "Saudi Arabia"
-              : _countryController.text,
+      "country": _countryController.text,
       "phoneNumber": _phoneController.text,
-
-      // ✅ حقول إضافية (أرسلها حتى لو لم يستخدمها هذا الروت حالياً، قد يحتاجها Middleware آخر)
       "is_default": _isDefault ? 1 : 0,
       "latitude": _lat,
       "longitude": _long,
     };
-    // طباعة البيانات المرسلة في الكونسول للمراجعة
-    print("🚀 Sending Data: $data");
 
     try {
       final provider = Provider.of<AddressProvider>(context, listen: false);
-
       if (widget.address == null) {
         await provider.addAddress(data);
       } else {
@@ -146,34 +130,21 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
       }
 
       if (!mounted) return;
-      Navigator.pop(context);
+      Navigator.pop(context, true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("تم حفظ العنوان بنجاح"),
+          content: Text("✅ تم حفظ العنوان بنجاح"),
           backgroundColor: Colors.green,
         ),
       );
     } catch (e) {
-      // 3. كشف سبب الخطأ الحقيقي (400)
-      String errorMessage = "فشل الحفظ: تأكد من صحة البيانات";
-
+      String errorMessage = "فشل الحفظ";
       if (e is DioException) {
-        // طباعة رد السيرفر في الكونسول (مهم جداً!)
-        print("❌ Server Error Status: ${e.response?.statusCode}");
-        print("❌ Server Error Data: ${e.response?.data}");
-
-        // محاولة استخراج رسالة الخطأ وعرضها للمستخدم
         if (e.response?.data != null && e.response?.data is Map) {
-          final serverMsg =
-              e.response?.data['message']; // أو 'error' حسب الباك إند
-          if (serverMsg != null) {
-            errorMessage = "خطأ: $serverMsg";
-          }
+          final serverMsg = e.response?.data['message'];
+          if (serverMsg != null) errorMessage = serverMsg;
         }
-      } else {
-        print("❌ General Error: $e");
       }
-
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
@@ -189,125 +160,182 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(
-          widget.address == null ? "إضافة عنوان جديد" : "تعديل العنوان",
+          widget.address == null ? "عنوان جديد" : "تعديل العنوان",
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
+        centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      // جعل الزر عائماً في الأسفل لضمان سهولة الوصول
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, -5),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: ElevatedButton(
+            onPressed: _isLoading ? null : _save,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primaryColor, // استخدام اللون الرئيسي للتطبيق
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 0,
+            ),
+            child:
+                _isLoading
+                    ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                    : Text(
+                      widget.address == null ? "حفظ العنوان" : "تحديث البيانات",
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+          ),
+        ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         child: Form(
           key: _formKey,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // الاسم والجوال
-              _buildTextField("الاسم بالكامل", _nameController, Icons.person),
-              const SizedBox(height: 16),
-              _buildTextField(
-                "رقم الجوال",
-                _phoneController,
-                Icons.phone,
+              // 1. قسم الخريطة (الأهم للتوصيل)
+              _buildSectionTitle("موقع التوصيل"),
+              const SizedBox(height: 10),
+              _buildMapSelector(),
+
+              const SizedBox(height: 25),
+
+              // 2. معلومات الاتصال
+              _buildSectionTitle("بيانات المستلم"),
+              const SizedBox(height: 10),
+              _buildModernTextField(
+                controller: _nameController,
+                label: "الاسم الكامل",
+                hint: "مثال: محمد أحمد",
+                icon: Icons.person_outline,
+              ),
+              const SizedBox(height: 12),
+              _buildModernTextField(
+                controller: _phoneController,
+                label: "رقم الجوال",
+                hint: "05xxxxxxxx",
+                icon: Icons.phone_android_outlined,
                 isPhone: true,
               ),
-              const SizedBox(height: 16),
 
-              // زر الخريطة
-              _buildMapButton(),
-              const SizedBox(height: 16),
+              const SizedBox(height: 25),
 
-              // الدولة (يمكن جعلها readonly إذا أردت تثبيتها)
-              _buildTextField("الدولة", _countryController, Icons.flag),
-              const SizedBox(height: 16),
+              // 3. تفاصيل العنوان
+              _buildSectionTitle("تفاصيل العنوان"),
+              const SizedBox(height: 10),
 
-              // ✨ صف المدينة والمنطقة
+              // سطر الدولة والمدينة
               Row(
                 children: [
                   Expanded(
-                    child: _buildTextField(
-                      "المدينة",
-                      _cityController,
-                      Icons.location_city,
+                    child: _buildModernTextField(
+                      controller: _countryController,
+                      label: "الدولة",
+                      icon: Icons.flag_outlined,
+                      readOnly: true, // عادة الدولة ثابتة
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: _buildTextField(
-                      "المنطقة",
-                      _stateController,
-                      Icons.map,
+                    child: _buildModernTextField(
+                      controller: _cityController,
+                      label: "المدينة",
+                      icon: Icons.location_city_outlined,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
-              // ✨ صف الرمز البريدي والعنوان
+              // سطر المنطقة والرمز البريدي
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // الرمز البريدي (ثلث المساحة)
-                  SizedBox(
-                    width: 100,
-                    child: _buildTextField(
-                      "الرمز البريدي",
-                      _zipController,
-                      Icons.numbers,
+                  Expanded(
+                    child: _buildModernTextField(
+                      controller: _stateController,
+                      label: "المنطقة / الحي",
+                      icon: Icons.map_outlined,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildModernTextField(
+                      controller: _zipController,
+                      label: "الرمز البريدي",
+                      icon: Icons.markunread_mailbox_outlined,
                       isPhone: true,
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  // العنوان التفصيلي (باقي المساحة)
-                  Expanded(
-                    child: _buildTextField(
-                      "العنوان (الحي، الشارع)",
-                      _address1Controller,
-                      Icons.home,
-                    ),
-                  ),
                 ],
+              ),
+              const SizedBox(height: 12),
+
+              // تفاصيل الشارع
+              _buildModernTextField(
+                controller: _address1Controller,
+                label: "اسم الشارع / وصف المنزل",
+                hint: "مثال: بجوار مسجد...",
+                icon: Icons.home_outlined,
+                maxLines: 2,
               ),
 
               const SizedBox(height: 20),
-              SwitchListTile(
-                title: const Text("تعيين كعنوان افتراضي"),
-                value: _isDefault,
-                activeColor: const Color(0xFFF105C6),
-                onChanged: (val) => setState(() => _isDefault = val),
-              ),
-              const SizedBox(height: 30),
 
-              // زر الحفظ
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _save,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+              // 4. خيار الافتراضي
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: _fillColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    "تعيين كعنوان افتراضي",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
-                  child:
-                      _isLoading
-                          ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                          : Text(
-                            widget.address == null
-                                ? "حفظ العنوان"
-                                : "تحديث العنوان",
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                  subtitle: const Text(
+                    "سيتم استخدام هذا العنوان تلقائياً للطلبات القادمة",
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  value: _isDefault,
+                  activeColor: _primaryColor,
+                  onChanged: (val) => setState(() => _isDefault = val),
                 ),
               ),
             ],
@@ -317,66 +345,133 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
     );
   }
 
-  // ودجت زر الخريطة (فصلته لترتيب الكود)
-  Widget _buildMapButton() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: (_lat == null) ? Colors.red.shade300 : Colors.grey.shade400,
-        ),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListTile(
-        leading: Icon(
-          _lat != null ? Icons.location_on : Icons.map,
-          color: _lat != null ? const Color(0xFFF105C6) : Colors.grey,
-        ),
-        title: Text(
-          _lat != null ? "تم تحديد الموقع" : "تحديد الموقع من الخريطة (مطلوب)",
-          style: TextStyle(
-            color: _lat != null ? const Color(0xFFF105C6) : Colors.red,
-            fontWeight: _lat != null ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-        subtitle:
-            _lat != null
-                ? Text(
-                  "Lat: $_lat, Lng: $_long",
-                  style: const TextStyle(fontSize: 12),
-                )
-                : const Text(
-                  "يجب تحديد الموقع لتوصيل الطلب بدقة",
-                  style: TextStyle(fontSize: 11, color: Colors.grey),
-                ),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-        onTap: _pickLocation,
+  // --- Widgets ---
+
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w800,
+        color: Colors.black87,
       ),
     );
   }
 
-  Widget _buildTextField(
-    String label,
-    TextEditingController controller,
-    IconData icon, {
+  Widget _buildMapSelector() {
+    bool isSelected = _lat != null;
+    return GestureDetector(
+      onTap: _pickLocation,
+      child: Container(
+        height: 120,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color:
+              isSelected
+                  ? Colors.green.withOpacity(0.05)
+                  : const Color(0xFFFFF0F5), // لون خلفية خفيف
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? Colors.green : _primaryColor.withOpacity(0.3),
+            width: 1.5,
+            style:
+                isSelected
+                    ? BorderStyle.solid
+                    : BorderStyle.none, // حدود متقطعة أو متصلة
+          ),
+          image:
+              isSelected
+                  ? null
+                  : const DecorationImage(
+                    // يمكنك وضع صورة خريطة ثابتة هنا كخلفية لزيادة الجمالية
+                    image: AssetImage(
+                      'assets/images/map_placeholder.png',
+                    ), // تأكد من وجود صورة أو احذف السطر
+                    fit: BoxFit.cover,
+                    opacity: 0.1,
+                  ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isSelected ? Icons.check_circle : Icons.location_on_rounded,
+              color: isSelected ? Colors.green : _primaryColor,
+              size: 35,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isSelected
+                  ? "تم تحديد الموقع بنجاح"
+                  : "اضغط لتحديد الموقع على الخريطة",
+              style: TextStyle(
+                color: isSelected ? Colors.green.shade700 : _primaryColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+            ),
+            if (isSelected)
+              Text(
+                "إحداثيات: ${_lat!.toStringAsFixed(4)}, ${_long!.toStringAsFixed(4)}",
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              )
+            else
+              const Text(
+                "خطوة ضرورية لتوصيل الطلب لباب منزلك",
+                style: TextStyle(color: Colors.grey, fontSize: 11),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernTextField({
+    required TextEditingController controller,
+    required String label,
+    String? hint,
+    required IconData icon,
     bool isPhone = false,
+    bool readOnly = false,
+    int maxLines = 1,
   }) {
     return TextFormField(
       controller: controller,
+      readOnly: readOnly,
       keyboardType: isPhone ? TextInputType.number : TextInputType.text,
-      validator: (val) => val!.isEmpty ? "مطلوب" : null,
+      maxLines: maxLines,
+      style: const TextStyle(fontWeight: FontWeight.w500),
+      validator: (val) {
+        if (readOnly) return null;
+        if (val == null || val.isEmpty) return "هذا الحقل مطلوب";
+        return null;
+      },
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, color: Colors.grey),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        hintText: hint,
+        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+        prefixIcon: Icon(icon, color: Colors.grey.shade600, size: 22),
+        filled: true,
+        fillColor: _fillColor,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none, // بدون حدود افتراضياً
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade200),
+        ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFF105C6), width: 2),
+          borderSide: BorderSide(color: _primaryColor, width: 1.5),
         ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 16,
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1),
         ),
       ),
     );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:linyora_project/models/product_model.dart';
 import 'package:preload_page_view/preload_page_view.dart';
 import 'package:video_player/video_player.dart';
 import '../../../models/reel_model.dart';
@@ -194,7 +195,11 @@ class _ModelReelsViewerState extends State<ModelReelsViewer> {
                     // تمرير الدوال هنا
                     onLike: () => _handleLike(index),
                     onComment: () => _showComments(context, index),
-                    onShare: () => _handleShare(index), onFollow: () {  }, onProfileTap: () {  }, isLoading: true,
+                    onShare: () => _handleShare(index),
+                    onFollow: () {},
+                    onProfileTap: () {},
+                    isLoading: true,
+                    onShowProducts: (List<ProductModel> p1) {},
                   ),
                 ],
               );

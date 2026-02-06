@@ -11,33 +11,38 @@ class CheckoutService {
   Future<List<AddressModel>> getAddresses() async {
     try {
       final response = await _apiClient.get('/users/addresses');
-      return (response.data as List)
-          .map((e) => AddressModel.fromJson(e))
-          .toList();
+      if (response.data is List) {
+        return (response.data as List)
+            .map((e) => AddressModel.fromJson(e))
+            .toList();
+      }
+      return [];
     } catch (e) {
-      print('Error fetching addresses: $e');
+      print('❌ Error fetching addresses: $e');
       return [];
     }
   }
-
-  // 2. جلب خيارات الشحن لمجموعة منتجات
-  // جلب خيارات الشحن لمجموعة منتجات محددة
+  // 3. جلب خيارات الشحن
   Future<List<ShippingOption>> getShippingOptions(List<int> productIds) async {
     try {
       final response = await _apiClient.post(
         '/products/shipping-options-for-cart',
-        data: {'productIds': productIds}, // إرسال قائمة الآيديهات فقط
+        data: {'productIds': productIds},
       );
 
-      return (response.data as List)
-          .map((e) => ShippingOption.fromJson(e))
-          .toList();
+      if (response.data is List) {
+        return (response.data as List)
+            .map((e) => ShippingOption.fromJson(e))
+            .toList();
+      }
+      return [];
     } catch (e) {
-      print("Error fetching shipping: $e");
+      print("❌ Error fetching shipping: $e");
       return [];
     }
   }
 
+  // 4. الدفع بالبطاقة (Stripe)
   Future<void> placeCardOrder({
     required List<CartItemModel> cartItems,
     required int addressId,
@@ -47,50 +52,35 @@ class CheckoutService {
     required String paymentMethodId,
   }) async {
     try {
-      // 1. تجهيز الـ Payload (تم إضافة productId لضمان التوافق)
-      final orderPayload = {
-        'cartItems':
-            cartItems
-                .map(
-                  (item) => {
-                    'id': item.selectedVariant.id,
-                    'variant_id': item.selectedVariant.id,
-                    'quantity': item.quantity,
-                    'price': item.selectedVariant.price,
+      // ✅ استخدام الدالة المساعدة لتجهيز البيانات بشكل آمن
+      final itemsPayload = _buildCartItemsPayload(cartItems);
 
-                    // 🔥 الإصلاح هنا: إرسال المفتاحين لضمان القبول
-                    'product_id': item.product.id, // لقاعدة البيانات
-                    'productId': item.product.id, // للكود (Node.js Controller)
-                  },
-                )
-                .toList(),
+      final orderPayload = {
+        'cartItems': itemsPayload,
         'shippingAddressId': addressId,
         'shipping_cost': shippingCost,
         'total_amount': totalAmount,
         'merchant_shipping_selections': shippingSelections,
       };
 
-      // 2. إنشاء PaymentIntent
+      // إنشاء PaymentIntent
       final intentResponse = await _apiClient.post(
         '/payments/create-intent',
         data: {
           'amount': totalAmount,
           'currency': 'sar',
           'payment_method_id': paymentMethodId,
-          'merchant_id':
-              cartItems.isNotEmpty ? cartItems.first.product.merchantId : null,
+          'merchant_id': cartItems.isNotEmpty ? cartItems.first.product.merchantId : null,
           ...orderPayload,
         },
       );
 
       final String clientSecret = intentResponse.data['clientSecret'];
-      // استخراج ID النية سواء جاء داخل object أو مباشرة
-      final String paymentIntentId =
-          intentResponse.data['id'] ??
+      final String paymentIntentId = intentResponse.data['id'] ??
           intentResponse.data['paymentIntentId'] ??
           clientSecret.split('_secret')[0];
 
-      // 3. تأكيد الدفع عبر Stripe SDK
+      // تأكيد الدفع عبر Stripe
       await Stripe.instance.confirmPayment(
         paymentIntentClientSecret: clientSecret,
         data: PaymentMethodParams.cardFromMethodId(
@@ -100,27 +90,19 @@ class CheckoutService {
         ),
       );
 
-      // 4. إنشاء الطلب في الباك إند
+      // حفظ الطلب في الباك إند
       await _apiClient.post(
         '/orders/create-from-intent',
         data: {'paymentIntentId': paymentIntentId, ...orderPayload},
       );
     } on StripeException catch (e) {
-      throw Exception(e.error.localizedMessage);
+      throw Exception(e.error.localizedMessage ?? "فشلت عملية الدفع");
     } catch (e) {
-      if (e is DioException && e.response?.data != null) {
-        // محاولة طباعة الخطأ القادم من السيرفر
-        throw Exception(
-          e.response?.data['message'] ??
-              e.response?.data['error'] ??
-              "فشلت عملية الدفع",
-        );
-      }
-      throw e;
+      throw _handleError(e);
     }
   }
 
-  // ✅ دالة الدفع عند الاستلام (COD) - تم الإصلاح
+  // 5. الدفع عند الاستلام (COD)
   Future<void> placeCodOrder({
     required List<CartItemModel> cartItems,
     required int addressId,
@@ -128,36 +110,56 @@ class CheckoutService {
     required double shippingCost,
     required double totalAmount,
   }) async {
-    // نفس الإصلاح هنا
-    final orderPayload = {
-      'cartItems':
-          cartItems
-              .map(
-                (item) => {
-                  'id': item.selectedVariant.id,
-                  'variant_id': item.selectedVariant.id,
-                  'quantity': item.quantity,
-                  'price': item.selectedVariant.price,
-
-                  // 🔥 الإصلاح: إرسال المفتاحين
-                  'product_id': item.product.id,
-                  'productId': item.product.id,
-                },
-              )
-              .toList(),
-      'shippingAddressId': addressId,
-      'shipping_cost': shippingCost,
-      'total_amount': totalAmount,
-      'merchant_shipping_selections': shippingSelections,
-    };
-
     try {
+      // ✅ استخدام نفس الدالة المساعدة
+      final itemsPayload = _buildCartItemsPayload(cartItems);
+
+      final orderPayload = {
+        'cartItems': itemsPayload,
+        'shippingAddressId': addressId,
+        'shipping_cost': shippingCost,
+        'total_amount': totalAmount,
+        'merchant_shipping_selections': shippingSelections,
+      };
+
       await _apiClient.post('/orders/create-cod', data: orderPayload);
     } catch (e) {
-      if (e is DioException && e.response?.data != null) {
-        throw Exception(e.response?.data['message'] ?? "فشل الطلب");
-      }
-      throw e;
+      throw _handleError(e);
     }
+  }
+
+  // --- دوال مساعدة (Private Helpers) ---
+
+  // ✅ دالة لتجهيز بيانات المنتجات بشكل آمن (تحل مشكلة Null Safety)
+  List<Map<String, dynamic>> _buildCartItemsPayload(List<CartItemModel> cartItems) {
+    return cartItems.map((item) {
+      // السعر: إذا وجد للمتغير سعر نأخذه، وإلا نأخذ سعر المنتج
+      final double price = item.selectedVariant?.price ?? item.product.price;
+      
+      // معرف المتغير: قد يكون null
+      final int? variantId = item.selectedVariant?.id;
+
+      return {
+        'product_id': item.product.id,
+        'productId': item.product.id, // للتوافق
+        
+        'variant_id': variantId,
+        'variantId': variantId, // للتوافق
+        'id': variantId, // بعض الباك إند القديم قد يطلب id فقط
+        
+        'quantity': item.quantity,
+        'price': price,
+      };
+    }).toList();
+  }
+
+  // ✅ دالة لاستخراج رسالة الخطأ
+  Exception _handleError(dynamic e) {
+    if (e is DioException && e.response?.data != null) {
+      final data = e.response?.data;
+      final msg = data['message'] ?? data['error'] ?? "حدث خطأ غير معروف";
+      return Exception(msg);
+    }
+    return Exception(e.toString());
   }
 }

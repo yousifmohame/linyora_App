@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:linyora_project/features/layout/main_layout_screen.dart';
 import 'package:linyora_project/features/models/analytics/screens/model_analytics_screen.dart';
 import 'package:linyora_project/features/models/bank/screens/model_bank_settings_screen.dart';
 import 'package:linyora_project/features/models/chat/screens/chat_screen.dart';
@@ -427,12 +428,27 @@ class _ModelDashboardScreenState extends State<ModelDashboardScreen> {
                         'تسجيل الخروج',
                         style: TextStyle(color: Colors.red),
                       ),
-                      onTap:
-                          () async =>
-                              await Provider.of<AuthProvider>(
-                                context,
-                                listen: false,
-                              ).logout(),
+                      onTap: () async {
+                        // 1. إغلاق القائمة الجانبية (Drawer) أولاً
+                        Navigator.pop(context);
+
+                        // 2. تنفيذ عملية الخروج في البروفايدر
+                        await Provider.of<AuthProvider>(
+                          context,
+                          listen: false,
+                        ).logout();
+
+                        // 3. التحقق من أن السياق (Context) لا يزال صالحاً قبل الانتقال
+                        if (context.mounted) {
+                          // 4. الانتقال إلى شاشة تسجيل الدخول وحذف كل الصفحات السابقة من الذاكرة
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(
+                              builder: (context) => const MainLayoutScreen(),
+                            ),
+                            (route) => false,
+                          );
+                        }
+                      },
                     );
                   }
 

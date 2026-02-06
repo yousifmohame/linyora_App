@@ -1,16 +1,16 @@
-
-
-import 'package:linyora_project/core/utils/image_helper.dart';
+import 'package:linyora_project/models/product_model.dart'; // ✅ هام جداً: استيراد المودل العام
 
 class ProductDetailsModel {
   final int id;
   final String name;
   final String description;
-  final int merchantId;
+  final String merchantId; // يفضل توحيد النوع مع ProductModel (String)
   final String merchantName;
   final bool isDropshipping;
-  final List<ProductVariant> variants;
+  final List<ProductVariant> variants; // ✅ نستخدم الفارينت المستورد
   final List<ProductReview> reviews;
+  final String imageUrl; // نحتاجها للتحويل
+  final double price; // نحتاجها للتحويل
 
   ProductDetailsModel({
     required this.id,
@@ -21,77 +21,68 @@ class ProductDetailsModel {
     required this.isDropshipping,
     required this.variants,
     required this.reviews,
+    required this.imageUrl,
+    required this.price,
   });
 
   factory ProductDetailsModel.fromJson(Map<String, dynamic> json) {
-    return ProductDetailsModel(
-      id: json['id'],
-      name: json['name'] ?? '',
-      description: json['description'] ?? '',
-      merchantId: json['merchant_id'] ?? json['merchantId'] ?? 0,
-      merchantName: json['merchantName'] ?? '',
-      isDropshipping: json['is_dropshipping'] == true,
-      variants: (json['variants'] as List?)
-              ?.map((v) => ProductVariant.fromJson(v))
-              .toList() ??
-          [],
-      reviews: (json['reviews'] as List?)
-              ?.map((r) => ProductReview.fromJson(r))
-              .toList() ??
-          [],
-    );
-  }
-}
-
-class ProductVariant {
-  final int? id;
-  final String color;
-  final double price;
-  final double? compareAtPrice;
-  final int stockQuantity;
-  final String? sku;
-  final List<String> images;
-
-  ProductVariant({
-    this.id,
-    required this.color,
-    required this.price,
-    this.compareAtPrice,
-    required this.stockQuantity,
-    this.sku,
-    required this.images,
-  });
-
-  factory ProductVariant.fromJson(Map<String, dynamic> json) {
-    // ✅ إصلاح آمن للصور: التأكد من أنها قائمة
-    List<String> parsedImages = [];
-    if (json['images'] != null) {
-      if (json['images'] is List) {
-        parsedImages =
-            (json['images'] as List)
-                .map((e) => ImageHelper.getValidUrl(e.toString()))
-                .toList();
-      } else if (json['images'] is String) {
-        // في بعض الأحيان قد تأتي كسلسلة نصية واحدة
-        parsedImages = [ImageHelper.getValidUrl(json['images'])];
-      }
+    // استخراج المتغيرات باستخدام المودل الموجود في product_model.dart
+    List<ProductVariant> variantsList = [];
+    if (json['variants'] != null && json['variants'] is List) {
+      variantsList = (json['variants'] as List)
+          .map((v) => ProductVariant.fromJson(v))
+          .toList();
     }
 
-    return ProductVariant(
-      id: int.tryParse(json['id'].toString()),
-      color: json['color'] ?? '',
-      price: double.tryParse(json['price'].toString()) ?? 0.0,
-      compareAtPrice:
-          json['compare_at_price'] != null
-              ? double.tryParse(json['compare_at_price'].toString())
-              : null,
-      stockQuantity: int.tryParse(json['stock_quantity'].toString()) ?? 0,
-      sku: json['sku'],
-      images: parsedImages,
+    // تحديد الصورة والسعر الافتراضي للتحويل لاحقاً
+    String displayImage = '';
+    double displayPrice = double.tryParse(json['price']?.toString() ?? '0') ?? 0.0;
+
+    if (json['image_url'] != null) {
+      displayImage = json['image_url'].toString();
+    } else if (variantsList.isNotEmpty && variantsList.first.images.isNotEmpty) {
+      displayImage = variantsList.first.images.first;
+    }
+
+    return ProductDetailsModel(
+      id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      name: json['name'] ?? '',
+      description: json['description'] ?? '',
+      // التعامل المرن مع merchant_id سواء جاء رقم أو نص
+      merchantId: json['merchant_id']?.toString() ?? json['merchantId']?.toString() ?? '0',
+      merchantName: json['merchantName'] ?? json['merchant_name'] ?? 'Unknown',
+      isDropshipping: json['is_dropshipping'] == true || json['is_dropshipping'] == 1,
+      variants: variantsList,
+      reviews: (json['reviews'] as List?)
+              ?.map((r) => ProductReview.fromJson(r))
+              .toList() ?? [],
+      imageUrl: displayImage,
+      price: displayPrice,
+    );
+  }
+
+  // ✅ دالة التحويل: هذه هي "الحلقة المفقودة" لربط صفحة التفاصيل بالسلة
+  ProductModel toProductModel() {
+    return ProductModel(
+      id: id,
+      name: name,
+      description: description,
+      imageUrl: imageUrl,
+      price: price,
+      rating: 0.0, // يمكن حسابها من reviews إذا أردت
+      reviewCount: reviews.length,
+      merchantId: merchantId,
+      merchantName: merchantName,
+      isNew: false,
+      status: 'active',
+      stock: 100, // قيمة افتراضية أو احسبها من variants
+      variants: variants,
+      isDropshipping: isDropshipping,
     );
   }
 }
 
+// ✅ كلاس التقييمات (يمكن إبقاؤه هنا لأنه خاص بالتفاصيل)
 class ProductReview {
   final int id;
   final double rating;
@@ -109,11 +100,13 @@ class ProductReview {
 
   factory ProductReview.fromJson(Map<String, dynamic> json) {
     return ProductReview(
-      id: json['id'],
-      rating: double.parse(json['rating'].toString()),
+      id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      rating: double.tryParse(json['rating']?.toString() ?? '0') ?? 0.0,
       comment: json['comment'] ?? '',
-      userName: json['userName'] ?? 'مستخدم',
+      userName: json['user_name'] ?? json['userName'] ?? 'مستخدم',
       createdAt: json['created_at'] ?? '',
     );
   }
 }
+
+// ❌❌❌ لا تقم بإضافة class ProductVariant هنا مرة أخرى! ❌❌❌

@@ -78,20 +78,16 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(
-          icon,
-          size: 26,
-          color: isSelected ? Colors.white : Colors.grey[700],
-        ),
+        Icon(icon, size: 26, color: isSelected ? Colors.white : Colors.black),
         if (!isSelected)
           Padding(
-            padding: const EdgeInsets.only(top: 4.0),
+            padding: const EdgeInsets.only(top: 2.0),
             child: Text(
               label,
               style: const TextStyle(
-                fontSize: 9,
+                fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey,
+                color: Colors.black,
               ),
             ),
           ),

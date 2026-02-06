@@ -6,34 +6,47 @@ class CartService {
   final ApiClient _apiClient = ApiClient();
 
   // إرسال الطلب للسيرفر
-  Future<void> placeOrder(List<CartItemModel> items) async {
+  // ✅ التعديل: نمرر العنوان وطريقة الدفع كمعاملات (Parameters)
+  Future<void> placeOrder({
+    required List<CartItemModel> items,
+    required int addressId,
+    String paymentMethod = 'cod', // قيمة افتراضية
+  }) async {
     try {
-      // تجهيز البيانات بالشكل الذي يطلبه الباك اند (orderRoutes/orderController)
-      // عادة يتوقع الباك اند قائمة بـ {variant_id, quantity}
+      // تجهيز البيانات
       final List<Map<String, dynamic>> orderItems = items.map((item) {
+        // ✅ 1. تحديد السعر الصحيح (سعر المتغير أو سعر المنتج الأصلي)
+        final double finalPrice = item.selectedVariant?.price ?? item.product.price;
+
         return {
-          'variant_id': item.selectedVariant.id,
+          'product_id': item.product.id,
+          
+          // ✅ 2. معالجة الـ Null Safety للمتغير
+          // إذا كان selectedVariant يساوي null، سيرسل null، وإلا سيرسل الـ id
+          'variant_id': item.selectedVariant?.id, 
+          
           'quantity': item.quantity,
-          // قد تحتاج لإرسال product_id أيضاً حسب تصميم الباك اند
-          'product_id': item.product.id, 
+          'price': finalPrice, // يفضل إرسال السعر للتحقق في الباك إند
         };
       }).toList();
 
       // إرسال الطلب
-      // تأكد من المسار الصحيح في الباك اند (مثلاً /orders)
       await _apiClient.post('/orders', data: {
         'items': orderItems,
-        'payment_method': 'cod', // افتراضياً الدفع عند الاستلام، يمكن تغييره
-        'shipping_address_id': 1, // يجب تمرير عنوان حقيقي هنا لاحقاً
+        'payment_method': paymentMethod, 
+        'shipping_address_id': addressId, // ✅ استخدام القيمة الممررة
+        // يمكن إضافة total_amount هنا إذا كان الباك إند يطلبه
       });
       
     } catch (e) {
+      // ✅ 3. تحسين قراءة الأخطاء من Dio
+      if (e is DioException && e.response?.data != null) {
+        final errorMsg = e.response?.data['message'] ?? e.response?.data['error'] ?? 'حدث خطأ غير معروف';
+        throw Exception(errorMsg);
+      }
+      
       print('Checkout Error: $e');
       throw Exception('فشل إتمام الطلب، يرجى المحاولة لاحقاً');
     }
   }
-
-  // يمكن إضافة دوال أخرى هنا مثل:
-  // - التحقق من توفر الكميات (Validate Stock)
-  // - حساب تكلفة الشحن (Calculate Shipping)
 }

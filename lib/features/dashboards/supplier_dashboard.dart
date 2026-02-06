@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:linyora_project/features/layout/main_layout_screen.dart';
 import 'package:linyora_project/features/supplier/Verification/screens/verification_screen.dart';
 import 'package:linyora_project/features/supplier/bank/screens/supplier_bank_screen.dart';
 import 'package:linyora_project/features/supplier/orders/screens/supplier_orders_screen.dart';
@@ -36,8 +37,24 @@ class _SupplierDashboardScreenState extends State<SupplierDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    // ✅ 3. جلب عدد الإشعارات عند بدء التطبيق
+    // 1. جلب الإشعارات
     _fetchUnreadNotifications();
+
+    // 2. ✅ تحديث بيانات المستخدم للتأكد من حالة التوثيق
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshUserProfile();
+    });
+  }
+
+  // دالة لتحديث بيانات المستخدم
+  Future<void> _refreshUserProfile() async {
+    try {
+      // نفترض أن لديك دالة في AuthProvider تجلب بيانات المستخدم من الـ API
+      // وتقوم بتحديث المتغير user المخزن في البروفايدر
+      await Provider.of<AuthProvider>(context, listen: false).refreshUser();
+    } catch (e) {
+      print("Error refreshing user profile: $e");
+    }
   }
 
   // ✅ 4. دالة جلب عدد الإشعارات (تتصل بالباك إند)
@@ -293,12 +310,35 @@ class _SupplierDashboardScreenState extends State<SupplierDashboardScreen> {
                         'تسجيل الخروج',
                         style: TextStyle(color: Colors.red),
                       ),
-                      onTap:
-                          () async =>
-                              await Provider.of<AuthProvider>(
-                                context,
-                                listen: false,
-                              ).logout(),
+                      onTap: () async {
+                        // 1. إغلاق القائمة الجانبية (Drawer) أولاً
+                        Navigator.pop(context);
+
+                        // 2. تنفيذ عملية الخروج في البروفايدر
+                        await Provider.of<AuthProvider>(
+                          context,
+                          listen: false,
+                        ).logout();
+
+                        // 3. التحقق من أن السياق (Context) لا يزال صالحاً قبل الانتقال
+                        if (context.mounted) {
+                          // 4. الانتقال إلى شاشة تسجيل الدخول وحذف كل الصفحات السابقة من الذاكرة
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(
+                              builder: (context) => const MainLayoutScreen(),
+                            ), // استبدل LoginScreen باسم كلاس شاشة الدخول
+                            (route) => false,
+                          );
+
+                          // 💡 ملاحظة: إذا لم تكن تستخدم مسارات مسماة (Named Routes)، استخدم هذا الكود بدلاً من السطر أعلاه:
+                          /*
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginScreen()), // استبدل LoginScreen باسم كلاس شاشة الدخول
+          (route) => false,
+        );
+        */
+                        }
+                      },
                     );
                   }
 

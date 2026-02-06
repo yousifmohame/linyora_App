@@ -1,19 +1,24 @@
 import 'package:flutter/material.dart';
-import 'package:linyora_project/features/public_profiles/screens/merchant_profile_screen.dart';
-import 'package:linyora_project/models/product_details_model.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 
-// تأكد من المسارات الصحيحة
+// المودلز والخدمات
+import 'package:linyora_project/models/product_model.dart';
+import 'package:linyora_project/models/product_details_model.dart';
 import 'package:linyora_project/features/products/widgets/related_products_section.dart';
 import 'package:linyora_project/features/wishlist/providers/wishlist_provider.dart';
-import 'package:linyora_project/models/product_model.dart'; // الموديل العام
-import '../../cart/providers/cart_provider.dart';
-import '../../cart/screens/cart_screen.dart';
-import '../../cart/screens/checkout_screen.dart';
-import '../services/product_service.dart';
+import 'package:linyora_project/features/cart/providers/cart_provider.dart';
+import 'package:linyora_project/features/auth/providers/auth_provider.dart'; // ✅ هام للتحقق من الأدمن
 
+// الشاشات
+import 'package:linyora_project/features/cart/screens/cart_screen.dart';
+import 'package:linyora_project/features/cart/screens/checkout_screen.dart';
+import 'package:linyora_project/features/public_profiles/screens/merchant_profile_screen.dart';
+import 'package:linyora_project/features/home/screens/notifications_screen.dart'; // ✅ للإشعارات
+import 'package:linyora_project/features/home/screens/home_screen.dart'; // ✅ للعودة للرئيسية
+
+import '../services/product_service.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   final String productId;
@@ -59,33 +64,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     }
   }
 
-  // --- 1. دالة لتحويل بيانات التفاصيل إلى ProductModel للمفضلة ---
-  ProductModel _createProductModelForWishlist() {
-    if (_product == null || _selectedVariant == null) {
-      // ارجاع كائن فارغ أو معالجة الخطأ (نظرياً لن يحدث لأن الزر لا يظهر إلا بعد التحميل)
-      throw Exception("Product not loaded yet");
-    }
-
-    return ProductModel(
-      id: _product!.id,
-      name: _product!.name,
-      description: _product!.description,
-      // نستخدم سعر وصورة المتغير المختار حالياً
-      price: _selectedVariant!.price,
-      compareAtPrice: _selectedVariant!.compareAtPrice,
-      imageUrl:
-          _selectedVariant!.images.isNotEmpty
-              ? _selectedVariant!.images.first
-              : '',
-      // حساب التقييم الحالي ليتم تخزينه
-      rating: _calculateAverageRating(),
-      reviewCount: _product!.reviews.length,
-      merchantName: _product!.merchantName,
-      isNew: false, // يمكن تعديل المنطق هنا
-    );
-  }
-
-  // --- 2. دالة لحساب متوسط التقييم ---
   double _calculateAverageRating() {
     if (_product == null || _product!.reviews.isEmpty) return 0.0;
     double total = _product!.reviews.fold(0, (sum, item) => sum + item.rating);
@@ -101,12 +79,12 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   void _addToCart({bool goToCheckout = false}) {
-    if (_product == null || _selectedVariant == null) return;
-
+    if (_product == null) return;
+    final productModel = _product!.toProductModel();
     Provider.of<CartProvider>(
       context,
       listen: false,
-    ).addToCart(_product!, _selectedVariant!, _quantity);
+    ).addToCart(productModel, _quantity, _selectedVariant);
 
     if (goToCheckout) {
       Navigator.push(
@@ -119,6 +97,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   void _showAddToCartSuccessSheet() {
+    final String image =
+        (_selectedVariant != null && _selectedVariant!.images.isNotEmpty)
+            ? _selectedVariant!.images.first
+            : _product!.imageUrl;
+
+    final double price = _selectedVariant?.price ?? _product!.price;
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -146,10 +131,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: CachedNetworkImage(
-                      imageUrl: _selectedVariant!.images.first,
+                      imageUrl: image,
                       width: 60,
                       height: 60,
                       fit: BoxFit.cover,
+                      errorWidget:
+                          (context, url, error) =>
+                              Container(color: Colors.grey[200]),
                     ),
                   ),
                   const SizedBox(width: 15),
@@ -159,7 +147,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       children: [
                         Text(_product!.name, maxLines: 1),
                         Text(
-                          "${_selectedVariant!.price} ر.س",
+                          "${price.toStringAsFixed(0)} ر.س",
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ],
@@ -198,26 +186,20 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     );
   }
 
-  Color _parseColor(String colorName) {
-    // 1. تنظيف النص: حذف المسافات وتحويل الأحرف لصغيرة
+  Color _parseColor(String? colorName) {
+    if (colorName == null || colorName.isEmpty) return Colors.grey.shade200;
     final normalizedColor = colorName.trim().toLowerCase();
-
-    // 2. التحقق مما إذا كان المدخل كود Hex (مثلاً #FF0000)
     if (normalizedColor.startsWith('#')) {
       try {
         final buffer = StringBuffer();
-        if (normalizedColor.length == 7)
-          buffer.write('ff'); // إضافة Alpha إذا لم يوجد
+        if (normalizedColor.length == 7) buffer.write('ff');
         buffer.write(normalizedColor.replaceFirst('#', ''));
         return Color(int.parse(buffer.toString(), radix: 16));
       } catch (e) {
-        return Colors.grey.shade200; // لون احتياطي في حال الخطأ
+        return Colors.grey.shade200;
       }
     }
-
-    // 3. قاموس الألوان الموسع (يغطي الألوان الشائعة في الملابس والمنتجات)
     const Map<String, Color> colorMap = {
-      // الألوان الأساسية
       'white': Colors.white,
       'black': Colors.black,
       'red': Colors.red,
@@ -229,37 +211,152 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       'pink': Colors.pink,
       'brown': Colors.brown,
       'grey': Colors.grey,
-      'gray': Colors.grey,
-
-      // ألوان الموضة والتجارة الإلكترونية
-      'beige': Color(0xFFF5F5DC), // بيج
-      'ivory': Color(0xFFFFFFF0), // عاجي
-      'cream': Color(0xFFFFFDD0), // كريمي
-      'off white': Color(0xFFFAF9F6), // أوف وايت
-      'navy': Color(0xFF000080), // كحلي
-      'maroon': Color(0xFF800000), // مارون / عودي
-      'burgundy': Color(0xFF800020), // برغندي
-      'olive': Color(0xFF808000), // زيتوني
-      'teal': Color(0xFF008080), // تركواز غامق
-      'cyan': Colors.cyan, // سماوي
-      'turquoise': Color(0xFF40E0D0), // تركواز
-      'gold': Color(0xFFFFD700), // ذهبي
-      'silver': Color(0xFFC0C0C0), // فضي
-      'bronze': Color(0xFFCD7F32), // برونزي
-      'mustard': Color(0xFFFFDB58), // خردلي
-      'khaki': Color(0xFFF0E68C), // كاكي
-      'coral': Color(0xFFFF7F50), // مرجاني
-      'peach': Color(0xFFFFE5B4), // خوخي
-      'lavender': Color(0xFFE6E6FA), // لافندر
-      'mauve': Color(0xFFE0B0FF), // بنفسجي فاتح
-      'charcoal': Color(0xFF36454F), // فحم
-      'indigo': Colors.indigo, // نيلي
-      'lime': Colors.lime, // ليموني
-      'tan': Color(0xFFD2B48C), // تان (بني فاتح)
+      'beige': Color(0xFFF5F5DC),
+      'navy': Color(0xFF000080),
+      'maroon': Color(0xFF800000),
+      'gold': Color(0xFFFFD700),
+      'silver': Color(0xFFC0C0C0),
     };
-
-    // 4. إرجاع اللون الموجود في القاموس، أو رمادي فاتح كقيمة افتراضية
     return colorMap[normalizedColor] ?? const Color(0xFFEEEEEE);
+  }
+
+  // ✅ 1. الـ SliverAppBar الجديد المطابق للرئيسية
+  Widget _buildSliverAppBar() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final isRealAdmin =
+        authProvider.user != null && authProvider.user!.roleId == 1;
+
+    return SliverAppBar(
+      floating: true,
+      pinned: true,
+      snap: true,
+      backgroundColor: Colors.white,
+      elevation: 0,
+      surfaceTintColor: Colors.white,
+      // زر رجوع لأنه صفحة تفاصيل
+      leading: const BackButton(color: Colors.black),
+      title: GestureDetector(
+        onTap: () {
+          // العودة للرئيسية
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+            (route) => false,
+          );
+        },
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              "INOYRA",
+              style: TextStyle(
+                color: Colors.black,
+                fontFamily: 'Playfair Display',
+                fontWeight: FontWeight.w900,
+                fontSize: 24,
+                letterSpacing: 2.0,
+              ),
+            ),
+            const Text(
+              "L",
+              style: TextStyle(
+                color: Colors.pink,
+                fontFamily: 'Playfair Display',
+                fontWeight: FontWeight.w900,
+                fontSize: 30,
+                letterSpacing: 2.0,
+              ),
+            ),
+            if (isRealAdmin)
+              Container(
+                margin: const EdgeInsets.only(left: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  "ADMIN",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+      centerTitle: true,
+      actions: [
+        // زر المشاركة (أضفناه هنا لأنه مهم في صفحة المنتج)
+        IconButton(
+          icon: const Icon(Icons.share, color: Colors.black),
+          onPressed: _shareProduct,
+        ),
+        // زر الإشعارات
+        IconButton(
+          icon: const Icon(
+            Icons.notifications_outlined,
+            color: Colors.black,
+            size: 28,
+          ),
+          onPressed:
+              () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (c) => const NotificationsScreen()),
+              ),
+        ),
+        // زر السلة
+        Consumer<CartProvider>(
+          builder: (context, cart, child) {
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                IconButton(
+                  icon: const Icon(
+                    Icons.shopping_cart_outlined,
+                    color: Colors.black,
+                    size: 28,
+                  ),
+                  onPressed:
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (c) => const CartScreen()),
+                      ),
+                ),
+                if (cart.items.isNotEmpty)
+                  Positioned(
+                    top: 3,
+                    right: 4,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        '${cart.items.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(width: 8),
+      ],
+    );
   }
 
   @override
@@ -271,80 +368,60 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
     bool hasDiscount = false;
     int discountPercent = 0;
-    if (_selectedVariant != null &&
-        _selectedVariant!.compareAtPrice != null &&
-        _selectedVariant!.compareAtPrice! > _selectedVariant!.price) {
+
+    final double currentPrice = _selectedVariant?.price ?? _product!.price;
+    final double? comparePrice = _selectedVariant?.compareAtPrice;
+
+    if (comparePrice != null && comparePrice > currentPrice) {
       hasDiscount = true;
       discountPercent =
-          ((_selectedVariant!.compareAtPrice! - _selectedVariant!.price) /
-                  _selectedVariant!.compareAtPrice! *
-                  100)
-              .round();
+          ((comparePrice - currentPrice) / comparePrice * 100).round();
     }
 
-    // حساب التقييم الحقيقي
     final double rating = _calculateAverageRating();
     final int reviewCount = _product!.reviews.length;
+
+    final List<String> currentImages =
+        (_selectedVariant != null && _selectedVariant!.images.isNotEmpty)
+            ? _selectedVariant!.images
+            : [_product!.imageUrl];
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
       body: CustomScrollView(
         controller: _scrollController,
         slivers: [
-          SliverAppBar(
-            expandedHeight: 450.0,
-            pinned: true,
-            backgroundColor: Colors.white,
-            elevation: 0,
-            title: Text(
-              _product!.name,
-              style: const TextStyle(color: Colors.black, fontSize: 16),
-            ),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.black),
-              onPressed: () => Navigator.pop(context),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.share, color: Colors.black),
-                onPressed: _shareProduct,
-              ),
-              IconButton(
-                icon: const Icon(
-                  Icons.shopping_bag_outlined,
-                  color: Colors.black,
-                ),
-                onPressed:
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const CartScreen()),
-                    ),
-              ),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                color: Colors.white,
-                child: Stack(
-                  alignment: Alignment.bottomCenter,
-                  children: [
-                    PageView.builder(
-                      itemCount: _selectedVariant?.images.length ?? 0,
-                      onPageChanged:
-                          (index) => setState(() => _currentImageIndex = index),
-                      itemBuilder: (context, index) {
-                        return CachedNetworkImage(
-                          imageUrl: _selectedVariant!.images[index],
-                          fit: BoxFit.contain,
-                        );
-                      },
-                    ),
+          // ✅ 1. البار العلوي
+          _buildSliverAppBar(),
+
+          // ✅ 2. معرض الصور (تم نقله إلى SliverToBoxAdapter)
+          SliverToBoxAdapter(
+            child: Container(
+              height: 450, // نفس الارتفاع السابق
+              color: Colors.white,
+              child: Stack(
+                alignment: Alignment.bottomCenter,
+                children: [
+                  PageView.builder(
+                    itemCount: currentImages.length,
+                    onPageChanged:
+                        (index) => setState(() => _currentImageIndex = index),
+                    itemBuilder: (context, index) {
+                      return CachedNetworkImage(
+                        imageUrl: currentImages[index],
+                        fit: BoxFit.contain,
+                        errorWidget:
+                            (context, url, error) =>
+                                const Icon(Icons.image_not_supported, size: 50),
+                      );
+                    },
+                  ),
+                  if (currentImages.length > 1)
                     Positioned(
                       bottom: 20,
                       child: Row(
                         children:
-                            _selectedVariant!.images.asMap().entries.map((
-                              entry,
-                            ) {
+                            currentImages.asMap().entries.map((entry) {
                               return Container(
                                 width: _currentImageIndex == entry.key ? 20 : 8,
                                 height: 8,
@@ -362,12 +439,12 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                             }).toList(),
                       ),
                     ),
-                  ],
-                ),
+                ],
               ),
             ),
           ),
 
+          // ✅ 3. باقي تفاصيل المنتج (تم الحفاظ عليها)
           SliverList(
             delegate: SliverChildListDelegate([
               Container(
@@ -381,7 +458,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          '${_selectedVariant?.price.toStringAsFixed(0)}',
+                          currentPrice.toStringAsFixed(0),
                           style: const TextStyle(
                             fontSize: 26,
                             fontWeight: FontWeight.bold,
@@ -398,7 +475,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                         const SizedBox(width: 12),
                         if (hasDiscount) ...[
                           Text(
-                            '${_selectedVariant?.compareAtPrice?.toStringAsFixed(0)}',
+                            comparePrice!.toStringAsFixed(0),
                             style: const TextStyle(
                               decoration: TextDecoration.lineThrough,
                               color: Colors.grey,
@@ -428,7 +505,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // الاسم + زر المفضلة الحقيقي (باستخدام Provider)
+                    // الاسم + زر المفضلة
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -442,21 +519,16 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                             ),
                           ),
                         ),
-
-                        // --- زر المفضلة الحقيقي ---
                         Consumer<WishlistProvider>(
                           builder: (context, wishlist, _) {
-                            // 1. التحقق من الحالة في البروفايدر
                             final isWishlisted = wishlist.isWishlisted(
                               _product!.id,
                             );
-
                             return GestureDetector(
                               onTap: () {
-                                // 2. استدعاء دالة التحويل لإنشاء ProductModel وإضافته
-                                final productModel =
-                                    _createProductModelForWishlist();
-                                wishlist.toggleWishlist(productModel);
+                                wishlist.toggleWishlist(
+                                  _product!.toProductModel(),
+                                );
                               },
                               child: Container(
                                 padding: const EdgeInsets.all(8),
@@ -487,33 +559,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
                     const SizedBox(height: 8),
 
-                    // التقييمات الحقيقية
+                    // التقييمات
                     Row(
                       children: [
-                        // رسم النجوم بناءً على المتوسط
-                        ...List.generate(5, (index) {
-                          if (index < rating.floor()) {
-                            return const Icon(
-                              Icons.star,
-                              color: Colors.amber,
-                              size: 18,
-                            );
-                          } else if (index < rating &&
-                              (rating - index) >= 0.5) {
-                            return const Icon(
-                              Icons.star_half,
-                              color: Colors.amber,
-                              size: 18,
-                            );
-                          } else {
-                            return const Icon(
-                              Icons.star_border,
-                              color: Colors.amber,
-                              size: 18,
-                            );
-                          }
-                        }),
-                        const SizedBox(width: 8),
+                        const Icon(Icons.star, color: Colors.amber, size: 18),
+                        const SizedBox(width: 4),
                         Text(
                           reviewCount > 0
                               ? '${rating.toStringAsFixed(1)} ($reviewCount تقييم)'
@@ -531,78 +581,98 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
               const SizedBox(height: 8),
 
-              // قسم الألوان
-              Container(
-                color: Colors.white,
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "اختر اللون",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 12),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children:
-                            _product!.variants.map((variant) {
-                              bool isSelected =
-                                  _selectedVariant?.id == variant.id;
-                              return GestureDetector(
-                                onTap:
-                                    () => setState(() {
-                                      _selectedVariant = variant;
-                                      _currentImageIndex = 0;
-                                    }),
-                                child: Container(
-                                  margin: const EdgeInsets.only(left: 12),
-                                  padding: const EdgeInsets.all(2),
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color:
-                                          isSelected
-                                              ? Colors.pink
-                                              : Colors.transparent,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  child: Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color: _parseColor(variant.color),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.grey.shade300,
+              // الألوان
+              if (_product!.variants.isNotEmpty)
+                Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "اختر المواصفات",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 12),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children:
+                              _product!.variants.map((variant) {
+                                bool isSelected =
+                                    _selectedVariant?.id == variant.id;
+
+                                if (variant.color != null &&
+                                    variant.color!.isNotEmpty) {
+                                  return GestureDetector(
+                                    onTap:
+                                        () => setState(() {
+                                          _selectedVariant = variant;
+                                          _currentImageIndex = 0;
+                                        }),
+                                    child: Container(
+                                      margin: const EdgeInsets.only(left: 12),
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color:
+                                              isSelected
+                                                  ? Colors.pink
+                                                  : Colors.transparent,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: Container(
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: _parseColor(variant.color),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: Colors.grey.shade300,
+                                          ),
+                                        ),
+                                        child:
+                                            isSelected
+                                                ? Icon(
+                                                  Icons.check,
+                                                  color:
+                                                      _parseColor(
+                                                                variant.color,
+                                                              ) ==
+                                                              Colors.white
+                                                          ? Colors.black
+                                                          : Colors.white,
+                                                )
+                                                : null,
                                       ),
                                     ),
-                                    child:
-                                        isSelected
-                                            ? Icon(
-                                              Icons.check,
-                                              color:
-                                                  _parseColor(variant.color) ==
-                                                          Colors.white
-                                                      ? Colors.black
-                                                      : Colors.white,
-                                            )
-                                            : null,
-                                  ),
-                                ),
-                              );
-                            }).toList(),
+                                  );
+                                } else {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(left: 8.0),
+                                    child: ChoiceChip(
+                                      label: Text(variant.name),
+                                      selected: isSelected,
+                                      onSelected:
+                                          (val) => setState(
+                                            () => _selectedVariant = variant,
+                                          ),
+                                      selectedColor: Colors.pink.shade100,
+                                    ),
+                                  );
+                                }
+                              }).toList(),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
 
               const SizedBox(height: 8),
 
-              // قسم التاجر
+              // التاجر
               Container(
                 color: Colors.white,
                 padding: const EdgeInsets.all(16),
@@ -629,19 +699,15 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     const Spacer(),
                     TextButton(
                       onPressed: () {
-                        // التأكد من أن المنتج تم تحميله لتجنب الأخطاء
-                        if (_product != null) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (context) => MerchantProfileScreen(
-                                    // تحويل الـ ID من int إلى String ليناسب الشاشة
-                                    merchantId: _product!.merchantId.toString(),
-                                  ),
-                            ),
-                          );
-                        }
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (context) => MerchantProfileScreen(
+                                  merchantId: _product!.merchantId,
+                                ),
+                          ),
+                        );
                       },
                       child: const Text(
                         "زيارة المتجر",
@@ -697,11 +763,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
               const SizedBox(height: 8),
 
-              // المنتجات المشابهة
-              RelatedProductsSection(
-                merchantId: _product!.merchantId,
-                currentProductId: _product!.id,
-              ),
+              // منتجات مشابهة
+              RelatedProductsSection(currentProductId: _product!.id),
 
               const SizedBox(height: 100),
             ]),
@@ -746,9 +809,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       icon: const Icon(Icons.add, size: 20),
                       onPressed:
                           () => setState(() {
-                            if (_selectedVariant != null &&
-                                _quantity < _selectedVariant!.stockQuantity)
-                              _quantity++;
+                            final maxStock =
+                                _selectedVariant?.stockQuantity ?? 100;
+                            if (_quantity < maxStock) _quantity++;
                           }),
                     ),
                   ],

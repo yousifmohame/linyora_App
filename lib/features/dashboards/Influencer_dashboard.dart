@@ -10,6 +10,7 @@ import 'package:linyora_project/features/influencers/requests/screens/model_requ
 import 'package:linyora_project/features/influencers/services/model_service.dart';
 import 'package:linyora_project/features/influencers/stories/screens/stories_screen.dart';
 import 'package:linyora_project/features/influencers/verification/screens/verification_screen.dart';
+import 'package:linyora_project/features/layout/main_layout_screen.dart';
 import 'package:linyora_project/features/models/analytics/screens/model_analytics_screen.dart';
 import 'package:linyora_project/features/models/reels/screens/model_reels_screen.dart';
 import 'package:linyora_project/features/models/wallet/screens/model_wallet_screen.dart';
@@ -422,23 +423,32 @@ class _InfluencerDashboardScreenState extends State<InfluencerDashboardScreen> {
                   itemBuilder: (context, index) {
                     if (index == visibleNavItems.length) {
                       return ListTile(
-                        leading: const Icon(
-                          Icons.logout_rounded,
-                          color: Colors.red,
-                        ),
+                        leading: const Icon(Icons.logout, color: Colors.red),
                         title: const Text(
                           'تسجيل الخروج',
-                          style: TextStyle(
-                            color: Colors.red,
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: TextStyle(color: Colors.red),
                         ),
-                        onTap:
-                            () async =>
-                                await Provider.of<AuthProvider>(
-                                  context,
-                                  listen: false,
-                                ).logout(),
+                        onTap: () async {
+                          // 1. إغلاق القائمة الجانبية (Drawer) أولاً
+                          Navigator.pop(context);
+
+                          // 2. تنفيذ عملية الخروج في البروفايدر
+                          await Provider.of<AuthProvider>(
+                            context,
+                            listen: false,
+                          ).logout();
+
+                          // 3. التحقق من أن السياق (Context) لا يزال صالحاً قبل الانتقال
+                          if (context.mounted) {
+                            // 4. الانتقال إلى شاشة تسجيل الدخول وحذف كل الصفحات السابقة من الذاكرة
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(
+                                builder: (context) => const MainLayoutScreen(),
+                              ),
+                              (route) => false,
+                            );
+                          }
+                        },
                       );
                     }
                     final item = visibleNavItems[index];

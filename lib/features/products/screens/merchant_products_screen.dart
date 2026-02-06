@@ -582,7 +582,7 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
 
                           // ✅ ونأخذ حالة الدروب شيبينج من السيرفر
                           isDropshipping: fetchedProduct.isDropshipping,
-                          originalProductId: fetchedProduct.originalProductId,
+                          originalProductId: fetchedProduct.originalProductId, merchantId: fetchedProduct.merchantId,
                         );
 
                         // نرسل المنتج المدمج لصفحة التعديل

@@ -1,5 +1,4 @@
-import 'package:linyora_project/models/product_details_model.dart';
-import '../core/utils/image_helper.dart';
+import '../core/widgets/optimized_image.dart';
 
 class ProductModel {
   final int id;
@@ -8,19 +7,23 @@ class ProductModel {
   final String imageUrl;
   final double rating;
   final int reviewCount;
+
+  final String merchantId;
   final String merchantName;
+
   final bool isNew;
   final String? brand;
   final String status;
   final double price;
-  final String? promotionEndsAt;
   final double? compareAtPrice;
   final int stock;
   final List<ProductVariant>? variants;
+
+  final String? promotionEndsAt;
   final List<int>? categoryIds;
 
-  // حقول الدروب شيبينج
   final bool isDropshipping;
+  // ✅ الحقل الذي كان يسبب الخطأ في شاشة التاجر
   final int? originalProductId;
 
   ProductModel({
@@ -30,6 +33,7 @@ class ProductModel {
     required this.imageUrl,
     required this.rating,
     required this.reviewCount,
+    required this.merchantId,
     required this.merchantName,
     this.isNew = false,
     this.brand,
@@ -38,113 +42,148 @@ class ProductModel {
     this.compareAtPrice,
     this.stock = 0,
     this.variants,
-    this.categoryIds,
     this.promotionEndsAt,
+    this.categoryIds,
     this.isDropshipping = false,
-    this.originalProductId,
+    this.originalProductId, // ✅
   });
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
-    // 1. استخراج المتغيرات (Variants)
     List<ProductVariant> variantsList = [];
-    if (json['variants'] != null) {
-      if (json['variants'] is List) {
-        variantsList =
-            (json['variants'] as List)
-                .map((v) => ProductVariant.fromJson(v))
-                .toList();
-      }
+    if (json['variants'] != null && json['variants'] is List) {
+      variantsList =
+          (json['variants'] as List)
+              .map((v) => ProductVariant.fromJson(v))
+              .toList();
     }
 
-    // 2. تحديد البيانات الرئيسية
-    double displayPrice = 0.0;
-    double? displayComparePrice;
+    double displayPrice =
+        double.tryParse(json['price']?.toString() ?? '0') ?? 0.0;
     String displayImage = '';
     int totalStock = 0;
 
     if (variantsList.isNotEmpty) {
       final first = variantsList.first;
-      displayPrice = first.price;
-      displayComparePrice = first.compareAtPrice;
+      if (displayPrice == 0) displayPrice = first.price;
       if (first.images.isNotEmpty) displayImage = first.images.first;
       totalStock = variantsList.fold(
         0,
         (sum, item) => sum + item.stockQuantity,
       );
     } else {
-      // ✅ التعديل هنا: تحويل السعر بشكل آمن جداً
-      // يعمل سواء كان السعر قادماً كـ String "100.00" أو int 100 أو double 100.0
-      displayPrice = double.tryParse(json['price']?.toString() ?? '0') ?? 0.0;
-
+      totalStock = int.tryParse(json['stock']?.toString() ?? '0') ?? 0;
       if (json['image_url'] != null) {
         displayImage = json['image_url'].toString();
-      } else if (json['image'] != null) {
-        displayImage = json['image'].toString();
+      } else if (json['images'] != null &&
+          (json['images'] as List).isNotEmpty) {
+        displayImage = json['images'][0].toString();
       }
-
-      // تحويل آمن للمخزون أيضاً
-      totalStock = int.tryParse(json['stock']?.toString() ?? '0') ?? 0;
     }
 
-    // 3. معالجة الفئات
+    // معالجة الفئات
     List<int> catIds = [];
-
     if (json['categoryIds'] != null && json['categoryIds'] is List) {
       catIds =
           (json['categoryIds'] as List)
-              .map((e) => int.tryParse(e.toString()) ?? 0)
-              .where((e) => e > 0)
+              .map((e) => int.parse(e.toString()))
               .toList();
-    } else if (json['categories'] != null && json['categories'] is List) {
-      catIds =
-          (json['categories'] as List)
-              .map((e) => int.tryParse(e['id']?.toString() ?? '0') ?? 0)
-              .where((e) => e > 0)
-              .toList();
-    }
-
-    if (catIds.isEmpty && json['category_id'] != null) {
-      int? singleId = int.tryParse(json['category_id'].toString());
-      if (singleId != null && singleId > 0) {
-        catIds.add(singleId);
-      }
-    }
-
-    // 4. تحديد حالة الدروب شيبينج
-    bool isDropshippingProduct = false;
-    if (json['is_dropshipping'] != null) {
-      isDropshippingProduct =
-          json['is_dropshipping'] == true ||
-          json['is_dropshipping'] == 1 ||
-          json['is_dropshipping'].toString() == '1';
-    } else if (json['supplier_id'] != null) {
-      isDropshippingProduct = true;
     }
 
     return ProductModel(
       id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       name: json['name']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
-      imageUrl: ImageHelper.getValidUrl(displayImage),
-      // تحويل آمن للتقييم وعدد المراجعات
+      imageUrl: displayImage,
       rating: double.tryParse(json['rating']?.toString() ?? '0') ?? 0.0,
       reviewCount: int.tryParse(json['reviewCount']?.toString() ?? '0') ?? 0,
 
+      merchantId:
+          json['merchant_id']?.toString() ??
+          json['merchantId']?.toString() ??
+          '0',
       merchantName:
-          json['merchantName']?.toString() ?? json['brand']?.toString() ?? '',
+          json['merchant_name']?.toString() ??
+          json['merchantName']?.toString() ??
+          'Unknown',
+
       isNew: json['is_new'] == true || json['is_new'] == 1,
-      promotionEndsAt: json['promotion_ends_at']?.toString(),
       brand: json['brand']?.toString(),
       status: json['status']?.toString() ?? 'active',
       price: displayPrice,
-      compareAtPrice: displayComparePrice,
+      compareAtPrice:
+          json['compare_at_price'] != null
+              ? double.tryParse(json['compare_at_price'].toString())
+              : null,
       stock: totalStock,
       variants: variantsList,
+
+      promotionEndsAt: json['promotion_ends_at']?.toString(),
       categoryIds: catIds,
-      isDropshipping: isDropshippingProduct,
-      originalProductId:
-          int.tryParse(json['original_product_id']?.toString() ?? '') ??
-          int.tryParse(json['supplier_product_id']?.toString() ?? ''),
+      isDropshipping:
+          json['is_dropshipping'] == true || json['is_dropshipping'] == 1,
+
+      // ✅ قراءة الحقل الجديد
+      originalProductId: int.tryParse(
+        json['original_product_id']?.toString() ?? '',
+      ),
+    );
+  }
+}
+
+class ProductVariant {
+  final int id;
+  final double price;
+  final double? compareAtPrice;
+  final int stockQuantity;
+  final String? color;
+  final String? size;
+  final List<String> images;
+  final String? sku;
+
+  ProductVariant({
+    required this.id,
+    required this.price,
+    this.compareAtPrice,
+    required this.stockQuantity,
+    this.color,
+    this.size,
+    required this.images,
+    this.sku,
+  });
+
+  String get name {
+    List<String> parts = [];
+    if (color != null && color!.isNotEmpty) parts.add(color!);
+    if (size != null && size!.isNotEmpty) parts.add(size!);
+    return parts.isEmpty ? 'Default' : parts.join(' / ');
+  }
+
+  factory ProductVariant.fromJson(Map<String, dynamic> json) {
+    List<String> imgs = [];
+    if (json['images'] != null && json['images'] is List) {
+      imgs = (json['images'] as List).map((e) => e.toString()).toList();
+    } else if (json['image'] != null) {
+      imgs.add(json['image'].toString());
+    }
+
+    return ProductVariant(
+      id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      price: double.tryParse(json['price']?.toString() ?? '0') ?? 0.0,
+      compareAtPrice:
+          json['compare_at_price'] != null
+              ? double.tryParse(json['compare_at_price'].toString())
+              : null,
+      stockQuantity:
+          int.tryParse(
+            json['stock_quantity']?.toString() ??
+                json['stock']?.toString() ??
+                '0',
+          ) ??
+          0,
+      color: json['color']?.toString(),
+      size: json['size']?.toString(),
+      images: imgs,
+      sku: json['sku']?.toString(),
     );
   }
 }

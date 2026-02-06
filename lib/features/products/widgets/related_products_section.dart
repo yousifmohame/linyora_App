@@ -99,7 +99,9 @@ class _RelatedProductsSectionState extends State<RelatedProductsSection> {
       rating: rating,
       reviewCount: detail.reviews.length,
       merchantName: detail.merchantName,
-      isNew: false, // يمكن تعديل هذا الشرط حسب تاريخ الإنشاء إذا توفر
+      isNew: false,
+      merchantId:
+          detail.merchantId, // يمكن تعديل هذا الشرط حسب تاريخ الإنشاء إذا توفر
     );
   }
 

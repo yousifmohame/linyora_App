@@ -5,6 +5,7 @@ import 'package:linyora_project/features/browse/screens/browse_models_screen.dar
 import 'package:linyora_project/features/chat/screens/chat_screen.dart';
 import 'package:linyora_project/features/dashboards/MyStore/my_store_screen.dart';
 import 'package:linyora_project/features/dropshipping/screens/merchant_dropshipping_screen.dart';
+import 'package:linyora_project/features/layout/main_layout_screen.dart';
 import 'package:linyora_project/features/settings/screens/settings_screen.dart';
 import 'package:linyora_project/features/shipping/screens/merchant_shipping_screen.dart';
 import 'package:linyora_project/features/subscriptions/screens/my_subscription_screen.dart';
@@ -362,12 +363,35 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
                         'تسجيل الخروج',
                         style: TextStyle(color: Colors.red),
                       ),
-                      onTap:
-                          () async =>
-                              await Provider.of<AuthProvider>(
-                                context,
-                                listen: false,
-                              ).logout(),
+                      onTap: () async {
+                        // 1. إغلاق القائمة الجانبية (Drawer) أولاً
+                        Navigator.pop(context);
+
+                        // 2. تنفيذ عملية الخروج في البروفايدر
+                        await Provider.of<AuthProvider>(
+                          context,
+                          listen: false,
+                        ).logout();
+
+                        // 3. التحقق من أن السياق (Context) لا يزال صالحاً قبل الانتقال
+                        if (context.mounted) {
+                          // 4. الانتقال إلى شاشة تسجيل الدخول وحذف كل الصفحات السابقة من الذاكرة
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(
+                              builder: (context) => const MainLayoutScreen(),
+                            ),
+                            (route) => false,
+                          );
+
+                          // أو استخدم هذا الكود إذا لم تكن تستخدم المسارات المسماة:
+                          /*
+        Navigator.of(context).pushAndRemoveUntil(
+           MaterialPageRoute(builder: (context) => const LoginScreen()),
+           (route) => false,
+        );
+        */
+                        }
+                      },
                     );
                   }
 

@@ -19,10 +19,11 @@ class SupplierStatsModel {
 
   factory SupplierStatsModel.fromJson(Map<String, dynamic> json) {
     return SupplierStatsModel(
-      totalProducts: int.tryParse(json['totalProducts']?.toString() ?? '0') ?? 0,
+      totalProducts:
+          int.tryParse(json['totalProducts']?.toString() ?? '0') ?? 0,
       totalStock: int.tryParse(json['totalStock']?.toString() ?? '0') ?? 0,
       totalOrders: int.tryParse(json['totalOrders']?.toString() ?? '0') ?? 0,
-      availableBalance: json['availableBalance']?.toString() ?? '0.00',
+      availableBalance: json['currentBalance']?.toString() ?? '0.00',
     );
   }
 }
@@ -37,7 +38,12 @@ class SupplierService {
       return SupplierStatsModel.fromJson(response.data);
     } catch (e) {
       // إرجاع أصفار في حالة الخطأ لضمان عدم انهيار الواجهة
-      return SupplierStatsModel(totalProducts: 0, totalStock: 0, totalOrders: 0, availableBalance: '0.00');
+      return SupplierStatsModel(
+        totalProducts: 0,
+        totalStock: 0,
+        totalOrders: 0,
+        availableBalance: '0.00',
+      );
     }
   }
 

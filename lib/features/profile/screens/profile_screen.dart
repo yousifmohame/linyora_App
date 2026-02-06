@@ -1,21 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
+import 'package:linyora_project/l10n/app_localizations.dart';
+
+// Screens
 import 'package:linyora_project/features/address/screens/addresses_screen.dart';
 import 'package:linyora_project/features/home/screens/AboutLinyoraScreen.dart';
 import 'package:linyora_project/features/home/screens/contact_us_screen.dart';
 import 'package:linyora_project/features/payment/screens/payment_methods_screen.dart';
 import 'package:linyora_project/features/profile/screens/EditProfileScreen.dart';
 import 'package:linyora_project/features/trends/screens/trends_screen.dart';
-
 import 'package:linyora_project/features/wishlist/screens/wishlist_screen.dart';
-import 'package:provider/provider.dart';
-import 'package:linyora_project/l10n/app_localizations.dart';
-
-// تأكد من المسارات الصحيحة
 import '../../orders/screens/my_orders_screen.dart';
-import '../../auth/services/auth_service.dart';
 import '../../auth/screens/login_screen.dart';
-import '../../shared/providers/locale_provider.dart'; // استيراد البروفايدر
+
+// Services & Providers
+import '../../auth/services/auth_service.dart';
+import '../../shared/providers/locale_provider.dart';
+// ✅ 1. استيراد سيرفس الطلبات (تأكد من المسار الصحيح)
+import 'package:linyora_project/features/orders/services/order_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -26,12 +29,45 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final AuthService _authService = AuthService.instance;
+  // ✅ 2. إنشاء نسخة من OrderService
+  final OrderService _orderService = OrderService();
+
+  // ✅ 3. متغير لحفظ عدد الطلبات
+  int _ordersCount = 0;
+  bool _isLoadingStats = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // ✅ 4. استدعاء دالة جلب البيانات عند بدء الشاشة
+    if (_authService.isLoggedIn) {
+      _fetchStats();
+    }
+  }
+
+  // ✅ 5. دالة جلب عدد الطلبات
+  Future<void> _fetchStats() async {
+    setState(() => _isLoadingStats = true);
+    try {
+      // نفترض أن دالة getMyOrders تعيد قائمة بالطلبات List<OrderModel>
+      // إذا كان لديك دالة خاصة للإحصائيات (getStats) يفضل استخدامها
+      final orders = await _orderService.getMyOrders();
+
+      if (mounted) {
+        setState(() {
+          _ordersCount = orders.length; // حساب عدد العناصر في القائمة
+          _isLoadingStats = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching profile stats: $e");
+      if (mounted) setState(() => _isLoadingStats = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // 1. الوصول للترجمة
     final l10n = AppLocalizations.of(context)!;
-
     final isLoggedIn = _authService.isLoggedIn;
     final user = _authService.currentUser;
 
@@ -41,7 +77,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         title: Text(
-          l10n.myProfile, // استخدام الترجمة
+          l10n.myProfile,
           style: const TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.bold,
@@ -53,14 +89,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             IconButton(
               icon: const Icon(Icons.settings_outlined, color: Colors.black),
               onPressed: () async {
-                // الانتقال لصفحة التعديل
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => const EditProfileScreen(),
                   ),
                 );
-                // عند العودة، نقوم بتحديث الصفحة لرؤية البيانات الجديدة
                 setState(() {});
               },
             ),
@@ -75,7 +109,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 20),
                     _buildProfileHeader(user, l10n),
                     const SizedBox(height: 20),
+
+                    // ✅ 6. تمرير القيم الحقيقية لدالة بناء الإحصائيات
                     _buildStatsRow(l10n),
+
                     const SizedBox(height: 20),
 
                     // القوائم
@@ -85,6 +122,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _ProfileTile(
                           icon: Icons.shopping_bag_outlined,
                           title: l10n.myOrders,
+                          // ✅ إضافة العدد بجانب العنوان (اختياري)
+                          trailingText:
+                              _ordersCount > 0 ? "$_ordersCount" : null,
                           onTap: () {
                             Navigator.push(
                               context,
@@ -126,7 +166,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         _ProfileTile(
                           icon: Icons.location_on_outlined,
-                          title: l10n.myAddresses, // أو l10n.addresses
+                          title: l10n.myAddresses,
                           onTap: () {
                             Navigator.push(
                               context,
@@ -155,11 +195,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _buildMenuSection(
                       title: l10n.appSettings,
                       children: [
-                        // زر اللغة
                         _ProfileTile(
                           icon: Icons.language,
                           title: l10n.language,
-                          // عرض اللغة الحالية
                           trailingText:
                               Localizations.localeOf(context).languageCode ==
                                       'ar'
@@ -235,7 +273,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // دالة إظهار نافذة اختيار اللغة
+  Widget _buildStatsRow(AppLocalizations l10n) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: 15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          // ✅ 7. عرض رقم الطلبات الحقيقي
+          _buildStatItem(
+            _isLoadingStats ? "..." : "$_ordersCount",
+            l10n.statsOrders,
+          ),
+          _buildVerticalDivider(),
+          // يمكنك تكرار نفس العملية للمتابعين والقسائم إذا توفرت في الـ API
+          _buildStatItem("0", l10n.statsFollowers),
+          _buildVerticalDivider(),
+          _buildStatItem("0", l10n.statsVouchers),
+        ],
+      ),
+    );
+  }
+
+  // ... (باقي الدوال كما هي: _showLanguageBottomSheet, _buildGuestView, _buildProfileHeader, _buildStatItem, _buildVerticalDivider, _buildMenuSection)
+
   void _showLanguageBottomSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -400,17 +465,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
                 const SizedBox(height: 8),
-                // داخل _buildProfileHeader
                 InkWell(
                   onTap: () async {
-                    // الانتقال لصفحة التعديل
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => const EditProfileScreen(),
                       ),
                     );
-                    // عند العودة، نقوم بتحديث الصفحة لرؤية البيانات الجديدة
                     setState(() {});
                   },
                   child: Container(
@@ -434,27 +496,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatsRow(AppLocalizations l10n) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.symmetric(vertical: 15),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildStatItem("0", l10n.statsOrders),
-          _buildVerticalDivider(),
-          _buildStatItem("0", l10n.statsFollowers),
-          _buildVerticalDivider(),
-          _buildStatItem("0", l10n.statsVouchers),
         ],
       ),
     );

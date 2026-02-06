@@ -4,34 +4,46 @@ import '../services/wishlist_service.dart';
 
 class WishlistProvider extends ChangeNotifier {
   final WishlistService _service = WishlistService();
-  
-  // قائمة المنتجات المفضلة
+
   List<ProductModel> _items = [];
-  // مجموعة IDs للبحث السريع (O(1))
   final Set<int> _itemIds = {};
 
-  List<ProductModel> get items => _items;
-  bool get isLoading => _items.isEmpty && _itemIds.isEmpty; // منطق بسيط للتحميل
+  // ✅ متغير صريح للتحميل
+  bool _isLoading = false;
 
-  // التحقق هل المنتج في المفضلة
+  List<ProductModel> get items => _items;
+  bool get isLoading => _isLoading;
+
   bool isWishlisted(int productId) {
     return _itemIds.contains(productId);
   }
 
-  // تحميل المفضلة عند فتح التطبيق
+  // تحميل المفضلة
   Future<void> fetchWishlist() async {
-    final products = await _service.getWishlist();
-    _items = products;
-    _itemIds.clear();
-    _itemIds.addAll(products.map((e) => e.id));
-    notifyListeners();
+    // تجنب التحميل المتكرر إذا كانت البيانات موجودة بالفعل (اختياري)
+    // if (_items.isNotEmpty) return;
+
+    _isLoading = true;
+    // notifyListeners(); // يمكن تفعيل هذا السطر إذا أردت إظهار لودينج عند كل تحديث
+
+    try {
+      final products = await _service.getWishlist();
+      _items = products;
+      _itemIds.clear();
+      _itemIds.addAll(products.map((e) => e.id));
+    } catch (e) {
+      debugPrint("Error fetching wishlist: $e");
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
-  // تبديل الحالة (Add/Remove)
+  // تبديل الحالة
   Future<void> toggleWishlist(ProductModel product) async {
     final isLiked = _itemIds.contains(product.id);
 
-    // 1. تحديث الواجهة فوراً (Optimistic Update)
+    // 1. تحديث فوري للواجهة (Optimistic UI)
     if (isLiked) {
       _items.removeWhere((p) => p.id == product.id);
       _itemIds.remove(product.id);
@@ -41,7 +53,7 @@ class WishlistProvider extends ChangeNotifier {
     }
     notifyListeners();
 
-    // 2. إرسال الطلب للسيرفر
+    // 2. إرسال للسيرفر
     try {
       if (isLiked) {
         await _service.removeFromWishlist(product.id);
@@ -49,7 +61,7 @@ class WishlistProvider extends ChangeNotifier {
         await _service.addToWishlist(product.id);
       }
     } catch (e) {
-      // 3. التراجع في حالة الخطأ
+      // 3. التراجع عند الخطأ
       if (isLiked) {
         _items.add(product);
         _itemIds.add(product.id);
@@ -58,8 +70,7 @@ class WishlistProvider extends ChangeNotifier {
         _itemIds.remove(product.id);
       }
       notifyListeners();
-      // يمكن عرض SnackBar هنا إذا كنت تمرر Context
-      print("Error updating wishlist: $e");
+      debugPrint("Wishlist Error: $e");
     }
   }
 }

@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/wallet_service.dart';
@@ -13,13 +14,13 @@ class ModelWalletScreen extends StatefulWidget {
 
 class _ModelWalletScreenState extends State<ModelWalletScreen> {
   final WalletService _service = WalletService();
-  
+
   ModelWallet? _wallet;
   List<Transaction> _transactions = [];
   bool _isLoading = true;
   bool _isSubmitting = false;
   bool _showBalance = true;
-  
+
   final TextEditingController _amountController = TextEditingController();
 
   // Colors
@@ -39,7 +40,7 @@ class _ModelWalletScreenState extends State<ModelWalletScreen> {
         _service.getWallet(),
         _service.getTransactions(),
       ]);
-      
+
       if (mounted) {
         setState(() {
           _wallet = results[0] as ModelWallet;
@@ -53,28 +54,92 @@ class _ModelWalletScreenState extends State<ModelWalletScreen> {
   }
 
   Future<void> _requestPayout() async {
-    final amount = double.tryParse(_amountController.text) ?? 0.0;
-    
-    if (amount < 50) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("الحد الأدنى للسحب 50 ر.س")));
+    // 1. التحقق المحلي (Client-Side Check)
+    bool hasPendingRequest = _transactions.any(
+      (t) => t.type == 'withdrawal' && t.status == 'pending',
+    );
+
+    if (hasPendingRequest) {
+      _showErrorSnackBar(
+        "لديك طلب سحب قيد المعالجة بالفعل. يرجى الانتظار.",
+        isWarning: true,
+      );
       return;
     }
+
+    final amount = double.tryParse(_amountController.text) ?? 0.0;
+
+    if (amount < 50) {
+      _showErrorSnackBar("الحد الأدنى للسحب 50 ر.س");
+      return;
+    }
+
     if (amount > (_wallet?.balance ?? 0)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("الرصيد غير كافٍ")));
+      _showErrorSnackBar("الرصيد غير كافٍ");
       return;
     }
 
     setState(() => _isSubmitting = true);
+
     try {
       await _service.requestPayout(amount);
       _amountController.clear();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("تم طلب السحب بنجاح ✅"), backgroundColor: Colors.green));
-      _fetchData(); // تحديث الرصيد
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("تم طلب السحب بنجاح ✅"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+      _fetchData();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("فشل الطلب: $e"), backgroundColor: Colors.red));
+      // 🔥🔥 هنا المعالجة الصحيحة للخطأ 🔥🔥
+      String errorMessage = "حدث خطأ غير متوقع، يرجى المحاولة لاحقاً";
+
+      if (e is DioException) {
+        // استخراج الرسالة القادمة من الباك إند
+        if (e.response?.data != null && e.response?.data is Map) {
+          errorMessage =
+              e.response?.data['message'] ??
+              e.response?.data['error'] ??
+              errorMessage;
+        } else if (e.type == DioExceptionType.connectionTimeout) {
+          errorMessage = "يرجى التحقق من اتصالك بالإنترنت";
+        }
+      } else {
+        // إزالة كلمة "Exception:" إذا كانت موجودة في الرسالة العادية
+        errorMessage = e.toString().replaceAll("Exception: ", "");
+      }
+
+      if (mounted) {
+        _showErrorSnackBar(errorMessage);
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  // دالة مساعدة لعرض التنبيهات بشكل موحد
+  void _showErrorSnackBar(String message, {bool isWarning = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              isWarning ? Icons.warning_amber_rounded : Icons.error_outline,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: isWarning ? Colors.orange : Colors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
   }
 
   @override
@@ -90,13 +155,25 @@ class _ModelWalletScreenState extends State<ModelWalletScreen> {
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [Colors.pink.shade50.withOpacity(0.3), Colors.purple.shade50.withOpacity(0.3)],
-                begin: Alignment.topLeft, end: Alignment.bottomRight,
+                colors: [
+                  Colors.pink.shade50.withOpacity(0.3),
+                  Colors.purple.shade50.withOpacity(0.3),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
             ),
           ),
-          Positioned(top: -50, right: -50, child: _buildBlurBlob(Colors.pink.shade200)),
-          Positioned(bottom: -50, left: -50, child: _buildBlurBlob(Colors.purple.shade200)),
+          Positioned(
+            top: -50,
+            right: -50,
+            child: _buildBlurBlob(Colors.pink.shade200),
+          ),
+          Positioned(
+            bottom: -50,
+            left: -50,
+            child: _buildBlurBlob(Colors.purple.shade200),
+          ),
 
           SafeArea(
             child: SingleChildScrollView(
@@ -117,15 +194,30 @@ class _ModelWalletScreenState extends State<ModelWalletScreen> {
                     childAspectRatio: 1.5,
                     children: [
                       _buildStatCard(
-                        "الرصيد المتاح", 
-                        _showBalance ? "${_wallet?.balance} ر.س" : "••••", 
-                        Icons.account_balance_wallet, 
+                        "الرصيد المتاح",
+                        _showBalance ? "${_wallet?.balance} ر.س" : "••••",
+                        Icons.account_balance_wallet,
                         Colors.green,
-                        showToggle: true
+                        showToggle: true,
                       ),
-                      _buildStatCard("قيد المعالجة", "${_wallet?.pendingClearance} ر.س", Icons.hourglass_empty, Colors.amber),
-                      _buildStatCard("إجمالي الأرباح", "${_wallet?.totalEarnings} ر.س", Icons.trending_up, Colors.blue),
-                      _buildStatCard("سحوبات الشهر", "0.00 ر.س", Icons.history, Colors.purple),
+                      _buildStatCard(
+                        "قيد المعالجة",
+                        "${_wallet?.pendingClearance} ر.س",
+                        Icons.hourglass_empty,
+                        Colors.amber,
+                      ),
+                      _buildStatCard(
+                        "إجمالي الأرباح",
+                        "${_wallet?.totalEarnings} ر.س",
+                        Icons.trending_up,
+                        Colors.blue,
+                      ),
+                      _buildStatCard(
+                        "سحوبات الشهر",
+                        "0.00 ر.س",
+                        Icons.history,
+                        Colors.purple,
+                      ),
                     ],
                   ),
 
@@ -142,7 +234,19 @@ class _ModelWalletScreenState extends State<ModelWalletScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(children: [Icon(Icons.send, color: _purpleColor), const SizedBox(width: 8), const Text("طلب سحب أرباح", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))]),
+                        Row(
+                          children: [
+                            Icon(Icons.send, color: _purpleColor),
+                            const SizedBox(width: 8),
+                            const Text(
+                              "طلب سحب أرباح",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 16),
                         TextField(
                           controller: _amountController,
@@ -152,21 +256,40 @@ class _ModelWalletScreenState extends State<ModelWalletScreen> {
                             hintText: "أدخلي المبلغ المطلوب",
                             filled: true,
                             fillColor: Colors.grey[50],
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                            suffixIcon: const Padding(padding: EdgeInsets.all(12), child: Text("ر.س", style: TextStyle(fontWeight: FontWeight.bold))),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            suffixIcon: const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: Text(
+                                "ر.س",
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 10),
                         Row(
-                          children: [100, 250, 500, 1000].map((amt) => Padding(
-                            padding: const EdgeInsets.only(left: 8),
-                            child: ActionChip(
-                              label: Text("$amt"),
-                              backgroundColor: Colors.white,
-                              side: BorderSide(color: Colors.grey.shade300),
-                              onPressed: () => _amountController.text = amt.toString(),
-                            ),
-                          )).toList(),
+                          children:
+                              [100, 250, 500, 1000]
+                                  .map(
+                                    (amt) => Padding(
+                                      padding: const EdgeInsets.only(left: 8),
+                                      child: ActionChip(
+                                        label: Text("$amt"),
+                                        backgroundColor: Colors.white,
+                                        side: BorderSide(
+                                          color: Colors.grey.shade300,
+                                        ),
+                                        onPressed:
+                                            () =>
+                                                _amountController.text =
+                                                    amt.toString(),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
                         ),
                         const SizedBox(height: 20),
                         SizedBox(
@@ -176,14 +299,33 @@ class _ModelWalletScreenState extends State<ModelWalletScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: _roseColor,
                               padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
-                            icon: _isSubmitting 
-                                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                : const Icon(Icons.check_circle, color: Colors.white),
-                            label: const Text("تأكيد الطلب", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            icon:
+                                _isSubmitting
+                                    ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                    : const Icon(
+                                      Icons.check_circle,
+                                      color: Colors.white,
+                                    ),
+                            label: const Text(
+                              "تأكيد الطلب",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
-                        )
+                        ),
                       ],
                     ),
                   ),
@@ -202,20 +344,45 @@ class _ModelWalletScreenState extends State<ModelWalletScreen> {
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(colors: [_roseColor, _purpleColor]),
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                            gradient: LinearGradient(
+                              colors: [_roseColor, _purpleColor],
+                            ),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(20),
+                            ),
                           ),
-                          child: const Row(children: [Icon(Icons.history, color: Colors.white), SizedBox(width: 8), Text("سجل المعاملات", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))]),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.history, color: Colors.white),
+                              SizedBox(width: 8),
+                              Text(
+                                "سجل المعاملات",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         if (_transactions.isEmpty)
-                          const Padding(padding: EdgeInsets.all(30), child: Text("لا توجد معاملات سابقة", style: TextStyle(color: Colors.grey)))
+                          const Padding(
+                            padding: EdgeInsets.all(30),
+                            child: Text(
+                              "لا توجد معاملات سابقة",
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          )
                         else
                           ListView.separated(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             itemCount: _transactions.length,
-                            separatorBuilder: (_, __) => const Divider(height: 1),
-                            itemBuilder: (ctx, idx) => _buildTransactionItem(_transactions[idx]),
+                            separatorBuilder:
+                                (_, __) => const Divider(height: 1),
+                            itemBuilder:
+                                (ctx, idx) =>
+                                    _buildTransactionItem(_transactions[idx]),
                           ),
                       ],
                     ),
@@ -237,18 +404,45 @@ class _ModelWalletScreenState extends State<ModelWalletScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)), child: Icon(Icons.account_balance_wallet, color: _roseColor, size: 28)),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.account_balance_wallet,
+                color: _roseColor,
+                size: 28,
+              ),
+            ),
             const SizedBox(width: 12),
-            const Text("المحفظة", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87)),
+            const Text(
+              "المحفظة",
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 8),
-        const Text("إدارة أرباحك وسحوباتك المالية", style: TextStyle(color: Colors.grey)),
+        const Text(
+          "إدارة أرباحك وسحوباتك المالية",
+          style: TextStyle(color: Colors.grey),
+        ),
       ],
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color, {bool showToggle = false}) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color, {
+    bool showToggle = false,
+  }) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -264,17 +458,31 @@ class _ModelWalletScreenState extends State<ModelWalletScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(title, style: TextStyle(fontSize: 11, color: Colors.grey[600], fontWeight: FontWeight.bold)),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               if (showToggle)
                 InkWell(
                   onTap: () => setState(() => _showBalance = !_showBalance),
-                  child: Icon(_showBalance ? Icons.visibility : Icons.visibility_off, size: 16, color: Colors.grey),
+                  child: Icon(
+                    _showBalance ? Icons.visibility : Icons.visibility_off,
+                    size: 16,
+                    color: Colors.grey,
+                  ),
                 )
               else
                 Icon(icon, size: 16, color: color),
             ],
           ),
-          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
         ],
       ),
     );
@@ -283,24 +491,46 @@ class _ModelWalletScreenState extends State<ModelWalletScreen> {
   Widget _buildTransactionItem(Transaction t) {
     Color color = t.type == 'earning' ? Colors.green : Colors.red;
     String sign = t.type == 'earning' ? '+' : '-';
-    
+
     return ListTile(
       leading: Container(
         padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-        child: Icon(t.type == 'earning' ? Icons.arrow_downward : Icons.arrow_upward, color: color, size: 18),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          t.type == 'earning' ? Icons.arrow_downward : Icons.arrow_upward,
+          color: color,
+          size: 18,
+        ),
       ),
-      title: Text(t.description, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-      subtitle: Text(DateFormat('yyyy-MM-dd').format(DateTime.parse(t.date)), style: const TextStyle(fontSize: 11)),
+      title: Text(
+        t.description,
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+      ),
+      subtitle: Text(
+        DateFormat('yyyy-MM-dd').format(DateTime.parse(t.date)),
+        style: const TextStyle(fontSize: 11),
+      ),
       trailing: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Text("$sign${t.amount} ر.س", style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+          Text(
+            "$sign${t.amount} ر.س",
+            style: TextStyle(color: color, fontWeight: FontWeight.bold),
+          ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(4)),
-            child: Text(t.status, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              t.status,
+              style: const TextStyle(fontSize: 10, color: Colors.grey),
+            ),
           ),
         ],
       ),
@@ -309,9 +539,16 @@ class _ModelWalletScreenState extends State<ModelWalletScreen> {
 
   Widget _buildBlurBlob(Color color) {
     return Container(
-      width: 200, height: 200,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: color.withOpacity(0.2)),
-      child: BackdropFilter(filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30), child: Container(color: Colors.transparent)),
+      width: 200,
+      height: 200,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color.withOpacity(0.2),
+      ),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+        child: Container(color: Colors.transparent),
+      ),
     );
   }
 }

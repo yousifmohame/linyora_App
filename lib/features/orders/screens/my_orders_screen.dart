@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart'; // تأكد من إضافة intl في pubspec.yaml
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../models/order_model.dart';
 import '../services/order_service.dart';
@@ -19,49 +19,88 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
 
   List<OrderModel> _allOrders = [];
   bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
+    // 5 تبويبات لتغطية كافة الحالات
     _tabController = TabController(length: 5, vsync: this);
     _fetchOrders();
   }
 
   Future<void> _fetchOrders() async {
-    // محاكاة تأخير بسيط لإظهار جمالية التحميل (اختياري)
-    // await Future.delayed(const Duration(seconds: 1));
-    final orders = await _orderService.getMyOrders();
-    if (mounted) {
-      setState(() {
-        _allOrders = orders;
-        _isLoading = false;
-      });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final orders = await _orderService.getMyOrders();
+      // ترتيب الطلبات من الأحدث للأقدم
+      orders.sort((a, b) => b.date.compareTo(a.date));
+
+      if (mounted) {
+        setState(() {
+          _allOrders = orders;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = "حدث خطأ أثناء جلب الطلبات، يرجى المحاولة مرة أخرى.";
+        });
+      }
     }
   }
 
-  List<OrderModel> _getOrdersByStatus(String statusFilter) {
-    if (statusFilter == 'all') return _allOrders;
-    return _allOrders
-        .where((o) => o.status.toLowerCase() == statusFilter)
-        .toList();
+  // دالة ذكية لفلترة الطلبات حسب التبويب
+  List<OrderModel> _getOrdersByStatus(String filterType) {
+    if (filterType == 'all') return _allOrders;
+
+    return _allOrders.where((order) {
+      final status = order.status.toLowerCase();
+      switch (filterType) {
+        case 'active': // قيد التنفيذ
+          return [
+            'pending',
+            'processing',
+            'confirmed',
+            'packing',
+          ].contains(status);
+        case 'shipped': // تم الشحن
+          return ['shipped', 'out_for_delivery', 'on_way'].contains(status);
+        case 'completed': // مكتمل
+          return ['delivered', 'completed'].contains(status);
+        case 'cancelled': // ملغي/مرتجع
+          return [
+            'cancelled',
+            'returned',
+            'refunded',
+            'rejected',
+          ].contains(status);
+        default:
+          return false;
+      }
+    }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA), // خلفية رمادية فاتحة جداً عصرية
+      backgroundColor: const Color(
+        0xFFF5F6FA,
+      ), // خلفية رمادية فاتحة جداً مريحة للعين
       appBar: AppBar(
         title: const Text(
           "طلباتي",
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.w800, // خط سميك وعصري
-            fontSize: 22,
-          ),
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
         ),
-        centerTitle: false, // العنوان لليمين (أو اليسار حسب اللغة) أكثر حداثة
         backgroundColor: Colors.white,
-        elevation: 0.5, // ظل خفيف جداً
+        elevation: 0.5,
+        centerTitle: true,
         leading: const BackButton(color: Colors.black),
         bottom: TabBar(
           controller: _tabController,
@@ -70,18 +109,16 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
           unselectedLabelColor: Colors.grey[600],
           indicatorColor: const Color(0xFFF105C6),
           indicatorWeight: 3,
-          indicatorSize: TabBarIndicatorSize.label, // المؤشر بحجم النص فقط
           labelStyle: const TextStyle(
             fontWeight: FontWeight.bold,
-            fontSize: 15,
-          ),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal),
+            fontFamily: 'Cairo',
+          ), // استخدم خط التطبيق
           tabs: const [
             Tab(text: "الكل"),
             Tab(text: "قيد التجهيز"),
-            Tab(text: "تم الشحن"),
-            Tab(text: "تم التوصيل"),
-            Tab(text: "ملغي"),
+            Tab(text: "في الطريق"),
+            Tab(text: "مكتملة"),
+            Tab(text: "ملغية/مسترجعة"),
           ],
         ),
       ),
@@ -90,226 +127,289 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
               ? const Center(
                 child: CircularProgressIndicator(color: Color(0xFFF105C6)),
               )
+              : _errorMessage != null
+              ? _buildErrorState()
               : TabBarView(
                 controller: _tabController,
                 children: [
-                  _OrdersListView(orders: _getOrdersByStatus('all')),
-                  _OrdersListView(orders: _getOrdersByStatus('processing')),
-                  _OrdersListView(orders: _getOrdersByStatus('shipped')),
-                  _OrdersListView(orders: _getOrdersByStatus('delivered')),
-                  _OrdersListView(orders: _getOrdersByStatus('cancelled')),
+                  _OrdersList(
+                    orders: _getOrdersByStatus('all'),
+                    onRefresh: _fetchOrders,
+                  ),
+                  _OrdersList(
+                    orders: _getOrdersByStatus('active'),
+                    onRefresh: _fetchOrders,
+                  ),
+                  _OrdersList(
+                    orders: _getOrdersByStatus('shipped'),
+                    onRefresh: _fetchOrders,
+                  ),
+                  _OrdersList(
+                    orders: _getOrdersByStatus('completed'),
+                    onRefresh: _fetchOrders,
+                  ),
+                  _OrdersList(
+                    orders: _getOrdersByStatus('cancelled'),
+                    onRefresh: _fetchOrders,
+                  ),
                 ],
               ),
     );
   }
-}
 
-class _OrdersListView extends StatelessWidget {
-  final List<OrderModel> orders;
-
-  const _OrdersListView({required this.orders});
-
-  @override
-  Widget build(BuildContext context) {
-    if (orders.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(25),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.inbox_outlined,
-                size: 60,
-                color: Colors.grey[400],
-              ),
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.wifi_off, size: 80, color: Colors.grey[400]),
+          const SizedBox(height: 16),
+          Text(_errorMessage!, style: const TextStyle(color: Colors.grey)),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _fetchOrders,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF105C6),
             ),
-            const SizedBox(height: 20),
-            Text(
-              "لا توجد طلبات هنا",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
-              ),
+            child: const Text(
+              "تحديث الصفحة",
+              style: TextStyle(color: Colors.white),
             ),
-            const SizedBox(height: 8),
-            Text(
-              "تصفح المنتجات وابدأ التسوق الآن",
-              style: TextStyle(color: Colors.grey[500]),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-      itemCount: orders.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 16),
-      itemBuilder: (context, index) {
-        return _OrderCardPro(order: orders[index]);
-      },
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _OrderCardPro extends StatelessWidget {
-  final OrderModel order;
-  const _OrderCardPro({required this.order});
+class _OrdersList extends StatelessWidget {
+  final List<OrderModel> orders;
+  final Future<void> Function() onRefresh;
+
+  const _OrdersList({required this.orders, required this.onRefresh});
 
   @override
   Widget build(BuildContext context) {
-    // إعداد متغيرات الحالة (أيقونة + لون + نص)
-    Color statusColor;
-    String statusText;
-    IconData statusIcon;
-    Color bgColor;
+    if (orders.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: onRefresh,
+        color: const Color(0xFFF105C6),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.7,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.shopping_bag_outlined,
+                      size: 60,
+                      color: Colors.grey[400],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    "لا توجد طلبات في هذه القائمة",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
-    switch (order.status.toLowerCase()) {
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      color: const Color(0xFFF105C6),
+      child: ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: orders.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 16),
+        itemBuilder: (context, index) {
+          return _BigStoreOrderCard(order: orders[index]);
+        },
+      ),
+    );
+  }
+}
+
+class _BigStoreOrderCard extends StatelessWidget {
+  final OrderModel order;
+
+  const _BigStoreOrderCard({required this.order});
+
+  // تحديد ستايل الحالة بناءً على النص
+  Map<String, dynamic> _getStatusStyle(String status) {
+    switch (status.toLowerCase()) {
       case 'delivered':
-        statusColor = const Color(0xFF27AE60); // أخضر احترافي
-        statusText = "تم التوصيل";
-        statusIcon = Icons.check_circle_outline;
-        bgColor = const Color(0xFFEAFAF1);
-        break;
-      case 'cancelled':
-        statusColor = const Color(0xFFEB5757); // أحمر ناعم
-        statusText = "ملغي";
-        statusIcon = Icons.cancel_outlined;
-        bgColor = const Color(0xFFFDECEC);
-        break;
+      case 'completed':
+        return {
+          'color': const Color(0xFF27AE60),
+          'bg': const Color(0xFFE8F8F5),
+          'text': 'تم التوصيل',
+          'icon': Icons.check_circle,
+        };
       case 'shipped':
-        statusColor = const Color(0xFF2D9CDB); // أزرق
-        statusText = "في الطريق";
-        statusIcon = Icons.local_shipping_outlined;
-        bgColor = const Color(0xFFEBF5FB);
-        break;
+      case 'on_way':
+        return {
+          'color': const Color(0xFF2980B9),
+          'bg': const Color(0xFFEBF5FB),
+          'text': 'في الطريق إليك',
+          'icon': Icons.local_shipping,
+        };
+      case 'cancelled':
+      case 'rejected':
+        return {
+          'color': const Color(0xFFC0392B),
+          'bg': const Color(0xFFFADBD8),
+          'text': 'ملغي',
+          'icon': Icons.cancel,
+        };
+      case 'processing':
+      case 'pending':
       default:
-        statusColor = const Color(0xFFF2994A); // برتقالي
-        statusText = "قيد التجهيز";
-        statusIcon = Icons.inventory_2_outlined;
-        bgColor = const Color(0xFFFEF5E7);
+        return {
+          'color': const Color(0xFFF39C12),
+          'bg': const Color(0xFFFEF9E7),
+          'text': 'قيد التجهيز',
+          'icon': Icons.inventory_2,
+        };
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final statusStyle = _getStatusStyle(order.status);
+
+    // ✅ إصلاح مشكلة التاريخ هنا
+    String dateFormatted;
+    try {
+      // محاولة تحويل النص إلى تاريخ وتنسيقه
+      final DateTime parsedDate = DateTime.parse(order.date);
+      dateFormatted = DateFormat('dd MMM yyyy - hh:mm a').format(parsedDate);
+    } catch (e) {
+      // في حال الفشل (التنسيق غير صحيح)، نعرض النص كما جاء من السيرفر
+      dateFormatted = order.date;
     }
 
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Column(
         children: [
-          // 1. رأس الكارت (Header)
+          // 1. رأس الكارت
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            padding: const EdgeInsets.all(12),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // أيقونة الحالة مع الخلفية
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: bgColor,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(statusIcon, color: statusColor, size: 20),
-                ),
-                const SizedBox(width: 12),
-
-                // رقم الطلب والتاريخ
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        statusText,
-                        style: TextStyle(
-                          color: statusColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "طلب #${order.orderNumber}",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        // استخدام DateFormat لتنسيق التاريخ بشكل جميل
-                        // تأكد من استيراد intl وإذا التاريخ String حوله لـ DateTime
-                        order.date.length >= 10
-                            ? order.date.substring(0, 10)
-                            : order.date,
-                        style: TextStyle(color: Colors.grey[500], fontSize: 12),
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      dateFormatted, // ✅ استخدام المتغير الآمن
+                      style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                    ),
+                  ],
                 ),
-
-                // رقم الطلب
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
-                    vertical: 4,
+                    vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
+                    color: statusStyle['bg'],
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.grey[300]!),
                   ),
-                  child: Text(
-                    "#${order.orderNumber}",
-                    style: TextStyle(
-                      color: Colors.grey[800],
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                    ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        statusStyle['icon'],
+                        size: 14,
+                        color: statusStyle['color'],
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        statusStyle['text'],
+                        style: TextStyle(
+                          color: statusStyle['color'],
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
 
-          const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F0)),
+          const Divider(height: 1, color: Color(0xFFEEEEEE)),
 
-          // 2. محتوى المنتجات (Products Carousel)
+          // 2. صور المنتجات
           InkWell(
-            onTap: () => _navigateToDetails(context),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
+            onTap:
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (_) => OrderDetailsScreen(
+                          orderId: order.id,
+                          initialOrder: order,
+                        ),
+                  ),
+                ),
+            child: Container(
+              height: 100,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               child: Row(
                 children: [
-                  // صور المنتجات (عرض أفقي)
                   Expanded(
-                    child: SizedBox(
-                      height: 60,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount:
-                            order.items.length > 4 ? 4 : order.items.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (context, index) {
-                          // إذا كان هناك أكثر من 4 منتجات، اعرض "+X" في العنصر الأخير
-                          if (index == 3 && order.items.length > 4) {
-                            return _MoreItemsBadge(
-                              count: order.items.length - 3,
-                            );
-                          }
-                          return _ProductThumbnail(
-                            imageUrl: order.items[index].productImage,
-                          );
-                        },
-                      ),
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount:
+                          order.items.length > 4 ? 4 : order.items.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 10),
+                      itemBuilder: (context, index) {
+                        if (index == 3 && order.items.length > 4) {
+                          return _MoreItemsBadge(count: order.items.length - 3);
+                        }
+                        return _ProductImage(
+                          imageUrl: order.items[index].productImage,
+                        );
+                      },
                     ),
                   ),
-
-                  // السهم للدلالة على القابلية للضغط
                   const Icon(
                     Icons.arrow_forward_ios,
                     size: 16,
@@ -320,53 +420,72 @@ class _OrderCardPro extends StatelessWidget {
             ),
           ),
 
-          const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F0)),
+          const Divider(height: 1, color: Color(0xFFEEEEEE)),
 
-          // 3. التذييل (Footer) - السعر والإجراء
+          // 3. الجزء السفلي
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      "الإجمالي",
-                      style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                    const Text(
+                      "المجموع الكلي",
+                      style: TextStyle(fontSize: 11, color: Colors.grey),
                     ),
-                    const SizedBox(height: 2),
                     Text(
                       "${order.totalPrice} ر.س",
                       style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900, // خط عريض جداً للأرقام
-                        color: Colors.black,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
                       ),
                     ),
                   ],
                 ),
+                const Spacer(),
 
-                // زر "التفاصيل"
+                // زر تتبع الشحنة
+                if ([
+                  'shipped',
+                  'out_for_delivery',
+                ].contains(order.status.toLowerCase()))
+                  OutlinedButton(
+                    onPressed: () {},
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.black,
+                      side: const BorderSide(color: Colors.grey),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text("تتبع الشحنة"),
+                  ),
+
+                const SizedBox(width: 8),
+
                 ElevatedButton(
-                  onPressed: () => _navigateToDetails(context),
+                  onPressed:
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (_) => OrderDetailsScreen(
+                                orderId: order.id,
+                                initialOrder: order,
+                              ),
+                        ),
+                      ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        Colors.black, // أسود للفخامة (أو لون البراند)
+                    backgroundColor: Colors.black,
                     foregroundColor: Colors.white,
                     elevation: 0,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 12,
-                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                   ),
-                  child: const Text(
-                    "التفاصيل",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                  child: const Text("التفاصيل"),
                 ),
               ],
             ),
@@ -375,51 +494,38 @@ class _OrderCardPro extends StatelessWidget {
       ),
     );
   }
-
-  void _navigateToDetails(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (_) => OrderDetailsScreen(orderId: order.id, initialOrder: order),
-      ),
-    );
-  }
 }
 
-// ويدجت لعرض صورة المنتج بشكل أنيق
-class _ProductThumbnail extends StatelessWidget {
+// ويدجت لعرض صورة المنتج
+class _ProductImage extends StatelessWidget {
   final String imageUrl;
-  const _ProductThumbnail({required this.imageUrl});
+  const _ProductImage({required this.imageUrl});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 60,
-      height: 60,
+      width: 70,
       decoration: BoxDecoration(
         border: Border.all(color: Colors.grey[200]!),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         color: Colors.white,
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         child: CachedNetworkImage(
           imageUrl: imageUrl,
           fit: BoxFit.cover,
-          placeholder:
-              (context, url) => Container(
-                color: Colors.grey[100],
-                child: const Icon(Icons.image, size: 20, color: Colors.grey),
-              ),
-          errorWidget: (context, url, error) => const Icon(Icons.error),
+          placeholder: (context, url) => Container(color: Colors.grey[50]),
+          errorWidget:
+              (context, url, error) =>
+                  const Icon(Icons.image_not_supported, color: Colors.grey),
         ),
       ),
     );
   }
 }
 
-// ويدجت لعرض "+3" مثلاً إذا كانت المنتجات كثيرة
+// ويدجت للمنتجات الزائدة (+2)
 class _MoreItemsBadge extends StatelessWidget {
   final int count;
   const _MoreItemsBadge({required this.count});
@@ -427,12 +533,11 @@ class _MoreItemsBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 60,
-      height: 60,
+      width: 70,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.grey[300]!),
       ),
       child: Text(

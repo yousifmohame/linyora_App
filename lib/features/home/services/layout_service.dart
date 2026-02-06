@@ -9,53 +9,45 @@ enum HomeItemType {
   flashSale,
   categories,
   newArrivals,
-  dynamicSection, // للأقسام القادمة من الداتابيز
+  dynamicSection,
   bestSellers,
   topRated,
   topModels,
   topMerchants,
   divider,
+  linyoraPicks, // ✅
+  seasonStyle, // ✅
 }
 
-// كلاس يمثل العنصر الواحد في القائمة
 class HomeLayoutItem {
   final String id;
   final HomeItemType type;
-  final dynamic data; // لحفظ بيانات القسم (SectionModel) إذا كان ديناميكياً
+  final dynamic data;
 
-  HomeLayoutItem({
-    required this.id,
-    required this.type,
-    this.data,
-  });
+  HomeLayoutItem({required this.id, required this.type, this.data});
 }
 
 class LayoutService {
   final ApiClient _apiClient = ApiClient();
 
-  /// ✅ جلب الترتيب المحفوظ من السيرفر وربطه بالبيانات الحالية
-  /// [availableSections]: قائمة الأقسام الحالية القادمة من SectionService
-  Future<List<HomeLayoutItem>> getHomeLayout(List<SectionModel> availableSections) async {
+  Future<List<HomeLayoutItem>> getHomeLayout(
+    List<SectionModel> availableSections,
+  ) async {
     try {
-      // 1. طلب الترتيب من الباك إند
       final response = await _apiClient.get('/layout/home');
-      
-      // إذا لم يكن هناك ترتيب محفوظ (null أو قائمة فارغة)، نرجع الترتيب الافتراضي
-      if (response.data == null || (response.data is List && (response.data as List).isEmpty)) {
+
+      if (response.data == null ||
+          (response.data is List && (response.data as List).isEmpty)) {
         return _getDefaultLayout(availableSections);
       }
 
-      // 2. تحويل البيانات القادمة (List<String>) إلى List<HomeLayoutItem>
       List<dynamic> savedIds = response.data;
       List<HomeLayoutItem> layout = [];
-
-      // قائمة مساعدة لتتبع الأقسام التي تمت إضافتها (لضمان عدم ضياع أقسام جديدة)
       Set<int> processedSectionIds = {};
 
       for (var id in savedIds) {
         String itemId = id.toString();
 
-        // -- مطابقة المعرفات الثابتة --
         if (itemId == 'marquee') {
           layout.add(HomeLayoutItem(id: 'marquee', type: HomeItemType.marquee));
         } else if (itemId == 'stories') {
@@ -63,70 +55,99 @@ class LayoutService {
         } else if (itemId == 'banners') {
           layout.add(HomeLayoutItem(id: 'banners', type: HomeItemType.banners));
         } else if (itemId == 'flash_sale') {
-          layout.add(HomeLayoutItem(id: 'flash_sale', type: HomeItemType.flashSale));
+          layout.add(
+            HomeLayoutItem(id: 'flash_sale', type: HomeItemType.flashSale),
+          );
         } else if (itemId == 'categories') {
-          layout.add(HomeLayoutItem(id: 'categories', type: HomeItemType.categories));
+          layout.add(
+            HomeLayoutItem(id: 'categories', type: HomeItemType.categories),
+          );
         } else if (itemId == 'new_arrivals') {
-          layout.add(HomeLayoutItem(id: 'new_arrivals', type: HomeItemType.newArrivals));
+          layout.add(
+            HomeLayoutItem(id: 'new_arrivals', type: HomeItemType.newArrivals),
+          );
+
+          // ✅ 1. إضافة التحقق من مختارات لينيورا
+        } else if (itemId == 'linyora_picks') {
+          layout.add(
+            HomeLayoutItem(
+              id: 'linyora_picks',
+              type: HomeItemType.linyoraPicks,
+            ),
+          );
+
+          // ✅ 2. إضافة التحقق من ستايل الموسم
+        } else if (itemId == 'season_style') {
+          layout.add(
+            HomeLayoutItem(id: 'season_style', type: HomeItemType.seasonStyle),
+          );
         } else if (itemId == 'best_sellers') {
-          layout.add(HomeLayoutItem(id: 'best_sellers', type: HomeItemType.bestSellers));
+          layout.add(
+            HomeLayoutItem(id: 'best_sellers', type: HomeItemType.bestSellers),
+          );
         } else if (itemId == 'top_rated') {
-          layout.add(HomeLayoutItem(id: 'top_rated', type: HomeItemType.topRated));
+          layout.add(
+            HomeLayoutItem(id: 'top_rated', type: HomeItemType.topRated),
+          );
         } else if (itemId == 'top_models') {
-          layout.add(HomeLayoutItem(id: 'top_models', type: HomeItemType.topModels));
+          layout.add(
+            HomeLayoutItem(id: 'top_models', type: HomeItemType.topModels),
+          );
         } else if (itemId == 'top_merchants') {
-          layout.add(HomeLayoutItem(id: 'top_merchants', type: HomeItemType.topMerchants));
-        
-        // -- مطابقة الأقسام الديناميكية (section_ID) --
+          layout.add(
+            HomeLayoutItem(
+              id: 'top_merchants',
+              type: HomeItemType.topMerchants,
+            ),
+          );
+
+          // الأقسام الديناميكية
         } else if (itemId.startsWith('section_')) {
-          // استخراج رقم القسم من النص "section_5" -> 5
           int? sectionId = int.tryParse(itemId.split('_')[1]);
           if (sectionId != null) {
-            // البحث عن القسم في القائمة المتوفرة حالياً
             try {
-              final section = availableSections.firstWhere((s) => s.id == sectionId);
-              layout.add(HomeLayoutItem(
-                id: itemId,
-                type: HomeItemType.dynamicSection,
-                data: section,
-              ));
+              final section = availableSections.firstWhere(
+                (s) => s.id == sectionId,
+              );
+              layout.add(
+                HomeLayoutItem(
+                  id: itemId,
+                  type: HomeItemType.dynamicSection,
+                  data: section,
+                ),
+              );
               processedSectionIds.add(sectionId);
             } catch (e) {
-              // القسم غير موجود (ربما تم حذفه)، نتجاهله
+              // القسم محذوف
             }
           }
         }
       }
 
-      // 3. (اختياري) إضافة أي أقسام جديدة ظهرت ولم تكن في الترتيب المحفوظ (تضاف في النهاية)
+      // إضافة الأقسام الجديدة التي لم تكن في الترتيب
       for (var section in availableSections) {
         if (!processedSectionIds.contains(section.id)) {
-          layout.add(HomeLayoutItem(
-            id: 'section_${section.id}',
-            type: HomeItemType.dynamicSection,
-            data: section,
-          ));
+          layout.add(
+            HomeLayoutItem(
+              id: 'section_${section.id}',
+              type: HomeItemType.dynamicSection,
+              data: section,
+            ),
+          );
         }
       }
 
       return layout;
-
     } catch (e) {
-      // في حالة الخطأ (مثلاً لا يوجد انترنت)، نعيد الترتيب الافتراضي
       print("Layout Load Error: $e");
       return _getDefaultLayout(availableSections);
     }
   }
 
-  /// ✅ حفظ الترتيب الجديد في السيرفر (للأدمن)
   Future<void> saveLayoutOrder(List<HomeLayoutItem> items) async {
     try {
-      // تحويل القائمة المعقدة إلى قائمة نصوص (IDs) فقط لإرسالها
       List<String> idsToSend = items.map((e) => e.id).toList();
-
-      // إرسال المصفوفة مباشرة للباك إند
       await _apiClient.post('/layout/home', data: idsToSend);
-      
       print("✅ Layout saved successfully: $idsToSend");
     } catch (e) {
       print("❌ Failed to save layout: $e");
@@ -134,7 +155,6 @@ class LayoutService {
     }
   }
 
-  /// 🔹 الترتيب الافتراضي (إذا لم يتم الحفظ مسبقاً)
   List<HomeLayoutItem> _getDefaultLayout(List<SectionModel> sections) {
     List<HomeLayoutItem> layout = [
       HomeLayoutItem(id: 'marquee', type: HomeItemType.marquee),
@@ -142,16 +162,21 @@ class LayoutService {
       HomeLayoutItem(id: 'banners', type: HomeItemType.banners),
       HomeLayoutItem(id: 'flash_sale', type: HomeItemType.flashSale),
       HomeLayoutItem(id: 'categories', type: HomeItemType.categories),
+      // ✅ 3. إضافتهم في الترتيب الافتراضي
+      HomeLayoutItem(id: 'linyora_picks', type: HomeItemType.linyoraPicks),
       HomeLayoutItem(id: 'new_arrivals', type: HomeItemType.newArrivals),
+      // ✅
+      HomeLayoutItem(id: 'season_style', type: HomeItemType.seasonStyle),
     ];
 
-    // دمج الأقسام الديناميكية في الوسط
     for (var section in sections) {
-      layout.add(HomeLayoutItem(
-        id: 'section_${section.id}',
-        type: HomeItemType.dynamicSection,
-        data: section,
-      ));
+      layout.add(
+        HomeLayoutItem(
+          id: 'section_${section.id}',
+          type: HomeItemType.dynamicSection,
+          data: section,
+        ),
+      );
     }
 
     layout.addAll([

@@ -17,7 +17,7 @@ class SupplierWalletService {
 
   Future<List<WalletTransaction>> getTransactions() async {
     try {
-      final response = await _apiClient.get('/wallet/transactions');
+      final response = await _apiClient.get('/wallet/supplier/transactions');
       final List list = response.data;
       return list.map((e) => WalletTransaction.fromJson(e)).toList();
     } catch (e) {

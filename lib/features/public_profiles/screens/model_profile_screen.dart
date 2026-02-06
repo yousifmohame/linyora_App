@@ -8,6 +8,7 @@ import '../../../core/widgets/optimized_image.dart';
 import '../../../models/public_profile_models.dart';
 import '../../reels/screens/widgets/optimized_video_player.dart';
 import '../services/public_profile_service.dart';
+import 'package:share_plus/share_plus.dart';
 
 class ModelProfileScreen extends StatefulWidget {
   final String modelId;
@@ -301,15 +302,29 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
                           ),
                         ),
                         const SizedBox(width: 10),
-                        OutlinedButton(
-                          onPressed: () {},
-                          style: OutlinedButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                        Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[300]!),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Icon(Icons.share),
+                          child: IconButton(
+                            icon: const Icon(Icons.share_outlined),
+                            onPressed: () {
+                              // 1. تجهيز رابط البروفايل (يمكنك تغيير الدومين لاحقاً)
+                              final String profileUrl =
+                                  "https://linyora.com/profile/${profile.id}";
+
+                              // 2. تجهيز النص الجذاب للمشاركة
+                              final String shareText =
+                                  "🌟 اكتشف بروفايل ${profile.name} المميز على تطبيق لينيورا!\n\nتصفح الأعمال والخدمات الحصرية هنا: 👇\n$profileUrl";
+
+                              // 3. فتح نافذة المشاركة الأصلية في النظام
+                              Share.share(
+                                shareText,
+                                subject: "بروفايل ${profile.name} على لينيورا",
+                              );
+                            },
+                          ),
                         ),
                       ],
                     ),

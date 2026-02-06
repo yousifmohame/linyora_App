@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:linyora_project/models/product_details_model.dart';
 import '../../../models/cart_item_model.dart';
-import '../../../models/product_details_model.dart';
+import '../../../models/product_model.dart'; // ✅ 1. استيراد مودل المنتج العام
+// import '../../../models/product_details_model.dart'; // يمكن الاستغناء عنه أو إبقاؤه حسب الحاجة
 
 class CartProvider extends ChangeNotifier {
   final List<CartItemModel> _items = [];
@@ -17,24 +19,37 @@ class CartProvider extends ChangeNotifier {
     return _items.fold(0, (sum, item) => sum + item.quantity);
   }
 
-  // دالة الإضافة للسلة
-  void addToCart(ProductDetailsModel product, ProductVariant variant, int quantity) {
-    // نتحقق مما إذا كان المنتج بهذا المتغير (اللون/المقاس) موجوداً بالفعل
+  // ✅ دالة الإضافة للسلة (تم التعديل لتكون مرنة)
+  // 1. تقبل ProductModel بدلاً من ProductDetailsModel
+  // 2. تقبل variant كقيمة اختيارية (Nullable)
+  // 3. تم تعديل الترتيب ليناسب استدعاء ProductCard
+  void addToCart(ProductModel product, int quantity, ProductVariant? variant) {
+    // نتحقق مما إذا كان المنتج موجوداً مسبقاً (مع نفس المتغير إن وجد)
     final existingIndex = _items.indexWhere(
-      (item) => item.product.id == product.id && item.selectedVariant.id == variant.id
-    );
+      (item) =>
+          item.product.id == product.id &&
+          item.selectedVariant?.id == variant?.id,
+    ); // ✅ مقارنة آمنة للـ Null
 
     if (existingIndex >= 0) {
-      // إذا كان موجوداً، نزيد الكمية فقط
+      // إذا كان موجوداً، نزيد الكمية
       _items[existingIndex].quantity += quantity;
     } else {
+      // ✅ تكوين ID فريد (مع مراعاة أن variant قد يكون null)
+      final String uniqueId =
+          variant != null
+              ? '${product.id}_${variant.id}'
+              : '${product.id}_base';
+
       // إذا لم يكن موجوداً، نضيفه كعنصر جديد
-      _items.add(CartItemModel(
-        id: '${product.id}_${variant.id}', // تكوين ID فريد
-        product: product,
-        selectedVariant: variant,
-        quantity: quantity,
-      ));
+      _items.add(
+        CartItemModel(
+          id: uniqueId,
+          product: product, // يجب أن يقبل CartItemModel هذا النوع
+          selectedVariant: variant, // قد يكون null
+          quantity: quantity,
+        ),
+      );
     }
 
     notifyListeners(); // تحديث الواجهة
@@ -53,7 +68,6 @@ class CartProvider extends ChangeNotifier {
       if (newQuantity > 0) {
         _items[index].quantity = newQuantity;
       } else {
-        // إذا الكمية 0 نحذف العنصر
         _items.removeAt(index);
       }
       notifyListeners();

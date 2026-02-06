@@ -137,18 +137,19 @@ class _ReelsScreenState extends State<ReelsScreen>
   }
 
   void _playVideoAt(int index) {
-    // ✅ التصحيح 2: حماية من تشغيل الفيديو الخطأ (في حالة السكرول السريع)
     if (index != _focusedIndex) return;
-
     final controller = _videoControllers[index];
     if (controller != null && controller.isInitialized) {
       controller.play();
     }
   }
 
-  void _pauseAll() {
+  Future<void> _pauseAll() async {
     for (var c in _videoControllers.values) {
-      c.pause();
+      if (c.isPlaying) {
+        // نتأكد أنه يعمل أولاً
+        await c.pause(); // ننتظر حتى يتوقف فعلياً
+      }
     }
   }
 
@@ -167,6 +168,204 @@ class _ReelsScreenState extends State<ReelsScreen>
   void _disposeAll() {
     for (var c in _videoControllers.values) c.dispose();
     _videoControllers.clear();
+  }
+
+  // ✅✅✅ تم نقل دالة عرض المنتجات لداخل الكلاس لتتمكن من الوصول لـ _pauseAll
+  void _showProductsSheet(BuildContext context, List<ProductModel> products) {
+    // (اختياري) إيقاف الفيديو عند فتح القائمة لتركيز الانتباه
+    // _pauseAll();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder:
+          (ctx) => DraggableScrollableSheet(
+            initialChildSize: 0.5,
+            minChildSize: 0.3,
+            maxChildSize: 0.8,
+            builder:
+                (_, controller) => Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
+                  ),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.shopping_bag_outlined,
+                            color: Colors.black,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            "المنتجات في هذا الفيديو (${products.length})",
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Expanded(
+                        child: ListView.separated(
+                          controller: controller,
+                          itemCount: products.length,
+                          separatorBuilder:
+                              (_, __) => const Divider(height: 24),
+                          itemBuilder: (context, index) {
+                            final product = products[index];
+
+                            return InkWell(
+                              // عند الضغط على الكارت أو زر الشراء
+                              onTap: () async {
+                                // 1. اجعل الدالة async
+                                // ✅ 2. انتظر حتى يتوقف الصوت تماماً
+                                await _pauseAll();
+
+                                if (!context.mounted) return; // تحقق من السياق
+
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (_) => ProductDetailsScreen(
+                                          productId: product.id.toString(),
+                                        ),
+                                  ),
+                                ).then((_) {
+                                  // العودة للتشغيل
+                                  if (widget.isActive && _isAppActive) {
+                                    _playVideoAt(_focusedIndex);
+                                  }
+                                });
+                              },
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // الصورة
+                                  Container(
+                                    width: 80,
+                                    height: 80,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8),
+                                      color: Colors.grey[100],
+                                      border: Border.all(
+                                        color: Colors.grey.shade200,
+                                      ),
+                                      image:
+                                          product.imageUrl.isNotEmpty
+                                              ? DecorationImage(
+                                                image: NetworkImage(
+                                                  product.imageUrl,
+                                                ),
+                                                fit: BoxFit.cover,
+                                              )
+                                              : null,
+                                    ),
+                                    child:
+                                        product.imageUrl.isEmpty
+                                            ? const Icon(
+                                              Icons.image_not_supported,
+                                              color: Colors.grey,
+                                            )
+                                            : null,
+                                  ),
+                                  const SizedBox(width: 12),
+
+                                  // التفاصيل
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          product.name,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        // يمكنك إضافة السعر هنا
+                                      ],
+                                    ),
+                                  ),
+
+                                  // زر الشراء
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      // ✅ 1. إيقاف الفيديو قبل الانتقال
+                                      await _pauseAll();
+
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (_) => ProductDetailsScreen(
+                                                productId:
+                                                    product.id.toString(),
+                                              ),
+                                        ),
+                                      ).then((_) {
+                                        // ✅ 2. إعادة تشغيل الفيديو عند العودة
+                                        if (widget.isActive && _isAppActive) {
+                                          _playVideoAt(_focusedIndex);
+                                        }
+                                      });
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.black,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 8,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      minimumSize: const Size(60, 36),
+                                    ),
+                                    child: const Text(
+                                      "شراء",
+                                      style: TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+          ),
+    ).then((_) {
+      // ✅ تشغيل الفيديو عند إغلاق القائمة (إذا لم ينتقل لصفحة أخرى)
+      if (widget.isActive && _isAppActive) {
+        _playVideoAt(_focusedIndex);
+      }
+    });
   }
 
   @override
@@ -278,6 +477,9 @@ class _ReelsScreenState extends State<ReelsScreen>
                       onComment: () => _showComments(context, index),
                       onShare: () => _handleShare(index),
                       onFollow: () => _handleFollow(index),
+                      // ✅ تم تمرير الدالة الجديدة هنا
+                      onShowProducts:
+                          (products) => _showProductsSheet(context, products),
                       onProfileTap: () {
                         _pauseAll();
                         Navigator.push(
@@ -387,7 +589,7 @@ class _AppLifecycleObserver extends WidgetsBindingObserver {
 }
 
 // -----------------------------------------------------------------------------
-// --- Widgets المساعدة (لم تتغير) ---
+// --- Widgets المساعدة ---
 // -----------------------------------------------------------------------------
 
 class ReelSkeleton extends StatelessWidget {
@@ -483,6 +685,8 @@ class ReelContentOverlay extends StatelessWidget {
   final ReelModel reel;
   final bool isLoading;
   final VoidCallback onLike, onComment, onShare, onFollow, onProfileTap;
+  // ✅ إضافة دالة الـ Callback لعرض المنتجات
+  final Function(List<ProductModel>) onShowProducts;
 
   const ReelContentOverlay({
     Key? key,
@@ -493,11 +697,11 @@ class ReelContentOverlay extends StatelessWidget {
     required this.onShare,
     required this.onFollow,
     required this.onProfileTap,
+    required this.onShowProducts, // ✅
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    // ✅ نتحقق من قائمة المنتجات باستخدام الاسم الصحيح (products)
     final hasProducts = reel.products != null && reel.products!.isNotEmpty;
 
     return Row(
@@ -542,11 +746,11 @@ class ReelContentOverlay extends StatelessWidget {
                     ),
                   ),
 
-                // ✅ زر عرض المنتجات (يظهر فقط إذا كانت القائمة غير فارغة)
+                // ✅ زر عرض المنتجات
                 if (hasProducts) ...[
                   const SizedBox(height: 12),
                   GestureDetector(
-                    onTap: () => _showProductsSheet(context, reel.products!),
+                    onTap: () => onShowProducts(reel.products!), // ✅ استدعاء
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -629,7 +833,7 @@ class ReelContentOverlay extends StatelessWidget {
                 icon: Icons.shopping_bag,
                 label: 'تسوق',
                 iconColor: Colors.amber,
-                onTap: () => _showProductsSheet(context, reel.products!),
+                onTap: () => onShowProducts(reel.products!), // ✅ استدعاء
               ),
             ],
             const SizedBox(height: 120),
@@ -638,204 +842,6 @@ class ReelContentOverlay extends StatelessWidget {
       ],
     );
   }
-}
-
-// ✅ دالة عرض قائمة المنتجات (متوافقة مع ProductModel الخاص بك)
-void _showProductsSheet(BuildContext context, List<ProductModel> products) {
-  showModalBottomSheet(
-    context: context,
-    backgroundColor: Colors.transparent,
-    isScrollControlled: true,
-    builder:
-        (ctx) => DraggableScrollableSheet(
-          initialChildSize: 0.5,
-          minChildSize: 0.3,
-          maxChildSize: 0.8,
-          builder:
-              (_, controller) => Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.shopping_bag_outlined,
-                          color: Colors.black,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          "المنتجات في هذا الفيديو (${products.length})",
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: ListView.separated(
-                        controller: controller,
-                        itemCount: products.length,
-                        separatorBuilder: (_, __) => const Divider(height: 24),
-                        itemBuilder: (context, index) {
-                          final product = products[index];
-
-                          // 1. حساب الخصم (نفس المنطق في ProductDetailsScreen)
-                          bool hasDiscount = false;
-                          if (product.compareAtPrice != null &&
-                              product.compareAtPrice! > product.price) {
-                            hasDiscount = true;
-                          }
-
-                          return InkWell(
-                            onTap: () {
-                              // التوجيه لصفحة التفاصيل عند الضغط على المنتج كاملًا
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder:
-                                      (_) => ProductDetailsScreen(
-                                        productId: product.id.toString(),
-                                      ),
-                                ),
-                              );
-                            },
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // الصورة
-                                Container(
-                                  width: 80,
-                                  height: 80,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(8),
-                                    color: Colors.grey[100],
-                                    border: Border.all(
-                                      color: Colors.grey.shade200,
-                                    ),
-                                    image:
-                                        product.imageUrl.isNotEmpty
-                                            ? DecorationImage(
-                                              image: NetworkImage(
-                                                product.imageUrl,
-                                              ),
-                                              fit: BoxFit.cover,
-                                            )
-                                            : null,
-                                  ),
-                                  child:
-                                      product.imageUrl.isEmpty
-                                          ? const Icon(
-                                            Icons.image_not_supported,
-                                            color: Colors.grey,
-                                          )
-                                          : null,
-                                ),
-                                const SizedBox(width: 12),
-
-                                // التفاصيل
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        product.name,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-
-                                      // ✅ عرض السعر بنفس تنسيق صفحة التفاصيل
-                                      // Row(
-                                      //   children: [
-                                      //     Text(
-                                      //       "${product.price.toStringAsFixed(0)} ر.س", // إزالة الكسور
-                                      //       style: const TextStyle(
-                                      //         color: Colors.black,
-                                      //         fontWeight: FontWeight.w800,
-                                      //         fontSize: 16,
-                                      //       ),
-                                      //     ),
-                                      //     if (hasDiscount) ...[
-                                      //       const SizedBox(width: 8),
-                                      //       Text(
-                                      //         "${product.compareAtPrice!.toStringAsFixed(0)}",
-                                      //         style: const TextStyle(
-                                      //           decoration: TextDecoration.lineThrough,
-                                      //           color: Colors.grey,
-                                      //           fontSize: 12,
-                                      //         ),
-                                      //       ),
-                                      //     ],
-                                      //   ],
-                                      // ),
-                                    ],
-                                  ),
-                                ),
-
-                                // زر الشراء
-                                ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder:
-                                            (_) => ProductDetailsScreen(
-                                              productId: product.id.toString(),
-                                            ),
-                                      ),
-                                    );
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.black,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    minimumSize: const Size(60, 36),
-                                  ),
-                                  child: const Text(
-                                    "شراء",
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-        ),
-  );
 }
 
 class _ProfileFollowButton extends StatelessWidget {

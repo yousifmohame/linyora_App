@@ -5,6 +5,7 @@ class ReelModel {
   final String videoUrl;
   final String? description;
   final String? thumbnailUrl;
+  final int viewsCount;
   bool isLiked;
   int likesCount;
   int commentsCount;
@@ -16,6 +17,7 @@ class ReelModel {
     required this.videoUrl,
     this.description,
     this.thumbnailUrl,
+    required this.viewsCount,
     this.isLiked = false,
     this.likesCount = 0,
     this.commentsCount = 0,
@@ -28,6 +30,7 @@ class ReelModel {
       id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
       videoUrl: json['video_url'] ?? '',
       thumbnailUrl: json['thumbnail_url'],
+      viewsCount: json['views_count'] ?? 0,
       description: json['caption'],
       isLiked: (json['isLikedByMe'] == true || json['isLikedByMe'] == 1),
       likesCount: json['likes_count'] ?? 0,

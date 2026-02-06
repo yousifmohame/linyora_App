@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:linyora_project/features/products/screens/main_prodects.dart';
 import 'package:provider/provider.dart';
 
 // --- Providers & Screens ---
@@ -56,6 +57,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<ProductModel> _newArrivals = [];
   List<ProductModel> _bestSellers = [];
   List<ProductModel> _topRated = [];
+  List<ProductModel> _linyoraPicks = []; // مختارات لينيورا
+  List<ProductModel> _seasonStyle = [];
 
   // ✅ القائمة الرئيسية التي تتحكم في ترتيب الصفحة بالكامل
   List<HomeLayoutItem> _layoutItems = [];
@@ -110,6 +113,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _homeService.getProductsByType('new'),
         _homeService.getProductsByType('best'),
         _homeService.getProductsByType('top'),
+        _homeService.getProductsByType('best'), // 8 (مختارات لينيورا)
+        _homeService.getProductsByType('new'),
       ]);
 
       if (mounted) {
@@ -122,6 +127,8 @@ class _HomeScreenState extends State<HomeScreen> {
           _newArrivals = results[5] as List<ProductModel>;
           _bestSellers = results[6] as List<ProductModel>;
           _topRated = results[7] as List<ProductModel>;
+          _linyoraPicks = results[8] as List<ProductModel>;
+          _seasonStyle = results[9] as List<ProductModel>;
         });
 
         // 2. بعد توفر البيانات، نجلب الترتيب من السيرفر ونبني القائمة
@@ -226,7 +233,38 @@ class _HomeScreenState extends State<HomeScreen> {
             HorizontalProductList(
               title: "وصل حديثاً 🆕",
               products: _newArrivals,
-              onSeeAll: () {},
+              // ✅ تفعيل زر عرض الكل
+              onSeeAll: () => _navigateToViewAll("وصل حديثاً", "new"),
+            ),
+            _buildDivider(),
+          ],
+        );
+      case HomeItemType.linyoraPicks:
+        // إذا كانت القائمة فارغة نخفي القسم
+        if (_linyoraPicks.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          children: [
+            HorizontalProductList(
+              title: "مختارات لينيورا ✨",
+              products: _linyoraPicks,
+              // ✅ تفعيل زر عرض الكل (نمرر النوع picks)
+              onSeeAll: () => _navigateToViewAll("مختارات لينيورا", "picks"),
+            ),
+            _buildDivider(),
+          ],
+        );
+
+      case HomeItemType.seasonStyle:
+        if (_seasonStyle.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          children: [
+            HorizontalProductList(
+              title: "ستايل الموسم 🍂",
+              products: _seasonStyle,
+              // ✅ تفعيل زر عرض الكل (نمرر النوع season)
+              onSeeAll: () => _navigateToViewAll("ستايل الموسم", "season"),
             ),
             _buildDivider(),
           ],
@@ -237,7 +275,8 @@ class _HomeScreenState extends State<HomeScreen> {
             HorizontalProductList(
               title: "الأكثر مبيعاً 🔥",
               products: _bestSellers,
-              onSeeAll: () {},
+              // ✅ تفعيل زر عرض الكل
+              onSeeAll: () => _navigateToViewAll("الأكثر مبيعاً", "best"),
             ),
             _buildDivider(),
           ],
@@ -248,7 +287,8 @@ class _HomeScreenState extends State<HomeScreen> {
             HorizontalProductList(
               title: "الأعلى تقييماً ⭐",
               products: _topRated,
-              onSeeAll: () {},
+              // ✅ تفعيل زر عرض الكل
+              onSeeAll: () => _navigateToViewAll("الأعلى تقييماً", "top"),
             ),
             _buildDivider(),
           ],
@@ -257,6 +297,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (_topModels.isEmpty) return const SizedBox.shrink();
         return Column(
           children: [
+            // يمكنك توجيه هذا لصفحة العارضات
             _buildSectionTitleWrapper("أشهر العارضات ✨", () {}),
             _buildTopUsersList(_topModels, isModel: true),
             _buildDivider(),
@@ -284,6 +325,14 @@ class _HomeScreenState extends State<HomeScreen> {
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  // ✅ دالة مساعدة للانتقال (عليك إنشاء هذه الشاشة أو استخدام شاشة المنتجات الموجودة لديك)
+  void _navigateToViewAll(String title, String apiType) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => ProductsScreen()),
+    );
   }
 
   // ✅ ودجت التغليف: تضيف أدوات التحكم فوق العنصر إذا كان وضع التعديل مفعلاً
@@ -371,6 +420,10 @@ class _HomeScreenState extends State<HomeScreen> {
         return "الأكثر مبيعاً";
       case HomeItemType.topRated:
         return "الأعلى تقييماً";
+      case HomeItemType.linyoraPicks:
+        return "مختارات لينيورا";
+      case HomeItemType.seasonStyle:
+        return "ستايل الموسم";
       case HomeItemType.topModels:
         return "أشهر العارضات";
       case HomeItemType.topMerchants:
@@ -858,15 +911,40 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildTopUsersList(List<TopUserModel> users, {required bool isModel}) {
-    return SizedBox(
-      height: 220,
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        scrollDirection: Axis.horizontal,
-        itemCount: users.length,
-        itemBuilder:
-            (context, index) =>
-                TopUserCard(user: users[index], isModel: isModel),
+    if (users.isEmpty) return const SizedBox.shrink();
+
+    // 1. حساب عرض الشاشة
+    final double screenWidth = MediaQuery.of(context).size.width;
+
+    // 2. عرض البطاقة الثابت + الهوامش (160 width + 20 margin horizontal)
+    const double cardWidth = 180.0;
+
+    // 3. حساب النسبة المطلوبة بدقة لتناسب حجم البطاقة
+    double fraction = cardWidth / screenWidth;
+
+    // تأكد أن النسبة لا تزيد عن 1 (لشاشات الهواتف الصغيرة جداً)
+    if (fraction > 1.0) fraction = 1.0;
+
+    return CarouselSlider.builder(
+      itemCount: users.length,
+      itemBuilder: (context, index, realIndex) {
+        return TopUserCard(user: users[index], isModel: isModel);
+      },
+      options: CarouselOptions(
+        height: 240,
+        autoPlay: true,
+        autoPlayInterval: const Duration(seconds: 4),
+        autoPlayAnimationDuration: const Duration(milliseconds: 800),
+        autoPlayCurve: Curves.fastOutSlowIn,
+
+        // ✅ التعديل هنا: استخدام النسبة المحسوبة ديناميكياً
+        viewportFraction: fraction,
+
+        // ✅ إضافة هذا السطر: لمنع توسيط البطاقة الأولى (يجعلها تبدأ من اليمين/اليسار)
+        padEnds: false,
+
+        enlargeCenterPage: false, // يفضل إلغاؤها في التابلت لتقليل الفراغات
+        enableInfiniteScroll: true,
       ),
     );
   }

@@ -26,11 +26,41 @@ class HorizontalProductList extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              // العنوان
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              // ✅ زر عرض الكل (يظهر فقط إذا تم تمرير onSeeAll)
               if (onSeeAll != null)
-                GestureDetector(
-                  onTap: onSeeAll,
-                  child: const Text("عرض الكل", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                InkWell(
+                  onTap: onSeeAll, // تفعيل النقر
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4.0),
+                    child: Row(
+                      children: const [
+                        Text(
+                          "عرض الكل",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.pink, // لون لينيورا
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(width: 4),
+                        Icon(
+                          Icons.arrow_forward_ios,
+                          size: 10,
+                          color: Colors.pink,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -38,14 +68,19 @@ class HorizontalProductList extends StatelessWidget {
 
         // List
         SizedBox(
-          height: 320, // ارتفاع مناسب للكارت
+          height: 320,
           child: ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             scrollDirection: Axis.horizontal,
             itemCount: products.length,
-            itemExtent: 172, // ⚡ تحسين الأداء: تحديد عرض ثابت للعنصر (160 عرض + 12 هامش)
+            // ⚡ تأكد أن ProductCard عرضه مناسب (مثلاً 160) لترك مسافات
+            itemExtent: 172,
             itemBuilder: (context, index) {
-              return ProductCard(product: products[index]);
+              // إضافة Padding بسيط حول الكارت لضمان وجود مسافة بين الكروت
+              return Padding(
+                padding: const EdgeInsets.only(right: 12.0),
+                child: ProductCard(product: products[index]),
+              );
             },
           ),
         ),

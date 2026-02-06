@@ -6,13 +6,13 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 class BannerVideoPlayer extends StatefulWidget {
   final String videoUrl;
   final bool isActive;
-  final VoidCallback onVideoFinished;
+  final VoidCallback? onVideoFinished; // جعلتها اختيارية لتجنب الأخطاء
 
   const BannerVideoPlayer({
     super.key,
     required this.videoUrl,
     required this.isActive,
-    required this.onVideoFinished,
+    this.onVideoFinished,
   });
 
   @override
@@ -22,23 +22,30 @@ class BannerVideoPlayer extends StatefulWidget {
 class _BannerVideoPlayerState extends State<BannerVideoPlayer> {
   VideoPlayerController? _controller;
   bool _isInitialized = false;
-  File? _videoFile; // نحتفظ بالملف حتى لا نحمله كل مرة
+  File? _videoFile;
+  bool _isPreloading = false; // لمنع التحميل المتكرر
 
   @override
   void initState() {
     super.initState();
-    // تحميل الملف فقط، لا تقم بتهيئة الفيديو بعد
     _preloadFile();
   }
 
   Future<void> _preloadFile() async {
+    if (_isPreloading) return;
+    _isPreloading = true;
+
     try {
+      // نستخدم الكاش مانجر لجلب الملف (يحمله مرة واحدة فقط)
       _videoFile = await DefaultCacheManager().getSingleFile(widget.videoUrl);
+
       if (mounted && widget.isActive) {
         _initializeVideo();
       }
     } catch (e) {
       debugPrint("Error preloading file: $e");
+    } finally {
+      _isPreloading = false;
     }
   }
 
@@ -46,76 +53,89 @@ class _BannerVideoPlayerState extends State<BannerVideoPlayer> {
   void didUpdateWidget(BannerVideoPlayer oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // 🧠 المخ: التحكم في الموارد
-    if (widget.isActive && !oldWidget.isActive) {
-      // إذا أصبح البانر مرئياً -> هيّئ الفيديو وشغله
-      _initializeVideo();
-    } else if (!widget.isActive && oldWidget.isActive) {
-      // إذا اختفى البانر -> دمر الفيديو فوراً لتحرير الموارد
-      _disposeVideo();
+    if (widget.isActive != oldWidget.isActive) {
+      if (widget.isActive) {
+        _initializeVideo();
+      } else {
+        // ✅ هنا نمرر true لأننا ما زلنا في الشاشة ونريد إخفاء الفيديو
+        _disposeController(updateUI: true);
+      }
     }
   }
 
   Future<void> _initializeVideo() async {
+    // إذا لم يكن الملف جاهزاً أو الفيديو يعمل بالفعل، لا تفعل شيئاً
     if (_videoFile == null || _controller != null) return;
 
     try {
-      _controller = VideoPlayerController.file(
+      final controller = VideoPlayerController.file(
         _videoFile!,
         videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
       );
 
-      await _controller!.initialize();
-      _controller!.setVolume(0.0);
-      _controller!.setLooping(false);
+      _controller = controller; // تعيينه قبل الـ await لمنع التكرار
 
-      _controller!.addListener(_videoListener);
+      await controller.initialize();
+      controller.setVolume(0.0); // كتم الصوت للبنرات
+      controller.setLooping(false);
 
-      if (mounted) {
-        setState(() {
-          _isInitialized = true;
-        });
-        _controller!.play();
+      controller.addListener(_videoListener);
+
+      // ✅ فحص أمان مزدوج: هل ما زال الودجت موجوداً؟ وهل ما زال نشطاً؟
+      if (!mounted || !widget.isActive) {
+        // إذا تغيرت الحالة أثناء التحميل، تخلص منه فوراً
+        _disposeController(updateUI: false);
+        return;
       }
+
+      setState(() {
+        _isInitialized = true;
+      });
+
+      controller.play();
     } catch (e) {
       debugPrint("Init Error: $e");
-      // في حالة الفشل، نبلغ أن الفيديو انتهى للانتقال للتالي
-      widget.onVideoFinished();
+      _disposeController(updateUI: true); // تنظيف في حال الخطأ
+      if (widget.onVideoFinished != null) widget.onVideoFinished!();
     }
   }
 
   void _videoListener() {
-    if (_controller != null &&
-        _controller!.value.position >= _controller!.value.duration) {
-      widget.onVideoFinished();
+    final controller = _controller;
+    if (controller != null &&
+        controller.value.position >= controller.value.duration) {
+      if (widget.onVideoFinished != null) widget.onVideoFinished!();
     }
   }
 
-  void _disposeVideo() {
-    // تدمير المتحكم لتحرير الـ Decoder في الهاتف
+  // ✅ التعديل الجوهري: إضافة معامل updateUI
+  void _disposeController({required bool updateUI}) {
     _controller?.removeListener(_videoListener);
     _controller?.dispose();
     _controller = null;
-    if (mounted) {
+
+    if (updateUI && mounted) {
       setState(() {
         _isInitialized = false;
       });
+    } else {
+      // إذا كنا نغلق الصفحة، نغير المتغير فقط بدون setState
+      _isInitialized = false;
     }
   }
 
   @override
   void dispose() {
-    _disposeVideo();
+    // 🛑 هام جداً: نمرر false هنا لمنع الـ Crash
+    _disposeController(updateUI: false);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // إذا لم يكن مهيأ، اعرض صورة سوداء أو لودينج
-    // هذا يمنع الوميض بينما يتم تحضير الـ Decoder
     if (!_isInitialized || _controller == null) {
       return Container(
-        color: Colors.black, // يفضل وضع صورة مصغرة (Thumbnail) هنا لو توفرت
+        color: Colors.black, // أو صورة Placeholder إذا توفرت
         child: const Center(
           child: SizedBox(
             width: 30,

@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:linyora_project/features/products/screens/main_prodects.dart';
 import 'package:provider/provider.dart';
+import 'package:linyora_project/features/products/screens/main_prodects.dart';
 import '../providers/cart_provider.dart';
 import '../../../models/cart_item_model.dart';
-// 1. استيراد شاشة الدفع الجديدة
 import 'checkout_screen.dart';
 
 class CartScreen extends StatelessWidget {
@@ -33,7 +32,33 @@ class CartScreen extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.delete_outline, color: Colors.red),
                   onPressed: () {
-                    cart.clearCart();
+                    // إظهار حوار تأكيد قبل الحذف
+                    showDialog(
+                      context: context,
+                      builder:
+                          (ctx) => AlertDialog(
+                            title: const Text("تفريغ السلة"),
+                            content: const Text(
+                              "هل أنت متأكد من حذف جميع المنتجات؟",
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                child: const Text("إلغاء"),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  cart.clearCart();
+                                  Navigator.pop(ctx);
+                                },
+                                child: const Text(
+                                  "حذف",
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                              ),
+                            ],
+                          ),
+                    );
                   },
                 ),
             ],
@@ -95,7 +120,7 @@ class CartScreen extends StatelessWidget {
           const SizedBox(height: 10),
           ElevatedButton(
             onPressed:
-                () => Navigator.push(
+                () => Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
                     builder: (context) => const ProductsScreen(),
@@ -121,14 +146,26 @@ class CartScreen extends StatelessWidget {
     CartProvider cart,
   ) {
     final product = item.product;
-    final variant = item.selectedVariant;
-    final image = variant.images.isNotEmpty ? variant.images[0] : '';
+    final variant = item.selectedVariant; // قد يكون null
+
+    // ✅ 1. تحديد الصورة: إذا وجد فارينت وله صور نستخدمها، وإلا صورة المنتج
+    final String image =
+        (variant != null && variant.images.isNotEmpty)
+            ? variant.images[0]
+            : product.imageUrl;
+
+    // ✅ 2. تحديد السعر: سعر الفارينت أو سعر المنتج
+    final double price = variant?.price ?? product.price;
+
+    // ✅ 3. تحديد أقصى كمية مخزون
+    final int maxStock = variant?.stockQuantity ?? product.stock;
 
     return Dismissible(
       key: Key(item.id),
       direction: DismissDirection.endToStart,
       onDismissed: (_) {
         cart.removeFromCart(item.id);
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text("تم حذف المنتج من السلة")));
@@ -157,6 +194,7 @@ class CartScreen extends StatelessWidget {
         ),
         child: Row(
           children: [
+            // صورة المنتج
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: CachedNetworkImage(
@@ -172,6 +210,8 @@ class CartScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
+
+            // التفاصيل
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -186,21 +226,29 @@ class CartScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    "اللون: ${variant.color}",
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
+
+                  // ✅ عرض المواصفات فقط إذا كانت موجودة
+                  if (variant != null)
+                    Text(
+                      "المواصفات: ${variant.name}", // استخدام getter name من المودل
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+
                   const SizedBox(height: 8),
+
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      // السعر
                       Text(
-                        "${variant.price.toStringAsFixed(0)} ر.س",
+                        "${price.toStringAsFixed(0)} ر.س",
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Color(0xFFF105C6),
                         ),
                       ),
+
+                      // أزرار الكمية
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.grey[100],
@@ -217,6 +265,7 @@ class CartScreen extends StatelessWidget {
                                     item.quantity - 1,
                                   );
                                 } else {
+                                  // يمكن إضافة تأكيد هنا أيضاً
                                   cart.removeFromCart(item.id);
                                 }
                               },
@@ -235,17 +284,22 @@ class CartScreen extends StatelessWidget {
                             _QtyBtn(
                               icon: Icons.add,
                               onTap: () {
-                                if (item.quantity < variant.stockQuantity) {
+                                // ✅ التحقق من المخزون الآمن
+                                if (item.quantity < maxStock) {
                                   cart.updateQuantity(
                                     item.id,
                                     item.quantity + 1,
                                   );
                                 } else {
+                                  ScaffoldMessenger.of(
+                                    context,
+                                  ).hideCurrentSnackBar();
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
                                       content: Text(
                                         "عذراً، هذه أقصى كمية متوفرة",
                                       ),
+                                      duration: Duration(seconds: 1),
                                     ),
                                   );
                                 }
@@ -267,9 +321,6 @@ class CartScreen extends StatelessWidget {
 
   Widget _buildCheckoutSection(BuildContext context, CartProvider cart) {
     double subtotal = cart.totalAmount;
-
-    // ملاحظة: حساب الشحن النهائي يتم الآن في صفحة Checkout
-    // هنا نعرض المجموع المبدئي فقط
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -296,12 +347,11 @@ class CartScreen extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            // 2. زر إتمام الشراء المحدث
+            // زر إتمام الشراء
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  // الانتقال إلى شاشة الدفع الجديدة
                   Navigator.push(
                     context,
                     MaterialPageRoute(

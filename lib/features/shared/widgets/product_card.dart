@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:linyora_project/features/cart/providers/cart_provider.dart'; // 1. استيراد البروفايدر
 import 'package:linyora_project/features/wishlist/providers/wishlist_provider.dart';
 import '../../../core/widgets/optimized_image.dart';
 import '../../../models/product_model.dart';
-// استيراد شاشة التفاصيل
 import '../../products/screens/product_details_screen.dart';
 
 class ProductCard extends StatelessWidget {
@@ -14,7 +14,7 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 1. حساب نسبة الخصم
+    // حساب نسبة الخصم
     int discountPercent = 0;
     if (product.compareAtPrice != null &&
         product.compareAtPrice! > product.price) {
@@ -26,7 +26,6 @@ class ProductCard extends StatelessWidget {
     }
 
     return GestureDetector(
-      // عند الضغط على الكارت بالكامل، انتقل لصفحة التفاصيل
       onTap: () => _navigateToDetails(context),
       child: Container(
         width: width,
@@ -48,7 +47,6 @@ class ProductCard extends StatelessWidget {
             // --- القسم العلوي: الصورة + الشارات ---
             Stack(
               children: [
-                // الصورة
                 ClipRRect(
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(16),
@@ -87,7 +85,6 @@ class ProductCard extends StatelessWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // اسم التاجر
                       Expanded(
                         child: Row(
                           children: [
@@ -118,7 +115,6 @@ class ProductCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                      // التقييم
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 6,
@@ -151,7 +147,6 @@ class ProductCard extends StatelessWidget {
                   ),
                 ),
 
-                // الشارات (خصم / جديد)
                 if (discountPercent > 0)
                   Positioned(
                     top: 8,
@@ -168,7 +163,6 @@ class ProductCard extends StatelessWidget {
                     child: _buildBadge("جديد", Colors.green),
                   ),
 
-                // زر المفضلة
                 Positioned(
                   top: 8,
                   right: 8,
@@ -210,7 +204,7 @@ class ProductCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        height: 1.2,
+                        height: 1.1,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -244,24 +238,23 @@ class ProductCard extends StatelessWidget {
                           ],
                         ),
 
-                        // زر إضافة للسلة (تم التعديل هنا)
+                        // زر إضافة للسلة (الذكي)
                         Material(
                           color: Colors.transparent,
                           child: InkWell(
                             borderRadius: BorderRadius.circular(8),
-                            // عند الضغط، نفتح صفحة التفاصيل ليختار المقاس/اللون
-                            onTap: () => _navigateToDetails(context),
+                            // ✅ استدعاء دالة المعالجة الذكية
+                            onTap: () => _handleAddToCartLogic(context),
                             child: Container(
-                              padding: const EdgeInsets.all(6), // مساحة للضغط
+                              padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: Colors.grey[100], // خلفية خفيفة
+                                color: const Color(0xFFF105C6).withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: const Icon(
-                                Icons
-                                    .shopping_cart_outlined, // تغيير لأيقونة مفرغة أجمل
-                                color: Colors.black87,
-                                size: 22,
+                                Icons.add_shopping_cart_rounded,
+                                color: Color(0xFFF105C6),
+                                size: 20,
                               ),
                             ),
                           ),
@@ -278,7 +271,186 @@ class ProductCard extends StatelessWidget {
     );
   }
 
-  // دالة مساعدة للتنقل
+  // =========================================================
+  // 🔥🔥🔥 المنطق الذكي للإضافة للسلة 🔥🔥🔥
+  // =========================================================
+
+  void _handleAddToCartLogic(BuildContext context) {
+    // 1. التحقق هل المنتج له خيارات (Variants)؟
+    bool hasVariants = product.variants != null && product.variants!.isNotEmpty;
+
+    if (hasVariants) {
+      // ✅ الحالة أ: يوجد خيارات -> نفتح نافذة سفلية للاختيار
+      _showVariantSelectionSheet(context);
+    } else {
+      // ✅ الحالة ب: منتج بسيط -> إضافة مباشرة
+      _addToCartDirectly(context, null);
+    }
+  }
+
+  // إضافة مباشرة للسلة
+  void _addToCartDirectly(BuildContext context, ProductVariant? variant) {
+    final cartProvider = Provider.of<CartProvider>(context, listen: false);
+
+    // استدعاء دالة الإضافة (تأكد أن الدالة تقبل 3 مدخلات كما صححناها سابقاً)
+    cartProvider.addToCart(
+      product,
+      1, // الكمية
+      variant, // الخيار (قد يكون null للمنتج البسيط)
+    );
+
+    // إغلاق النافذة إذا كانت مفتوحة (في حالة الـ BottomSheet)
+    if (variant != null) Navigator.pop(context);
+
+    // إظهار رسالة النجاح
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: const [
+            Icon(Icons.check_circle, color: Colors.white),
+            SizedBox(width: 8),
+            Text("تمت الإضافة للسلة بنجاح"),
+          ],
+        ),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // نافذة اختيار المقاس/اللون السريعة
+  void _showVariantSelectionSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        // نستخدم StatefulBuilder لتحديث حالة الاختيار داخل الـ Sheet فقط
+        ProductVariant? selectedVariant;
+
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // رأس النافذة
+                  Row(
+                    children: [
+                      OptimizedImage(
+                        imageUrl: product.imageUrl,
+                        width: 50,
+                        height: 50,
+                        fit: BoxFit.cover,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              product.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              selectedVariant != null
+                                  ? "${selectedVariant!.price.toInt()} ﷼"
+                                  : "${product.price.toInt()} ﷼",
+                              style: const TextStyle(
+                                color: Color(0xFFF105C6),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 30),
+                  const Text(
+                    "اختر الخيار المناسب:",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // قائمة الخيارات (Chips)
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children:
+                        product.variants!.map((variant) {
+                          bool isSelected = selectedVariant == variant;
+                          return ChoiceChip(
+                            label: Text(
+                              variant
+                                  .name, // تأكد أن لديك حقل name أو value في المودل
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : Colors.black,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            selected: isSelected,
+                            selectedColor: const Color(0xFFF105C6),
+                            backgroundColor: Colors.grey[100],
+                            onSelected: (val) {
+                              setSheetState(() {
+                                selectedVariant = val ? variant : null;
+                              });
+                            },
+                          );
+                        }).toList(),
+                  ),
+
+                  const SizedBox(height: 30),
+
+                  // زر التأكيد
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed:
+                          selectedVariant == null
+                              ? null // تعطيل الزر إذا لم يتم الاختيار
+                              : () =>
+                                  _addToCartDirectly(context, selectedVariant),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF105C6),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        "إضافة للسلة",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _navigateToDetails(BuildContext context) {
     Navigator.push(
       context,
@@ -289,7 +461,6 @@ class ProductCard extends StatelessWidget {
     );
   }
 
-  // دالة مساعدة للشارات
   Widget _buildBadge(String text, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

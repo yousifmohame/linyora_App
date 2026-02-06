@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:linyora_project/features/address/screens/add_edit_address_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
@@ -479,6 +480,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  // في ملف CheckoutScreen.dart
+  // لا تنسَ استيراد الصفحة الجديدة في الأعلى
+  // import 'add_address_screen.dart';
+
   Widget _buildAddressSection() {
     return Card(
       elevation: 0,
@@ -491,25 +496,44 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // الهيدر وزر الإضافة
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(Icons.location_on, color: _primaryColor),
-                const SizedBox(width: 8),
-                const Text(
-                  "عنوان الشحن",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                Row(
+                  children: [
+                    Icon(Icons.location_on, color: _primaryColor),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "عنوان الشحن",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
+                // ✅ زر إضافة صغير يظهر دائماً حتى لو هناك عناوين
+                if (_addresses.isNotEmpty)
+                  TextButton(
+                    onPressed: _navigateToAddAddress,
+                    child: Text(
+                      "إضافة",
+                      style: TextStyle(color: _primaryColor),
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 16),
+
             if (_addresses.isEmpty)
               Center(
                 child: TextButton.icon(
-                  onPressed: () {
-                    /* Navigate to add address */
-                  },
+                  // ✅ تفعيل الزر في حالة القائمة الفارغة
+                  onPressed: _navigateToAddAddress,
                   icon: const Icon(Icons.add),
                   label: const Text("إضافة عنوان جديد"),
+                  style: TextButton.styleFrom(foregroundColor: _primaryColor),
                 ),
               )
             else
@@ -614,6 +638,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
+  // ✅ دالة الانتقال والتحديث
+  // في ملف CheckoutScreen.dart
+
+  Future<void> _navigateToAddAddress() async {
+    // 1. ننتظر النتيجة باستخدام await
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AddEditAddressScreen()),
+    );
+
+    // 2. نتحقق إذا كانت النتيجة true
+    if (result == true) {
+      // 3. نعيد تحميل العناوين
+      await _fetchAddresses();
+
+      // (اختياري) تحسين إضافي: تحديد العنوان الجديد تلقائياً إذا كان هو الوحيد أو الافتراضي
+      // هذا يحدث تلقائياً داخل _fetchAddresses إذا كنت قد كتبت المنطق هناك
+    }
+  }
+
   // ✅ بطاقة التاجر مع خيارات الشحن
   Widget _buildMerchantGroupCard(MerchantGroup group) {
     return Card(
@@ -628,6 +672,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // رأس البطاقة (اسم التاجر)
             Row(
               children: [
                 const Icon(Icons.store, color: Colors.blue),
@@ -643,63 +688,82 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             const Divider(height: 24),
 
-            ...group.items
-                .map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Row(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: CachedNetworkImage(
-                            imageUrl:
-                                item.selectedVariant.images.isNotEmpty
-                                    ? item.selectedVariant.images[0]
-                                    : '',
-                            width: 50,
-                            height: 50,
-                            fit: BoxFit.cover,
-                            errorWidget:
-                                (context, url, error) => Container(
-                                  color: Colors.grey[200],
-                                  child: const Icon(Icons.image_not_supported),
-                                ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.product.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              Text(
-                                "${item.quantity} x ${item.selectedVariant.price} ر.س",
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Text(
-                          "${(item.quantity * item.selectedVariant.price).toStringAsFixed(0)} ر.س",
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ],
+            // قائمة المنتجات
+            ...group.items.map((item) {
+              // ✅ 1. استخراج المتغير (Variant) بشكل آمن
+              final variant = item.selectedVariant;
+
+              // ✅ 2. تحديد الصورة: إذا وجد فارينت وله صور نستخدمها، وإلا صورة المنتج
+              final String image =
+                  (variant != null && variant.images.isNotEmpty)
+                      ? variant.images[0]
+                      : item.product.imageUrl;
+
+              // ✅ 3. تحديد السعر: سعر الفارينت أو سعر المنتج
+              final double price = variant?.price ?? item.product.price;
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: CachedNetworkImage(
+                        imageUrl: image, // ✅ استخدام الصورة الآمنة
+                        width: 50,
+                        height: 50,
+                        fit: BoxFit.cover,
+                        errorWidget:
+                            (context, url, error) => Container(
+                              color: Colors.grey[200],
+                              child: const Icon(Icons.image_not_supported),
+                            ),
+                      ),
                     ),
-                  ),
-                )
-                .toList(),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.product.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w500),
+                          ),
+                          // ✅ عرض تفاصيل الفارينت إذا وجد
+                          if (variant != null)
+                            Text(
+                              variant.name,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          Text(
+                            // ✅ استخدام السعر الآمن
+                            "${item.quantity} x ${price.toStringAsFixed(0)} ر.س",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      // ✅ حساب المجموع بالسعر الآمن
+                      "${(item.quantity * price).toStringAsFixed(0)} ر.س",
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
 
             const SizedBox(height: 12),
+
+            // قسم الشحن
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -739,42 +803,40 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   else
                     Column(
                       children:
-                          group.shippingOptions
-                              .map(
-                                (opt) => RadioListTile<int>(
-                                  value: opt.id,
-                                  groupValue: group.selectedShipping?.id,
-                                  activeColor: _primaryColor,
-                                  contentPadding: EdgeInsets.zero,
-                                  title: Text(
-                                    opt.name,
-                                    style: const TextStyle(fontSize: 14),
-                                  ),
-                                  subtitle:
-                                      opt.estimatedDays != null
-                                          ? Text(
-                                            "يصل خلال ${opt.estimatedDays} أيام",
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey[600],
-                                            ),
-                                          )
-                                          : null,
-                                  secondary: Text(
-                                    "${opt.cost} ر.س",
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.blue,
-                                    ),
-                                  ),
-                                  onChanged: (val) {
-                                    setState(() {
-                                      group.selectedShipping = opt;
-                                    });
-                                  },
+                          group.shippingOptions.map((opt) {
+                            return RadioListTile<int>(
+                              value: opt.id,
+                              groupValue: group.selectedShipping?.id,
+                              activeColor: _primaryColor,
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(
+                                opt.name,
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                              subtitle:
+                                  opt.estimatedDays != null
+                                      ? Text(
+                                        "يصل خلال ${opt.estimatedDays} أيام",
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey[600],
+                                        ),
+                                      )
+                                      : null,
+                              secondary: Text(
+                                "${opt.cost} ر.س",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue,
                                 ),
-                              )
-                              .toList(),
+                              ),
+                              onChanged: (val) {
+                                setState(() {
+                                  group.selectedShipping = opt;
+                                });
+                              },
+                            );
+                          }).toList(),
                     ),
                 ],
               ),

@@ -87,7 +87,9 @@ class _SupplierWalletScreenState extends State<SupplierWalletScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context); // إغلاق النافذة المنبثقة إذا كانت مفتوحة
+        FocusScope.of(
+          context,
+        ).unfocus(); // إغلاق النافذة المنبثقة إذا كانت مفتوحة
         _fetchAllData(); // تحديث البيانات
       }
     } catch (e) {
@@ -435,6 +437,7 @@ class _SupplierWalletScreenState extends State<SupplierWalletScreen> {
       case 'completed':
       case 'paid':
       case 'cleared':
+      case 'approved':
         color = Colors.green;
         text = "مكتمل";
         break;
@@ -448,9 +451,22 @@ class _SupplierWalletScreenState extends State<SupplierWalletScreen> {
         text = "قيد المعالجة";
     }
 
-    return Text(
-      text,
-      style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
+    return Container(
+      // ✅ تحسين شكل الحالة
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 
