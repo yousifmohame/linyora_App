@@ -146,18 +146,12 @@ class CartScreen extends StatelessWidget {
     CartProvider cart,
   ) {
     final product = item.product;
-    final variant = item.selectedVariant; // قد يكون null
-
-    // ✅ 1. تحديد الصورة: إذا وجد فارينت وله صور نستخدمها، وإلا صورة المنتج
+    final variant = item.selectedVariant;
     final String image =
         (variant != null && variant.images.isNotEmpty)
             ? variant.images[0]
             : product.imageUrl;
-
-    // ✅ 2. تحديد السعر: سعر الفارينت أو سعر المنتج
     final double price = variant?.price ?? product.price;
-
-    // ✅ 3. تحديد أقصى كمية مخزون
     final int maxStock = variant?.stockQuantity ?? product.stock;
 
     return Dismissible(
@@ -216,21 +210,56 @@ class CartScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    product.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
+                  // ✨ التعديل هنا: صف يجمع الاسم وأيقونة الحذف
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // الاسم
+                      Expanded(
+                        child: Text(
+                          product.name,
+                          maxLines: 2, // السماح بسطرين في حال الاسم الطويل
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      // زر الحذف الصغير
+                      InkWell(
+                        onTap: () {
+                          cart.removeFromCart(item.id);
+                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("تم حذف المنتج"),
+                              duration: Duration(seconds: 1),
+                            ),
+                          );
+                        },
+                        child: const Padding(
+                          padding: EdgeInsets.only(
+                            right: 4.0,
+                            left: 4.0,
+                            bottom: 4.0,
+                          ),
+                          child: Icon(
+                            Icons.close, // أو Icons.delete_outline
+                            size: 18,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
+
                   const SizedBox(height: 4),
 
-                  // ✅ عرض المواصفات فقط إذا كانت موجودة
                   if (variant != null)
                     Text(
-                      "المواصفات: ${variant.name}", // استخدام getter name من المودل
+                      "المواصفات: ${variant.name}",
                       style: const TextStyle(color: Colors.grey, fontSize: 12),
                     ),
 
@@ -265,7 +294,6 @@ class CartScreen extends StatelessWidget {
                                     item.quantity - 1,
                                   );
                                 } else {
-                                  // يمكن إضافة تأكيد هنا أيضاً
                                   cart.removeFromCart(item.id);
                                 }
                               },
@@ -284,7 +312,6 @@ class CartScreen extends StatelessWidget {
                             _QtyBtn(
                               icon: Icons.add,
                               onTap: () {
-                                // ✅ التحقق من المخزون الآمن
                                 if (item.quantity < maxStock) {
                                   cart.updateQuantity(
                                     item.id,

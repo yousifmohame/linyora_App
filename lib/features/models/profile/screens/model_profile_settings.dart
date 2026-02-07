@@ -10,13 +10,15 @@ class ModelProfileSettingsScreen extends StatefulWidget {
   const ModelProfileSettingsScreen({Key? key}) : super(key: key);
 
   @override
-  State<ModelProfileSettingsScreen> createState() => _ModelProfileSettingsScreenState();
+  State<ModelProfileSettingsScreen> createState() =>
+      _ModelProfileSettingsScreenState();
 }
 
-class _ModelProfileSettingsScreenState extends State<ModelProfileSettingsScreen> {
+class _ModelProfileSettingsScreenState
+    extends State<ModelProfileSettingsScreen> {
   final ProfileService _service = ProfileService();
   final ImagePicker _picker = ImagePicker();
-  
+
   ProfileData? _profile;
   bool _isLoading = true;
   bool _isSaving = false;
@@ -27,7 +29,7 @@ class _ModelProfileSettingsScreenState extends State<ModelProfileSettingsScreen>
   late TextEditingController _bioController;
   late TextEditingController _followersController;
   late TextEditingController _engagementController;
-  
+
   // Social Controllers
   final Map<String, TextEditingController> _socialControllers = {};
 
@@ -46,23 +48,55 @@ class _ModelProfileSettingsScreenState extends State<ModelProfileSettingsScreen>
     try {
       final data = await _service.getProfile();
       _profile = data;
-      
+
       // Initialize Controllers
       _nameController = TextEditingController(text: data.name);
       _bioController = TextEditingController(text: data.bio);
-      _followersController = TextEditingController(text: data.stats.followers);
-      _engagementController = TextEditingController(text: data.stats.engagement);
-      
-      _socialControllers['instagram'] = TextEditingController(text: data.socialLinks.instagram);
-      _socialControllers['twitter'] = TextEditingController(text: data.socialLinks.twitter);
-      _socialControllers['facebook'] = TextEditingController(text: data.socialLinks.facebook);
-      _socialControllers['tiktok'] = TextEditingController(text: data.socialLinks.tiktok);
-      _socialControllers['snapchat'] = TextEditingController(text: data.socialLinks.snapchat);
-      _socialControllers['whatsapp'] = TextEditingController(text: data.socialLinks.whatsapp);
+
+      // ✅✅ 1. حساب مجموع المتابعين (الخارجي + الداخلي)
+      // تنظيف النص من أي رموز غير رقمية (مثل k, +, ,) لتحويله لرقم
+      int externalFollowers =
+          int.tryParse(
+            data.stats.followers.replaceAll(RegExp(r'[^0-9]'), ''),
+          ) ??
+          0;
+      // جلب متابعي المنصة من الموديل (الذي أضفناه سابقاً)
+      int platformFollowers = data.followersCount;
+
+      int totalFollowers = externalFollowers + platformFollowers;
+
+      // عرض المجموع
+      _followersController = TextEditingController(
+        text: totalFollowers.toString(),
+      );
+
+      // التفاعل يبقى كما هو (أو يمكنك جعله للقراءة فقط أيضاً)
+      _engagementController = TextEditingController(
+        text: data.stats.engagement,
+      );
+
+      _socialControllers['instagram'] = TextEditingController(
+        text: data.socialLinks.instagram,
+      );
+      _socialControllers['twitter'] = TextEditingController(
+        text: data.socialLinks.twitter,
+      );
+      _socialControllers['facebook'] = TextEditingController(
+        text: data.socialLinks.facebook,
+      );
+      _socialControllers['tiktok'] = TextEditingController(
+        text: data.socialLinks.tiktok,
+      );
+      _socialControllers['snapchat'] = TextEditingController(
+        text: data.socialLinks.snapchat,
+      );
+      _socialControllers['whatsapp'] = TextEditingController(
+        text: data.socialLinks.whatsapp,
+      );
 
       setState(() => _isLoading = false);
     } catch (e) {
-      if(mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -75,9 +109,12 @@ class _ModelProfileSettingsScreenState extends State<ModelProfileSettingsScreen>
     try {
       final url = await _service.uploadImage(File(image.path));
       setState(() {
-        if (type == 'profile') _profile!.profilePictureUrl = url;
-        else if (type == 'cover') _profile!.storeBannerUrl = url;
-        else if (type == 'portfolio') _profile!.portfolio.add(url);
+        if (type == 'profile')
+          _profile!.profilePictureUrl = url;
+        else if (type == 'cover')
+          _profile!.storeBannerUrl = url;
+        else if (type == 'portfolio')
+          _profile!.portfolio.add(url);
       });
       _showMessage("تم رفع الصورة بنجاح");
     } catch (e) {
@@ -97,12 +134,15 @@ class _ModelProfileSettingsScreenState extends State<ModelProfileSettingsScreen>
     if (_profile == null) return;
 
     setState(() => _isSaving = true);
-    
+
     // Update model from controllers
     _profile!.name = _nameController.text;
     _profile!.bio = _bioController.text;
-    _profile!.stats.followers = _followersController.text;
-    _profile!.stats.engagement = _engagementController.text;
+
+    // ❌ 2. لا نقم بحفظ الإحصائيات لأنها أصبحت محسوبة تلقائياً
+    // _profile!.stats.followers = _followersController.text;
+    // _profile!.stats.engagement = _engagementController.text;
+
     _profile!.socialLinks.instagram = _socialControllers['instagram']!.text;
     _profile!.socialLinks.twitter = _socialControllers['twitter']!.text;
     _profile!.socialLinks.facebook = _socialControllers['facebook']!.text;
@@ -122,13 +162,17 @@ class _ModelProfileSettingsScreenState extends State<ModelProfileSettingsScreen>
 
   void _showMessage(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: isError ? Colors.red : Colors.green),
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: isError ? Colors.red : Colors.green,
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_isLoading)
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     return Scaffold(
       body: Stack(
@@ -137,13 +181,25 @@ class _ModelProfileSettingsScreenState extends State<ModelProfileSettingsScreen>
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [Colors.pink.shade50.withOpacity(0.3), Colors.purple.shade50.withOpacity(0.3)],
-                begin: Alignment.topLeft, end: Alignment.bottomRight,
+                colors: [
+                  Colors.pink.shade50.withOpacity(0.3),
+                  Colors.purple.shade50.withOpacity(0.3),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
             ),
           ),
-          Positioned(top: -50, right: -50, child: _buildBlurBlob(Colors.pink.shade200)),
-          Positioned(bottom: -50, left: -50, child: _buildBlurBlob(Colors.purple.shade200)),
+          Positioned(
+            top: -50,
+            right: -50,
+            child: _buildBlurBlob(Colors.pink.shade200),
+          ),
+          Positioned(
+            bottom: -50,
+            left: -50,
+            child: _buildBlurBlob(Colors.purple.shade200),
+          ),
 
           SafeArea(
             child: SingleChildScrollView(
@@ -152,7 +208,7 @@ class _ModelProfileSettingsScreenState extends State<ModelProfileSettingsScreen>
                 children: [
                   _buildHeader(),
                   const SizedBox(height: 20),
-                  
+
                   // 1. Basic Info Card
                   _buildCard(
                     title: "المعلومات الأساسية",
@@ -167,25 +223,45 @@ class _ModelProfileSettingsScreenState extends State<ModelProfileSettingsScreen>
                           decoration: BoxDecoration(
                             color: Colors.grey[200],
                             borderRadius: BorderRadius.circular(12),
-                            image: _profile?.storeBannerUrl != null
-                                ? DecorationImage(image: CachedNetworkImageProvider(_profile!.storeBannerUrl!), fit: BoxFit.cover)
-                                : null,
+                            image:
+                                _profile?.storeBannerUrl != null
+                                    ? DecorationImage(
+                                      image: CachedNetworkImageProvider(
+                                        _profile!.storeBannerUrl!,
+                                      ),
+                                      fit: BoxFit.cover,
+                                    )
+                                    : null,
                             border: Border.all(color: Colors.grey.shade300),
                           ),
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
                               if (_profile?.storeBannerUrl == null)
-                                Column(mainAxisAlignment: MainAxisAlignment.center, children: const [Icon(Icons.camera_alt, color: Colors.grey), Text("أضف صورة غلاف", style: TextStyle(color: Colors.grey, fontSize: 10))]),
+                                Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: const [
+                                    Icon(Icons.camera_alt, color: Colors.grey),
+                                    Text(
+                                      "أضف صورة غلاف",
+                                      style: TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               if (_uploadingType == 'cover')
-                                const CircularProgressIndicator(color: Colors.white),
+                                const CircularProgressIndicator(
+                                  color: Colors.white,
+                                ),
                             ],
                           ),
                         ),
                       ),
-                      
+
                       const SizedBox(height: 16),
-                      
+
                       // Profile Pic
                       Center(
                         child: Stack(
@@ -193,22 +269,49 @@ class _ModelProfileSettingsScreenState extends State<ModelProfileSettingsScreen>
                             CircleAvatar(
                               radius: 40,
                               backgroundColor: Colors.grey[200],
-                              backgroundImage: _profile?.profilePictureUrl != null ? CachedNetworkImageProvider(_profile!.profilePictureUrl!) : null,
-                              child: _profile?.profilePictureUrl == null ? Text(_profile?.name[0] ?? 'U', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: _roseColor)) : null,
+                              backgroundImage:
+                                  _profile?.profilePictureUrl != null
+                                      ? CachedNetworkImageProvider(
+                                        _profile!.profilePictureUrl!,
+                                      )
+                                      : null,
+                              child:
+                                  _profile?.profilePictureUrl == null
+                                      ? Text(
+                                        _profile?.name[0] ?? 'U',
+                                        style: TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.bold,
+                                          color: _roseColor,
+                                        ),
+                                      )
+                                      : null,
                             ),
                             Positioned(
-                              bottom: 0, right: 0,
+                              bottom: 0,
+                              right: 0,
                               child: InkWell(
                                 onTap: () => _pickAndUploadImage('profile'),
                                 child: CircleAvatar(
                                   radius: 14,
                                   backgroundColor: Colors.white,
-                                  child: _uploadingType == 'profile' 
-                                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)) 
-                                    : Icon(Icons.camera_alt, size: 16, color: _roseColor),
+                                  child:
+                                      _uploadingType == 'profile'
+                                          ? const SizedBox(
+                                            width: 14,
+                                            height: 14,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                          : Icon(
+                                            Icons.camera_alt,
+                                            size: 16,
+                                            color: _roseColor,
+                                          ),
                                 ),
                               ),
-                            )
+                            ),
                           ],
                         ),
                       ),
@@ -216,7 +319,11 @@ class _ModelProfileSettingsScreenState extends State<ModelProfileSettingsScreen>
                       const SizedBox(height: 16),
                       _buildTextField("الاسم الكامل", _nameController),
                       const SizedBox(height: 12),
-                      _buildTextField("النبذة التعريفية (Bio)", _bioController, maxLines: 3),
+                      _buildTextField(
+                        "النبذة التعريفية (Bio)",
+                        _bioController,
+                        maxLines: 3,
+                      ),
                     ],
                   ),
 
@@ -230,7 +337,12 @@ class _ModelProfileSettingsScreenState extends State<ModelProfileSettingsScreen>
                       GridView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 8, mainAxisSpacing: 8),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                            ),
                         itemCount: (_profile?.portfolio.length ?? 0) + 1,
                         itemBuilder: (ctx, idx) {
                           // زر الإضافة في النهاية
@@ -238,20 +350,69 @@ class _ModelProfileSettingsScreenState extends State<ModelProfileSettingsScreen>
                             return InkWell(
                               onTap: () => _pickAndUploadImage('portfolio'),
                               child: Container(
-                                decoration: BoxDecoration(color: Colors.pink.shade50, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.pink.shade200, style: BorderStyle.solid)),
-                                child: _uploadingType == 'portfolio' 
-                                  ? const Center(child: CircularProgressIndicator()) 
-                                  : Column(mainAxisAlignment: MainAxisAlignment.center, children: const [Icon(Icons.add_photo_alternate, color: Colors.pink), Text("إضافة", style: TextStyle(fontSize: 10, color: Colors.pink))]),
+                                decoration: BoxDecoration(
+                                  color: Colors.pink.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.pink.shade200,
+                                    style: BorderStyle.solid,
+                                  ),
+                                ),
+                                child:
+                                    _uploadingType == 'portfolio'
+                                        ? const Center(
+                                          child: CircularProgressIndicator(),
+                                        )
+                                        : Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: const [
+                                            Icon(
+                                              Icons.add_photo_alternate,
+                                              color: Colors.pink,
+                                            ),
+                                            Text(
+                                              "إضافة",
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.pink,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                               ),
                             );
                           }
-                          
+
                           // الصور الموجودة
                           final imgUrl = _profile!.portfolio[idx];
                           return Stack(
                             children: [
-                              ClipRRect(borderRadius: BorderRadius.circular(8), child: CachedNetworkImage(imageUrl: imgUrl, fit: BoxFit.cover, width: double.infinity, height: double.infinity)),
-                              Positioned(top: 2, right: 2, child: InkWell(onTap: () => _removePortfolioImage(imgUrl), child: const CircleAvatar(radius: 10, backgroundColor: Colors.red, child: Icon(Icons.close, size: 12, color: Colors.white)))),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: CachedNetworkImage(
+                                  imageUrl: imgUrl,
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                ),
+                              ),
+                              Positioned(
+                                top: 2,
+                                right: 2,
+                                child: InkWell(
+                                  onTap: () => _removePortfolioImage(imgUrl),
+                                  child: const CircleAvatar(
+                                    radius: 10,
+                                    backgroundColor: Colors.red,
+                                    child: Icon(
+                                      Icons.close,
+                                      size: 12,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ],
                           );
                         },
@@ -267,30 +428,65 @@ class _ModelProfileSettingsScreenState extends State<ModelProfileSettingsScreen>
                     children: [
                       Expanded(
                         child: _buildCard(
-                          title: "الإحصائيات",
+                          title: "الإحصائيات (تلقائي)",
                           icon: Icons.bar_chart,
                           children: [
-                            _buildTextField("المتابعين", _followersController, icon: Icons.group),
+                            // ✅ 3. تفعيل وضع القراءة فقط
+                            _buildTextField(
+                              "إجمالي المتابعين",
+                              _followersController,
+                              icon: Icons.group,
+                              readOnly: true,
+                            ),
                             const SizedBox(height: 8),
-                            _buildTextField("التفاعل", _engagementController, icon: Icons.bolt),
+                            _buildTextField(
+                              "التفاعل",
+                              _engagementController,
+                              icon: Icons.bolt,
+                              readOnly: true,
+                            ),
                           ],
                         ),
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   _buildCard(
                     title: "روابط التواصل",
                     icon: Icons.link,
                     children: [
-                      _buildSocialInput("Instagram", _socialControllers['instagram']!, Colors.purple),
-                      _buildSocialInput("Twitter", _socialControllers['twitter']!, Colors.blue),
-                      _buildSocialInput("TikTok", _socialControllers['tiktok']!, Colors.black),
-                      _buildSocialInput("Snapchat", _socialControllers['snapchat']!, Colors.amber),
-                      _buildSocialInput("Facebook", _socialControllers['facebook']!, Colors.indigo),
-                      _buildSocialInput("WhatsApp", _socialControllers['whatsapp']!, Colors.green),
+                      _buildSocialInput(
+                        "Instagram",
+                        _socialControllers['instagram']!,
+                        Colors.purple,
+                      ),
+                      _buildSocialInput(
+                        "Twitter",
+                        _socialControllers['twitter']!,
+                        Colors.blue,
+                      ),
+                      _buildSocialInput(
+                        "TikTok",
+                        _socialControllers['tiktok']!,
+                        Colors.black,
+                      ),
+                      _buildSocialInput(
+                        "Snapchat",
+                        _socialControllers['snapchat']!,
+                        Colors.amber,
+                      ),
+                      _buildSocialInput(
+                        "Facebook",
+                        _socialControllers['facebook']!,
+                        Colors.indigo,
+                      ),
+                      _buildSocialInput(
+                        "WhatsApp",
+                        _socialControllers['whatsapp']!,
+                        Colors.green,
+                      ),
                     ],
                   ),
 
@@ -305,20 +501,42 @@ class _ModelProfileSettingsScreenState extends State<ModelProfileSettingsScreen>
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
                         shadowColor: Colors.transparent,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         padding: EdgeInsets.zero,
                       ),
-                      icon: _isSaving ? const SizedBox() : const Icon(Icons.save, color: Colors.white),
+                      icon:
+                          _isSaving
+                              ? const SizedBox()
+                              : const Icon(Icons.save, color: Colors.white),
                       label: Ink(
-                        decoration: BoxDecoration(gradient: LinearGradient(colors: [_roseColor, _purpleColor]), borderRadius: BorderRadius.circular(12)),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [_roseColor, _purpleColor],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         child: Container(
                           alignment: Alignment.center,
-                          child: _isSaving ? const CircularProgressIndicator(color: Colors.white) : const Text("حفظ التغييرات", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                          child:
+                              _isSaving
+                                  ? const CircularProgressIndicator(
+                                    color: Colors.white,
+                                  )
+                                  : const Text(
+                                    "حفظ التغييرات",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                         ),
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 20),
                 ],
               ),
@@ -337,51 +555,122 @@ class _ModelProfileSettingsScreenState extends State<ModelProfileSettingsScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)), child: Icon(Icons.person, color: _roseColor, size: 28)),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.person, color: _roseColor, size: 28),
+            ),
             const SizedBox(width: 12),
-            const Text("تعديل الملف الشخصي", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const Text(
+              "تعديل الملف الشخصي",
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         const SizedBox(height: 4),
-        const Text("قم بتحديث معلوماتك لجذب المزيد من العملاء", style: TextStyle(color: Colors.grey)),
+        const Text(
+          "قم بتحديث معلوماتك لجذب المزيد من العملاء",
+          style: TextStyle(color: Colors.grey),
+        ),
       ],
     );
   }
 
-  Widget _buildCard({required String title, required IconData icon, required List<Widget> children}) {
+  Widget _buildCard({
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
     return Container(
-      decoration: BoxDecoration(color: Colors.white.withOpacity(0.9), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade200), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(gradient: LinearGradient(colors: [_roseColor, _purpleColor]), borderRadius: const BorderRadius.vertical(top: Radius.circular(16))),
-            child: Row(children: [Icon(icon, color: Colors.white, size: 20), const SizedBox(width: 8), Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))]),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [_roseColor, _purpleColor]),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
           ),
-          Padding(padding: const EdgeInsets.all(16), child: Column(children: children)),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(children: children),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, {int maxLines = 1, IconData? icon}) {
+  // ✅ 4. تحديث دالة بناء الحقل لدعم القراءة فقط وتغيير اللون
+  Widget _buildTextField(
+    String label,
+    TextEditingController controller, {
+    int maxLines = 1,
+    IconData? icon,
+    bool readOnly = false,
+  }) {
     return TextField(
       controller: controller,
       maxLines: maxLines,
+      readOnly: readOnly, // تفعيل القراءة فقط
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: icon != null ? Icon(icon, size: 18, color: Colors.grey) : null,
-        filled: true, fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: _purpleColor)),
+        prefixIcon:
+            icon != null ? Icon(icon, size: 18, color: Colors.grey) : null,
+        filled: true,
+        // تغيير لون الخلفية إذا كان للقراءة فقط
+        fillColor: readOnly ? Colors.grey.shade200 : Colors.white,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: _purpleColor),
+        ),
       ),
     );
   }
 
-  Widget _buildSocialInput(String label, TextEditingController controller, Color color) {
+  Widget _buildSocialInput(
+    String label,
+    TextEditingController controller,
+    Color color,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
@@ -389,9 +678,13 @@ class _ModelProfileSettingsScreenState extends State<ModelProfileSettingsScreen>
         decoration: InputDecoration(
           labelText: label,
           prefixIcon: Icon(Icons.link, color: color, size: 18),
-          filled: true, fillColor: Colors.grey[50],
+          filled: true,
+          fillColor: Colors.grey[50],
           isDense: true,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
         ),
       ),
     );
@@ -399,9 +692,16 @@ class _ModelProfileSettingsScreenState extends State<ModelProfileSettingsScreen>
 
   Widget _buildBlurBlob(Color color) {
     return Container(
-      width: 200, height: 200,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: color.withOpacity(0.2)),
-      child: BackdropFilter(filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30), child: Container(color: Colors.transparent)),
+      width: 200,
+      height: 200,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color.withOpacity(0.2),
+      ),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+        child: Container(color: Colors.transparent),
+      ),
     );
   }
 }

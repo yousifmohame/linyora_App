@@ -9,20 +9,53 @@ class BrowseService {
   // جلب قائمة المودلز
   Future<List<BrowsedModel>> getModels() async {
     try {
-      print('=== DEBUG: Fetching Models ===');
+      print('\n🔵 === START DEBUG: Fetching Models ===');
+
       final response = await _apiClient.get('/browse/models');
 
-      print('Status Code: ${response.statusCode}');
+      print('📡 Status Code: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        return (response.data as List)
-            .map((e) => BrowsedModel.fromJson(e))
-            .toList();
+        // ✅ 1. طباعة البيانات الخام بشكل منظم
+        try {
+          // نقوم بترميز البيانات كـ JSON نصي منسق ليسهل قراءته في الكونسول
+          String prettyJson = const JsonEncoder.withIndent(
+            '  ',
+          ).convert(response.data);
+          print('📦 Raw Data from Backend:\n$prettyJson');
+        } catch (e) {
+          print('⚠️ Could not print pretty JSON: $e');
+          print('📦 Raw Data (Unformatted): ${response.data}');
+        }
+
+        print('🔄 Starting Parsing...');
+
+        // ✅ 2. محاولة التحويل مع التقاط الأخطاء لكل عنصر
+        List<BrowsedModel> models = [];
+        List<dynamic> dataList = response.data as List;
+
+        for (var i = 0; i < dataList.length; i++) {
+          try {
+            models.add(BrowsedModel.fromJson(dataList[i]));
+          } catch (e) {
+            print('❌ Error parsing item at index [$i]:');
+            print('   Data: ${dataList[i]}');
+            print('   Error: $e');
+          }
+        }
+
+        print(
+          '✅ Parsing Complete. Success: ${models.length} / Total: ${dataList.length}',
+        );
+        print('🔵 === END DEBUG ===\n');
+
+        return models;
       }
-      print('Failed to fetch models: ${response.statusCode}');
+
+      print('❌ Failed to fetch models: ${response.statusCode}');
       return [];
     } catch (e) {
-      print("Error fetching models: $e");
+      print("❌ Error fetching models: $e");
       return [];
     }
   }
@@ -129,5 +162,3 @@ class BrowseService {
     }
   }
 }
-
-

@@ -14,14 +14,22 @@ import '../profile/screens/profile_screen.dart';
 import '../shared/widgets/app_drawer.dart';
 
 class MainLayoutScreen extends StatefulWidget {
-  const MainLayoutScreen({super.key});
+  final int initialIndex;
+  const MainLayoutScreen({super.key, this.initialIndex = 0});
 
   @override
   State<MainLayoutScreen> createState() => _MainLayoutScreenState();
 }
 
 class _MainLayoutScreenState extends State<MainLayoutScreen> {
-  int _currentIndex = 0;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    // 2. تعيين الصفحة الحالية بناءً على ما تم تمريره
+    _currentIndex = widget.initialIndex;
+  }
 
   // مراجع للمفاتيح لإجبار إعادة بناء ReelsScreen عند تغيير الحالة
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey();

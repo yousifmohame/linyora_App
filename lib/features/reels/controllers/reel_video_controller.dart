@@ -24,10 +24,17 @@ class ReelVideoController {
   // callbacks لتحديث الواجهة
   final Function(bool isPlaying, bool isBuffering) onStateChanged;
 
+  Timer? _viewTimer;
+  bool _viewCounted = false; // لضمان عدم احتساب المشاهدة مرتين لنفس الجلسة
+  final Function(String)? onVideoWatched; // Callback عند استحقاق المشاهدة
+  final String reelId; // نحتاج معرف الفيديو
+
   ReelVideoController({
     required this.videoUrl,
+    required this.reelId,
     required this.vsync,
     required this.onStateChanged,
+    this.onVideoWatched, // ✅ استقبال الدالة
   });
 
   Future<void> initialize() async {
@@ -104,6 +111,7 @@ class ReelVideoController {
   void play() {
     if (isInitialized && _videoPlayerController != null) {
       _videoPlayerController!.play();
+      _startViewTimer();
     }
   }
 
@@ -113,7 +121,27 @@ class ReelVideoController {
       _fadeController?.reverse();
       // ننتظر حتى يتوقف الفيديو فعلياً
       await _videoPlayerController!.pause();
+      _cancelViewTimer();
     }
+  }
+
+  void _startViewTimer() {
+    // إذا تم احتساب المشاهدة سابقاً أو المؤقت يعمل بالفعل، لا تفعل شيئاً
+    if (_viewCounted || (_viewTimer != null && _viewTimer!.isActive)) return;
+
+    _viewTimer = Timer(const Duration(seconds: 2), () {
+      if (videoPlayerController != null && videoPlayerController!.value.isPlaying) {
+        _viewCounted = true;
+        if (onVideoWatched != null) {
+          onVideoWatched!(reelId); // ✅ استدعاء دالة التسجيل
+        }
+      }
+    });
+  }
+
+  void _cancelViewTimer() {
+    _viewTimer?.cancel();
+    _viewTimer = null;
   }
 
   ChewieController? get chewieController => _chewieController;
@@ -127,6 +155,7 @@ class ReelVideoController {
     _fadeController?.dispose();
     _chewieController?.dispose();
     _videoPlayerController?.dispose();
+    _cancelViewTimer();
     isInitialized = false;
   }
 }

@@ -19,7 +19,7 @@ class ModelStats {
       engagement: json['engagement']?.toString() ?? '0%',
       completedProjects:
           int.tryParse(json['completed_projects']?.toString() ?? '0') ?? 0,
-      rating: double.tryParse(json['rating']?.toString() ?? '0.0') ?? 0.0,
+      rating: double.tryParse(json['engagement']?.toString() ?? '0.0') ?? 0.0,
     );
   }
 }

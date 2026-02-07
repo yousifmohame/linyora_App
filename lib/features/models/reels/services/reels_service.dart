@@ -11,7 +11,7 @@ class ReelsService {
     try {
       // Matches the endpoint used in your React code: api.get('/reels/my-reels')
       final response = await _apiClient.get('/reels/my-reels');
-      
+
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data;
         return data.map((json) => ModelReel.fromJson(json)).toList();
@@ -44,7 +44,8 @@ class ReelsService {
         '/reels/$reelId',
         data: {
           'caption': caption,
-          'tagged_products': "[]", // يمكن إرسال التاقات القديمة هنا للحفاظ عليها
+          'tagged_products':
+              "[]", // يمكن إرسال التاقات القديمة هنا للحفاظ عليها
         },
       );
       return true;

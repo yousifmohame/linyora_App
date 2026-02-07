@@ -4,9 +4,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart'; // 1. استي�
 import 'package:linyora_project/features/reels/screens/model_reels_viewer.dart';
 import 'package:linyora_project/features/shared/widgets/full_screen_image_viewer.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../core/widgets/optimized_image.dart';
 import '../../../models/public_profile_models.dart';
-import '../../reels/screens/widgets/optimized_video_player.dart';
 import '../services/public_profile_service.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -185,9 +183,9 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
                       children: [
                         _buildStatItem(
                           "المتابعين",
-                          "${profile.stats.followers}",
+                          "${profile.stats.followers + profile.followersCount}",
                         ),
-                        _buildStatItem("ريلز", "${profile.stats.reelsCount}"),
+                        _buildStatItem("ريلز", "${_modelData!.reels.length}"),
                         _buildStatItem(
                           "خدمات",
                           "${_modelData!.services.length + _modelData!.offers.length}",

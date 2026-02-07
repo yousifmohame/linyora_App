@@ -96,6 +96,7 @@ class UserProfile {
   final String? bio;
   final String roleName;
   final bool isVerified;
+  final int followersCount;
   bool isFollowedByMe;
   final ProfileStats stats;
   final SocialLinks socialLinks;
@@ -109,6 +110,7 @@ class UserProfile {
     this.bio,
     required this.roleName,
     required this.isVerified,
+    required this.followersCount,
     required this.isFollowedByMe,
     required this.stats,
     required this.socialLinks,
@@ -125,6 +127,7 @@ class UserProfile {
       roleName: json['role_name'] ?? 'Influencer',
       isVerified: json['is_verified'] == true,
       isFollowedByMe: json['isFollowedByMe'] == true,
+      followersCount: int.tryParse(json['followers_count']?.toString() ?? '0') ?? 0,
       stats: ProfileStats.fromJson(json['stats'] ?? {}),
       socialLinks: SocialLinks.fromJson(json['social_links'] ?? {}),
       portfolio: (json['portfolio'] as List?)?.map((e) => e.toString()).toList() ?? [],

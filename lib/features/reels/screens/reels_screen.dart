@@ -118,7 +118,13 @@ class _ReelsScreenState extends State<ReelsScreen>
 
     final controller = ReelVideoController(
       videoUrl: _videos[index].videoUrl,
+      reelId: _videos[index].id.toString(),
       vsync: this,
+      onVideoWatched: (id) {
+        _reelsService.trackView(id); // الاتصال بالسيرفر
+        // (اختياري) تحديث العداد محلياً لعدم الانتظار
+        // setState(() { _videos[index].viewsCount++; });
+      },
       onStateChanged: (isPlaying, isBuffering) {
         if (mounted && index == _focusedIndex) setState(() {});
       },
@@ -145,7 +151,7 @@ class _ReelsScreenState extends State<ReelsScreen>
   }
 
   Future<void> _pauseAll() async {
-    for (var c in _videoControllers.values) {
+    for (var c in _videoControllers.values.toList()) {
       if (c.isPlaying) {
         // نتأكد أنه يعمل أولاً
         await c.pause(); // ننتظر حتى يتوقف فعلياً

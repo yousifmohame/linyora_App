@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import '../../../core/api/api_client.dart';
 import '../../../models/reel_model.dart';
 import '../../../models/comment_model.dart'; // استيراد موديل التعليقات
@@ -62,6 +61,15 @@ class ReelsService {
     } catch (e) {
       print('Unlike Error: $e');
       rethrow;
+    }
+  }
+
+  Future<void> trackView(String reelId) async {
+    try {
+      // تأكد من أن الرابط يطابق ما قمت بإعداده في الباك إند
+      await _apiClient.post('/reels/$reelId/view', data: {});
+    } catch (e) {
+      print('Track View Error: $e');
     }
   }
 

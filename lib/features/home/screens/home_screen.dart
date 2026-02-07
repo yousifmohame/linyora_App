@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:linyora_project/features/layout/main_layout_screen.dart';
 import 'package:linyora_project/features/products/screens/main_prodects.dart';
 import 'package:provider/provider.dart';
 
@@ -29,6 +30,7 @@ import 'package:linyora_project/models/top_user_model.dart';
 import 'package:linyora_project/features/home/widgets/flash_sale_section.dart';
 import 'package:linyora_project/features/home/widgets/horizontal_product_list.dart';
 import 'package:linyora_project/features/stories/widgets/stories_section.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../widgets/section_display.dart';
 import '../widgets/banner_video_player.dart';
 import '../widgets/top_user_card.dart';
@@ -329,9 +331,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ✅ دالة مساعدة للانتقال (عليك إنشاء هذه الشاشة أو استخدام شاشة المنتجات الموجودة لديك)
   void _navigateToViewAll(String title, String apiType) {
-    Navigator.push(
+    // ✅ الطريقة الصحيحة (تفتح الهيكل الرئيسي وتحدد صفحة المنتجات)
+    Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (context) => ProductsScreen()),
+      MaterialPageRoute(
+        builder:
+            (context) => const MainLayoutScreen(
+              initialIndex: 1,
+            ), // رقم 1 هو ترتيب المنتجات
+      ),
+      (route) =>
+          false, // هذا يمنع الرجوع للصفحة السابقة (اجعلها true إذا أردت السماح بالرجوع)
     );
   }
 
@@ -861,7 +871,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 SizedBox(
                   height: 36,
                   child: ElevatedButton(
-                    onPressed: () => Navigator.pushNamed(context, banner.link),
+                    // ✅ هنا التغيير لفتح الرابط الخارجي
+                    onPressed: () => _launchExternalUrl(banner.link),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: Colors.black,
@@ -893,6 +904,21 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ],
     );
+  }
+
+  Future<void> _launchExternalUrl(String url) async {
+    if (url.isEmpty) return;
+
+    final Uri uri = Uri.parse(url);
+
+    try {
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        // يمكنك إظهار رسالة خطأ هنا للمستخدم
+        print('Could not launch $url');
+      }
+    } catch (e) {
+      print('Error launching url: $e');
+    }
   }
 
   Widget _buildSectionTitleWrapper(String title, VoidCallback onSeeAll) {

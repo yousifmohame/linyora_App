@@ -8,6 +8,9 @@ class ProfileData {
   SocialLinks socialLinks;
   Stats stats;
 
+  // ✅ تمت الإضافة: عدد متابعي المنصة (الداخلي)
+  int followersCount;
+
   ProfileData({
     required this.name,
     required this.email,
@@ -17,6 +20,8 @@ class ProfileData {
     required this.portfolio,
     required this.socialLinks,
     required this.stats,
+    // ✅ قيمة افتراضية
+    this.followersCount = 0,
   });
 
   factory ProfileData.fromJson(Map<String, dynamic> json) {
@@ -26,9 +31,18 @@ class ProfileData {
       bio: json['bio'] ?? '',
       profilePictureUrl: json['profile_picture_url'],
       storeBannerUrl: json['store_banner_url'],
-      portfolio: (json['portfolio'] as List<dynamic>? ?? []).map((e) => e.toString()).toList(),
+      portfolio:
+          (json['portfolio'] as List<dynamic>? ?? [])
+              .map((e) => e.toString())
+              .toList(),
       socialLinks: SocialLinks.fromJson(json['social_links'] ?? {}),
       stats: Stats.fromJson(json['stats'] ?? {}),
+
+      // ✅ قراءة العدد بأمان (سواء كان int أو String أو غير موجود)
+      followersCount:
+          json['followers_count'] is int
+              ? json['followers_count']
+              : int.tryParse(json['followers_count']?.toString() ?? '0') ?? 0,
     );
   }
 
@@ -40,9 +54,12 @@ class ProfileData {
     'portfolio': portfolio,
     'social_links': socialLinks.toJson(),
     'stats': stats.toJson(),
+    // ✅ إضافته للـ JSON (اختياري حسب حاجتك لإرساله)
+    'followers_count': followersCount,
   };
 }
 
+// الكلاسات الأخرى تبقى كما هي بدون تغيير
 class SocialLinks {
   String instagram;
   String twitter;

@@ -39,13 +39,25 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
     _loadStories();
   }
 
+  // ✅ التعديل 1: تحسين دالة التخلص من الموارد
   @override
   void dispose() {
+    // إيقاف التشغيل فوراً لمنع استمراره في الخلفية
+    controller.pause();
     controller.dispose();
     super.dispose();
   }
 
+  // ✅ التعديل 2: دالة موحدة للخروج الآمن
+  void _onClose() {
+    controller.pause(); // إيقاف الفيديو/القصة
+    if (mounted) {
+      Navigator.pop(context);
+    }
+  }
+
   Future<void> _loadStories() async {
+    // ... (نفس الكود السابق)
     try {
       final stories = await _storiesService.getStoriesById(
         widget.feedId,
@@ -67,6 +79,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
   }
 
   Color _parseColor(String? hexColor) {
+    // ... (نفس الكود السابق)
     if (hexColor == null || hexColor.isEmpty) return Colors.black;
     try {
       hexColor = hexColor.replaceAll("#", "");
@@ -77,8 +90,8 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
     }
   }
 
-  // ✅ دالة لعكس المحتوى الداخلي (صور ونصوص) إذا كان التطبيق RTL
   Widget _mirrorContentIfRtl(Widget child) {
+    // ... (نفس الكود السابق)
     final isRtl = Directionality.of(context) == TextDirection.rtl;
     if (!isRtl) return child;
 
@@ -90,12 +103,10 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
   }
 
   List<StoryItem> _buildStoryItems(List<StoryModel> stories) {
+    // ... (نفس الكود السابق)
     return stories.map((story) {
-      
-      // ✅ تحديد رابط الصورة: الأولوية للصورة المرفقة، ثم صورة المنتج
       final String? imageToDisplay = story.mediaUrl ?? story.productImage;
 
-      // 1. نص فقط (إذا لم يوجد ميديا ولا صورة منتج)
       if (story.mediaType == MediaType.text && imageToDisplay == null) {
         return StoryItem(
           _mirrorContentIfRtl(
@@ -109,7 +120,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
                   story.textContent ?? '',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                    fontFamily: 'Cairo', // تأكد من وجود الخط أو احذفه
+                    fontFamily: 'Cairo',
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -122,58 +133,56 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
           shown: story.isViewed,
           duration: const Duration(seconds: 5),
         );
-      }
-      
-      // 2. فيديو
-      else if (story.mediaType == MediaType.video && story.mediaUrl != null) {
+      } else if (story.mediaType == MediaType.video && story.mediaUrl != null) {
         return StoryItem.pageVideo(
           story.mediaUrl!,
           controller: controller,
-          caption: story.textContent != null
-              ? _mirrorContentIfRtl(
-                  Text(
-                    story.textContent!,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      backgroundColor: Colors.black54,
+          caption:
+              story.textContent != null
+                  ? _mirrorContentIfRtl(
+                    Text(
+                      story.textContent!,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        backgroundColor: Colors.black54,
+                      ),
                     ),
-                  ),
-                )
-              : null,
+                  )
+                  : null,
           shown: story.isViewed,
+          // ⚠️ ملاحظة: تأكد أنك تستخدم النسخة الحديثة من المكتبة التي تدعم التحكم
         );
-      }
-      
-      // 3. صورة (سواء كانت صورة مرفقة أو صورة منتج) ✅
-      else if (imageToDisplay != null) {
+      } else if (imageToDisplay != null) {
         return StoryItem(
           _mirrorContentIfRtl(
             Stack(
               children: [
-                // خلفية ملونة (تظهر إذا كانت الصورة لا تغطي الشاشة بالكامل)
                 Container(color: _parseColor(story.backgroundColor)),
-                
-                // الصورة
                 CachedNetworkImage(
-                  imageUrl: imageToDisplay, // ✅ استخدام المتغير الجديد
-                  fit: BoxFit.cover, // يمكنك تغييرها لـ contain إذا أردت عدم قص صورة المنتج
+                  imageUrl: imageToDisplay,
+                  fit: BoxFit.cover,
                   width: double.infinity,
                   height: double.infinity,
-                  placeholder: (c, u) => const Center(
-                    child: CircularProgressIndicator(color: Colors.white),
-                  ),
-                  errorWidget: (c, u, e) => Container(
-                    color: Colors.grey[900],
-                    child: const Center(
-                      child: Icon(Icons.broken_image, color: Colors.white, size: 50),
-                    ),
-                  ),
+                  placeholder:
+                      (c, u) => const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      ),
+                  errorWidget:
+                      (c, u, e) => Container(
+                        color: Colors.grey[900],
+                        child: const Center(
+                          child: Icon(
+                            Icons.broken_image,
+                            color: Colors.white,
+                            size: 50,
+                          ),
+                        ),
+                      ),
                 ),
-                
-                // النص المضاف (Caption)
-                if (story.textContent != null && story.textContent!.trim().isNotEmpty)
+                if (story.textContent != null &&
+                    story.textContent!.trim().isNotEmpty)
                   Positioned(
-                    bottom: 100, // مرفوع قليلاً لكي لا يغطي زر المنتج
+                    bottom: 100,
                     left: 20,
                     right: 20,
                     child: Container(
@@ -200,15 +209,12 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
           duration: const Duration(seconds: 5),
         );
       }
-      
-      // حالة احتياطية
       return StoryItem.text(title: "", backgroundColor: Colors.black);
     }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    // التحقق من اتجاه لغة التطبيق
     final isRtl = Directionality.of(context) == TextDirection.rtl;
 
     if (_hasError) {
@@ -222,7 +228,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
               const SizedBox(height: 16),
               const Text("لا توجد قصص", style: TextStyle(color: Colors.white)),
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: _onClose, // ✅ استخدام دالة الإغلاق الآمن
                 child: const Text("رجوع", style: TextStyle(color: Colors.blue)),
               ),
             ],
@@ -242,20 +248,16 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
       backgroundColor: Colors.black,
       body: GestureDetector(
         onVerticalDragUpdate: (details) {
-          if (details.primaryDelta! > 10) Navigator.pop(context);
+          // ✅ استخدام دالة الإغلاق الآمن عند السحب
+          if (details.primaryDelta! > 10) _onClose();
         },
         child: Stack(
           children: [
-            // 1. المشغل (Story View Layer)
             Transform(
               alignment: Alignment.center,
-              // ✅ الحل: إذا كان عربي، اقلب الشاشة أفقياً بالكامل
               transform:
                   isRtl ? Matrix4.rotationY(math.pi) : Matrix4.identity(),
               child: Directionality(
-                // ✅ هام جداً: أجبر المكتبة على الاعتقاد أنها في وضع إنجليزي (LTR)
-                // هذا يضمن أن ترتيب الأشرطة يكون [1][2][3] من اليسار
-                // ثم يقوم الـ Transform بعكسها لتصبح [3][2][1] من اليمين (وهو المطلوب للعربي)
                 textDirection: TextDirection.ltr,
                 child: StoryView(
                   storyItems: _storyItems!,
@@ -273,17 +275,15 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
                       _stories![index].isViewed = true;
                     }
                   },
-                  onComplete: () => Navigator.pop(context),
+                  onComplete: _onClose, // ✅ استخدام دالة الإغلاق الآمن
                   onVerticalSwipeComplete: (direction) {
-                    if (direction == Direction.down) Navigator.pop(context);
+                    if (direction == Direction.down)
+                      _onClose(); // ✅ استخدام دالة الإغلاق الآمن
                   },
                 ),
               ),
             ),
 
-            // 2. طبقات الواجهة (UI Layers) - هذه لا تتأثر بالـ Transform
-
-            // تدرج علوي
             Positioned(
               top: 0,
               left: 0,
@@ -300,7 +300,6 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
               ),
             ),
 
-            // الهيدر (معلومات المستخدم)
             Positioned(
               top: 90,
               left: 10,
@@ -352,13 +351,12 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
                       color: Colors.white,
                       size: 28,
                     ),
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: _onClose, // ✅ استخدام دالة الإغلاق الآمن
                   ),
                 ],
               ),
             ),
 
-            // زر المنتج
             if (_stories!.isNotEmpty &&
                 _stories![_currentIndex].productId != null)
               Positioned(
@@ -382,6 +380,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
                       ).then((_) => controller.play());
                     },
                     child: Container(
+                      // ... (نفس تصميم الزر)
                       height: 50,
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       decoration: BoxDecoration(
