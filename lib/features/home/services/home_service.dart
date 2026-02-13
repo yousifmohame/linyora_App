@@ -133,6 +133,27 @@ class HomeService {
     }
   }
 
+  // ✅ دالة جديدة: جلب سرعة الشريط
+  Future<int> getMarqueeSpeed() async {
+    try {
+      final response = await _apiClient.get('/settings/marquee_speed');
+      // نفترض أن الباك إند يرجع رقم مباشرة أو نص يحتوي على رقم
+      return int.tryParse(response.data.toString()) ?? 20;
+    } catch (e) {
+      return 20; // القيمة الافتراضية
+    }
+  }
+
+  // ✅ دالة جديدة: جلب لون الخلفية
+  Future<String> getMarqueeColor() async {
+    try {
+      final response = await _apiClient.get('/settings/marquee_bg_color');
+      return response.data.toString(); // يرجع سترينج مثل "#000000"
+    } catch (e) {
+      return "#000000"; // القيمة الافتراضية (أسود)
+    }
+  }
+
   // 8. البحث عن المنتجات
   Future<List<ProductModel>> searchProducts(String query) async {
     try {

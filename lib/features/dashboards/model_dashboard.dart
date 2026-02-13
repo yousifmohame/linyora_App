@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:linyora_project/features/chat/screens/chat_screen.dart';
 import 'package:linyora_project/features/layout/main_layout_screen.dart';
 import 'package:linyora_project/features/models/analytics/screens/model_analytics_screen.dart';
 import 'package:linyora_project/features/models/bank/screens/model_bank_settings_screen.dart';
-import 'package:linyora_project/features/models/chat/screens/chat_screen.dart';
 import 'package:linyora_project/features/models/notifications/screens/notification_screen.dart';
 import 'package:linyora_project/features/models/notifications/services/notifications_service.dart';
 import 'package:linyora_project/features/models/offers/screens/model_offers_screen.dart';
@@ -13,8 +13,8 @@ import 'package:linyora_project/features/models/reels/screens/model_reels_screen
 import 'package:linyora_project/features/models/requests/screens/model_requests_screen.dart';
 import 'package:linyora_project/features/models/stories/screens/stories_screen.dart';
 import 'package:linyora_project/features/models/verification/screens/verification_screen.dart';
-import 'package:linyora_project/features/models/wallet/screens/model_wallet_screen.dart';
 import 'package:linyora_project/features/public_profiles/screens/model_profile_screen.dart';
+import 'package:linyora_project/features/shared/wallet/screens/wallet_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
@@ -170,14 +170,14 @@ class _ModelDashboardScreenState extends State<ModelDashboardScreen> {
       {
         'title': 'المحفظة',
         'icon': Icons.account_balance_wallet_outlined,
-        'page': ModelWalletScreen(),
+        'page': WalletScreen(),
         'show': isVerified,
         'isLocked': !isSubscribed, // 🔒 مقفل
       },
       {
         'title': 'المحادثات',
         'icon': Icons.message_outlined,
-        'page': ChatScreen(currentUserId: user.id),
+        'page': ChatListScreen(currentUserId: user.id),
         'show': isVerified,
         'isLocked': !isSubscribed, // 🔒 مقفل
       },

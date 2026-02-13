@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:linyora_project/features/wishlist/providers/wishlist_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:linyora_project/l10n/app_localizations.dart';
 
@@ -30,10 +31,12 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final AuthService _authService = AuthService.instance;
   // ✅ 2. إنشاء نسخة من OrderService
-  final OrderService _orderService = OrderService();
 
   // ✅ 3. متغير لحفظ عدد الطلبات
   int _ordersCount = 0;
+  int _points = 0;
+  int _favoritesCount = 0;
+  String _membership = "Bronze";
   bool _isLoadingStats = false;
 
   @override
@@ -51,11 +54,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       // نفترض أن دالة getMyOrders تعيد قائمة بالطلبات List<OrderModel>
       // إذا كان لديك دالة خاصة للإحصائيات (getStats) يفضل استخدامها
-      final orders = await _orderService.getMyOrders();
+      final stats = await _authService.getUserStats();
 
       if (mounted) {
         setState(() {
-          _ordersCount = orders.length; // حساب عدد العناصر في القائمة
+          _ordersCount = int.tryParse(stats['orders']?.toString() ?? '0') ?? 0;
+          _points = int.tryParse(stats['points']?.toString() ?? '0') ?? 0;
+          _favoritesCount =
+              int.tryParse(stats['favorites']?.toString() ?? '0') ?? 0;
+          _membership = stats['membership'] ?? "Bronze";
           _isLoadingStats = false;
         });
       }
@@ -280,26 +287,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          // ✅ 7. عرض رقم الطلبات الحقيقي
+          // 1. الطلبات
           _buildStatItem(
             _isLoadingStats ? "..." : "$_ordersCount",
-            l10n.statsOrders,
+            l10n.myOrders, // "طلباتي"
           ),
+
           _buildVerticalDivider(),
-          // يمكنك تكرار نفس العملية للمتابعين والقسائم إذا توفرت في الـ API
-          _buildStatItem("0", l10n.statsFollowers),
+
+          // 2. النقاط (الآن تأتي صحيحة من السيرفر)
+          _buildStatItem(
+            _isLoadingStats ? "..." : "$_points",
+            "نقاطي", // أو l10n.myPoints
+          ),
+
           _buildVerticalDivider(),
-          _buildStatItem("0", l10n.statsVouchers),
+
+          // 3. المفضلة (تأتي من السيرفر)
+          _buildStatItem(
+            _isLoadingStats ? "..." : "$_favoritesCount",
+            l10n.favorites, // "المفضلة"
+          ),
         ],
       ),
     );
   }
-
-  // ... (باقي الدوال كما هي: _showLanguageBottomSheet, _buildGuestView, _buildProfileHeader, _buildStatItem, _buildVerticalDivider, _buildMenuSection)
 
   void _showLanguageBottomSheet(BuildContext context) {
     showModalBottomSheet(

@@ -19,18 +19,71 @@ class ProductFilterDrawer extends StatefulWidget {
 class _ProductFilterDrawerState extends State<ProductFilterDrawer> {
   final ProductService _productService = ProductService();
 
-  // حالة التحميل والبيانات
   bool _isLoading = true;
   FilterOptionsModel _filterOptions = FilterOptionsModel();
 
-  // قيم الفلاتر المختارة
-  RangeValues _priceRange = const RangeValues(
-    0,
-    5000,
-  ); // القيمة القصوى الافتراضية
+  RangeValues _priceRange = const RangeValues(0, 5000);
   List<String> _selectedBrands = [];
   int? _selectedRating;
   String? _selectedColor;
+
+  // خريطة الألوان الذكية (إنجليزي + عربي)
+  static const Map<String, Color> _smartColorMap = {
+    // English
+    'white': Colors.white,
+    'black': Colors.black,
+    'red': Colors.red,
+    'green': Colors.green,
+    'blue': Colors.blue,
+    'yellow': Colors.yellow,
+    'orange': Colors.orange,
+    'purple': Colors.purple,
+    'pink': Colors.pink,
+    'brown': Colors.brown,
+    'grey': Colors.grey,
+    'gray': Colors.grey,
+    'gold': Color(0xFFFFD700),
+    'silver': Color(0xFFC0C0C0),
+    'beige': Color(0xFFF5F5DC),
+    'navy': Color(0xFF000080),
+    'teal': Colors.teal,
+    'cyan': Colors.cyan,
+    'maroon': Color(0xFF800000),
+    'olive': Color(0xFF808000),
+    'lime': Colors.lime,
+    'indigo': Colors.indigo,
+    'violet': Color(0xFFEE82EE),
+
+    // Arabic
+    'أبيض': Colors.white,
+    'ابيض': Colors.white,
+    'أسود': Colors.black,
+    'اسود': Colors.black,
+    'أحمر': Colors.red,
+    'احمر': Colors.red,
+    'أخضر': Colors.green,
+    'اخضر': Colors.green,
+    'أزرق': Colors.blue,
+    'ازرق': Colors.blue,
+    'أصفر': Colors.yellow,
+    'اصفر': Colors.yellow,
+    'برتقالي': Colors.orange,
+    'بني': Colors.brown,
+    'رمادي': Colors.grey,
+    'رصاصي': Colors.grey,
+    'زهري': Colors.pink,
+    'وردي': Colors.pink,
+    'بنفسجي': Colors.purple,
+    'أرجواني': Colors.purple,
+    'ذهبي': Color(0xFFFFD700),
+    'فضي': Color(0xFFC0C0C0),
+    'بيج': Color(0xFFF5F5DC),
+    'كحلي': Color(0xFF000080),
+    'سماوي': Colors.cyan,
+    'نبيتي': Color(0xFF800000),
+    'زيتي': Color(0xFF808000),
+    'ليموني': Colors.lime,
+  };
 
   @override
   void initState() {
@@ -39,7 +92,7 @@ class _ProductFilterDrawerState extends State<ProductFilterDrawer> {
   }
 
   Future<void> _initData() async {
-    // 1. استعادة الفلاتر الحالية (من القيم الممررة)
+    // 1. استعادة الفلاتر
     if (widget.currentFilters['price_min'] != null) {
       _priceRange = RangeValues(
         double.tryParse(widget.currentFilters['price_min'].toString()) ?? 0,
@@ -47,7 +100,6 @@ class _ProductFilterDrawerState extends State<ProductFilterDrawer> {
       );
     }
     if (widget.currentFilters['brands'] != null) {
-      // التعامل مع الماركات سواء كانت String مفصولة بفواصل أو List
       var brandsData = widget.currentFilters['brands'];
       if (brandsData is List) {
         _selectedBrands = List<String>.from(brandsData);
@@ -60,7 +112,7 @@ class _ProductFilterDrawerState extends State<ProductFilterDrawer> {
     );
     _selectedColor = widget.currentFilters['color'];
 
-    // 2. جلب خيارات الفلترة من السيرفر
+    // 2. جلب الخيارات
     try {
       final options = await _productService.getFilterOptions();
       if (mounted) {
@@ -74,12 +126,52 @@ class _ProductFilterDrawerState extends State<ProductFilterDrawer> {
     }
   }
 
+  // ✅ الدالة الذكية الجديدة لتحليل الألوان
+  Color _parseColor(String input) {
+    if (input.isEmpty) return Colors.transparent;
+
+    String cleanInput = input.trim().toLowerCase();
+
+    // 1. Hex Code (#RRGGBB)
+    if (cleanInput.startsWith('#')) {
+      try {
+        final buffer = StringBuffer();
+        if (cleanInput.length == 7) buffer.write('ff'); // Add Alpha if missing
+        buffer.write(cleanInput.replaceFirst('#', ''));
+        return Color(int.parse(buffer.toString(), radix: 16));
+      } catch (e) {
+        return Colors.grey.shade300; // Fallback
+      }
+    }
+
+    // 2. البحث في الخريطة الذكية
+    if (_smartColorMap.containsKey(cleanInput)) {
+      return _smartColorMap[cleanInput]!;
+    }
+
+    // 3. Fallback ذكي: توليد لون من النص (Hash) إذا لم يكن معروفاً
+    // هذا مفيد للألوان الغريبة التي لا توجد في القائمة
+    /*
+    int hash = cleanInput.codeUnits.fold(0, (p, c) => p + c);
+    return Colors.primaries[hash % Colors.primaries.length];
+    */
+
+    return Colors.grey.shade200; // لون افتراضي للمجهول
+  }
+
+  // ✅ دالة ذكية لتحديد لون علامة الصح (أبيض أو أسود) بناءً على سطوع الخلفية
+  Color _getContrastColor(Color color) {
+    // حساب السطوع (Luminance)
+    // 0.0 = أسود حالك، 1.0 = أبيض ناصع
+    // العتبة 0.5 جيدة، لكن 0.6 تعطي نتائج أفضل للعين البشرية
+    return color.computeLuminance() > 0.6 ? Colors.black87 : Colors.white;
+  }
+
   void _apply() {
     final filters = <String, dynamic>{
       'price_min': _priceRange.start.round(),
       'price_max': _priceRange.end.round(),
-      if (_selectedBrands.isNotEmpty)
-        'brands': _selectedBrands, // قد تحتاج join(',') حسب الباك إند
+      if (_selectedBrands.isNotEmpty) 'brands': _selectedBrands,
       if (_selectedRating != null) 'rating': _selectedRating,
       if (_selectedColor != null) 'color': _selectedColor,
     };
@@ -96,300 +188,327 @@ class _ProductFilterDrawerState extends State<ProductFilterDrawer> {
     });
   }
 
-  // دالة ذكية لتحويل أسماء الألوان إلى ألوان حقيقية
-  Color _parseColor(String colorName) {
-    final name = colorName.trim().toLowerCase();
-
-    // دعم Hex Codes
-    if (name.startsWith('#')) {
-      try {
-        final buffer = StringBuffer();
-        if (name.length == 7) buffer.write('ff');
-        buffer.write(name.replaceFirst('#', ''));
-        return Color(int.parse(buffer.toString(), radix: 16));
-      } catch (e) {
-        return Colors.grey;
-      }
-    }
-
-    const Map<String, Color> colorMap = {
-      'red': Colors.red,
-      'blue': Colors.blue,
-      'black': Colors.black,
-      'white': Colors.white,
-      'green': Colors.green,
-      'yellow': Colors.yellow,
-      'orange': Colors.orange,
-      'purple': Colors.purple,
-      'pink': Colors.pink,
-      'brown': Colors.brown,
-      'grey': Colors.grey,
-      'gold': Color(0xFFFFD700),
-      'silver': Color(0xFFC0C0C0),
-      'beige': Color(0xFFF5F5DC),
-      'navy': Color(0xFF000080),
-      'teal': Colors.teal,
-    };
-    return colorMap[name] ?? Colors.grey.shade300;
-  }
-
-  Color _getCheckColor(Color bg) =>
-      bg.computeLuminance() > 0.5 ? Colors.black : Colors.white;
-
   @override
   Widget build(BuildContext context) {
     return Drawer(
       backgroundColor: Colors.white,
+      surfaceTintColor: Colors.white,
+      width: MediaQuery.of(context).size.width * 0.85, // عرض مناسب
       child: SafeArea(
         child: Column(
           children: [
             // --- Header ---
-            Padding(
-              padding: const EdgeInsets.all(16.0),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
                     "تصفية النتائج",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
-                  TextButton(
-                    onPressed: _clearAll,
-                    child: const Text(
-                      "مسح الكل",
-                      style: TextStyle(color: Colors.red),
+                  if (_isLoading)
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  else
+                    TextButton.icon(
+                      onPressed: _clearAll,
+                      icon: const Icon(
+                        Icons.refresh,
+                        size: 16,
+                        color: Colors.redAccent,
+                      ),
+                      label: const Text(
+                        "إعادة تعيين",
+                        style: TextStyle(color: Colors.redAccent, fontSize: 13),
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        backgroundColor: Colors.red.withOpacity(0.05),
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
-            const Divider(height: 1),
 
-            // --- Loading State ---
-            if (_isLoading)
-              const Expanded(
-                child: Center(
-                  child: CircularProgressIndicator(color: Colors.pink),
-                ),
-              )
-            else
-              // --- Content ---
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    // 1. السعر
-                    _buildSectionTitle("نطاق السعر"),
-                    RangeSlider(
-                      values: _priceRange,
-                      min: 0,
-                      max: 5000,
-                      divisions: 100,
-                      activeColor: Colors.pink,
-                      inactiveColor: Colors.pink.withOpacity(0.2),
-                      labels: RangeLabels(
-                        "${_priceRange.start.toInt()} ر.س",
-                        "${_priceRange.end.toInt()} ر.س",
-                      ),
-                      onChanged:
-                          (values) => setState(() => _priceRange = values),
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          "${_priceRange.start.toInt()} ر.س",
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                        Text(
-                          "${_priceRange.end.toInt()} ر.س",
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
+            // --- Content ---
+            Expanded(
+              child:
+                  _isLoading
+                      ? const Center(child: Text("جاري تحميل الخيارات..."))
+                      : ListView(
+                        padding: const EdgeInsets.all(20),
+                        children: [
+                          // 1. السعر
+                          _buildSectionHeader(
+                            "السعر",
+                            "${_priceRange.start.toInt()} - ${_priceRange.end.toInt()} ر.س",
+                          ),
+                          const SizedBox(height: 10),
+                          SliderTheme(
+                            data: SliderTheme.of(context).copyWith(
+                              activeTrackColor: Colors.pink,
+                              inactiveTrackColor: Colors.pink.withOpacity(0.1),
+                              thumbColor: Colors.white,
+                              overlayColor: Colors.pink.withOpacity(0.2),
+                              valueIndicatorColor: Colors.pink,
+                              thumbShape: const RoundSliderThumbShape(
+                                enabledThumbRadius: 12,
+                                elevation: 4,
+                              ),
+                              trackHeight: 4,
+                            ),
+                            child: RangeSlider(
+                              values: _priceRange,
+                              min: 0,
+                              max: 5000,
+                              divisions: 50,
+                              labels: RangeLabels(
+                                "${_priceRange.start.toInt()}",
+                                "${_priceRange.end.toInt()}",
+                              ),
+                              onChanged:
+                                  (values) =>
+                                      setState(() => _priceRange = values),
+                            ),
+                          ),
+                          const SizedBox(height: 30),
 
-                    // 2. الماركات (من API)
-                    if (_filterOptions.brands.isNotEmpty) ...[
-                      _buildSectionTitle("الماركة"),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children:
-                            _filterOptions.brands.map((brand) {
-                              final isSelected = _selectedBrands.contains(
-                                brand,
-                              );
-                              return FilterChip(
-                                label: Text(brand),
-                                selected: isSelected,
-                                onSelected: (selected) {
-                                  setState(() {
-                                    selected
-                                        ? _selectedBrands.add(brand)
-                                        : _selectedBrands.remove(brand);
-                                  });
-                                },
-                                selectedColor: Colors.pink.withOpacity(0.1),
-                                checkmarkColor: Colors.pink,
-                                labelStyle: TextStyle(
-                                  color:
-                                      isSelected ? Colors.pink : Colors.black87,
-                                  fontWeight:
-                                      isSelected
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                ),
-                                backgroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                  side: BorderSide(
-                                    color:
-                                        isSelected
-                                            ? Colors.pink
-                                            : Colors.grey.shade300,
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
+                          // 2. الماركات
+                          if (_filterOptions.brands.isNotEmpty) ...[
+                            _buildSectionHeader(
+                              "الماركات",
+                              _selectedBrands.isNotEmpty
+                                  ? "${_selectedBrands.length} محدد"
+                                  : null,
+                            ),
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 10,
+                              children:
+                                  _filterOptions.brands.map((brand) {
+                                    final isSelected = _selectedBrands.contains(
+                                      brand,
+                                    );
+                                    return FilterChip(
+                                      label: Text(brand),
+                                      selected: isSelected,
+                                      onSelected: (selected) {
+                                        setState(() {
+                                          selected
+                                              ? _selectedBrands.add(brand)
+                                              : _selectedBrands.remove(brand);
+                                        });
+                                      },
+                                      backgroundColor: Colors.white,
+                                      selectedColor: Colors.pink.shade50,
+                                      checkmarkColor: Colors.pink,
+                                      side: BorderSide(
+                                        color:
+                                            isSelected
+                                                ? Colors.pink
+                                                : Colors.grey.shade300,
+                                      ),
+                                      labelStyle: TextStyle(
+                                        color:
+                                            isSelected
+                                                ? Colors.pink
+                                                : Colors.black87,
+                                        fontWeight:
+                                            isSelected
+                                                ? FontWeight.w600
+                                                : FontWeight.normal,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                        vertical: 8,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    );
+                                  }).toList(),
+                            ),
+                            const SizedBox(height: 30),
+                          ],
 
-                    // 3. التقييم
-                    _buildSectionTitle("التقييم"),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children:
-                          [5, 4, 3, 2, 1].map((rating) {
-                            final isSelected = _selectedRating == rating;
-                            return InkWell(
-                              onTap:
-                                  () => setState(
-                                    () =>
-                                        _selectedRating =
-                                            isSelected ? null : rating,
-                                  ),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color:
-                                      isSelected
-                                          ? Colors.amber.withOpacity(0.2)
-                                          : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color:
-                                        isSelected
-                                            ? Colors.amber
-                                            : Colors.grey.shade300,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Text(
-                                      "$rating",
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
+                          // 3. التقييم
+                          _buildSectionHeader("التقييم", null),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 50,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: 5,
+                              separatorBuilder:
+                                  (_, __) => const SizedBox(width: 8),
+                              itemBuilder: (context, index) {
+                                int star = 5 - index; // 5, 4, 3...
+                                bool isSelected = _selectedRating == star;
+                                return InkWell(
+                                  onTap:
+                                      () => setState(
+                                        () =>
+                                            _selectedRating =
+                                                isSelected ? null : star,
+                                      ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          isSelected
+                                              ? Colors.amber.withOpacity(0.15)
+                                              : Colors.grey.shade50,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color:
+                                            isSelected
+                                                ? Colors.amber
+                                                : Colors.grey.shade200,
+                                        width: isSelected ? 1.5 : 1,
                                       ),
                                     ),
-                                    const SizedBox(width: 2),
-                                    const Icon(
-                                      Icons.star,
-                                      size: 14,
-                                      color: Colors.amber,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // 4. الألوان (من API)
-                    if (_filterOptions.colors.isNotEmpty) ...[
-                      _buildSectionTitle("اللون"),
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children:
-                            _filterOptions.colors.map((colorName) {
-                              final isSelected = _selectedColor == colorName;
-                              final color = _parseColor(colorName);
-                              return GestureDetector(
-                                onTap:
-                                    () => setState(
-                                      () =>
-                                          _selectedColor =
-                                              isSelected ? null : colorName,
-                                    ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      width: 36,
-                                      height: 36,
-                                      decoration: BoxDecoration(
-                                        color: color,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
+                                    child: Row(
+                                      children: [
+                                        Text(
+                                          "$star",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                            color:
+                                                isSelected
+                                                    ? Colors.black87
+                                                    : Colors.grey.shade600,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Icon(
+                                          Icons.star_rounded,
+                                          size: 18,
                                           color:
                                               isSelected
-                                                  ? Colors.pink
-                                                  : Colors.grey.shade300,
-                                          width: isSelected ? 2 : 1,
+                                                  ? Colors.amber
+                                                  : Colors.grey.shade400,
                                         ),
-                                        boxShadow: [
-                                          if (isSelected)
-                                            BoxShadow(
-                                              color: Colors.pink.withOpacity(
-                                                0.3,
-                                              ),
-                                              blurRadius: 4,
-                                              spreadRadius: 1,
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 30),
+
+                          // 4. الألوان (الذكية)
+                          if (_filterOptions.colors.isNotEmpty) ...[
+                            _buildSectionHeader("اللون", _selectedColor),
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 12,
+                              children:
+                                  _filterOptions.colors.map((colorName) {
+                                    final isSelected =
+                                        _selectedColor == colorName;
+                                    final color = _parseColor(colorName);
+                                    final checkColor = _getContrastColor(color);
+
+                                    return GestureDetector(
+                                      onTap:
+                                          () => setState(
+                                            () =>
+                                                _selectedColor =
+                                                    isSelected
+                                                        ? null
+                                                        : colorName,
+                                          ),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          AnimatedContainer(
+                                            duration: const Duration(
+                                              milliseconds: 200,
                                             ),
+                                            width: 44,
+                                            height: 44,
+                                            decoration: BoxDecoration(
+                                              color: color,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color:
+                                                    isSelected
+                                                        ? Colors.pink
+                                                        : Colors.grey.shade300,
+                                                width: isSelected ? 2.5 : 1,
+                                              ),
+                                              boxShadow:
+                                                  isSelected
+                                                      ? [
+                                                        BoxShadow(
+                                                          color: color
+                                                              .withOpacity(0.4),
+                                                          blurRadius: 8,
+                                                          spreadRadius: 2,
+                                                        ),
+                                                      ]
+                                                      : [],
+                                            ),
+                                            child:
+                                                isSelected
+                                                    ? Icon(
+                                                      Icons.check,
+                                                      size: 24,
+                                                      color: checkColor,
+                                                    )
+                                                    : null,
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            colorName,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color:
+                                                  isSelected
+                                                      ? Colors.black87
+                                                      : Colors.grey.shade500,
+                                              fontWeight:
+                                                  isSelected
+                                                      ? FontWeight.bold
+                                                      : FontWeight.normal,
+                                            ),
+                                          ),
                                         ],
                                       ),
-                                      child:
-                                          isSelected
-                                              ? Icon(
-                                                Icons.check,
-                                                size: 20,
-                                                color: _getCheckColor(color),
-                                              )
-                                              : null,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      colorName,
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
+                                    );
+                                  }).toList(),
+                            ),
+                          ],
+                          const SizedBox(height: 50), // مساحة إضافية في الأسفل
+                        ],
                       ),
-                    ],
-                  ],
-                ),
-              ),
+            ),
 
             // --- Footer ---
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
+                    blurRadius: 20,
                     offset: const Offset(0, -5),
                   ),
                 ],
@@ -397,17 +516,27 @@ class _ProductFilterDrawerState extends State<ProductFilterDrawer> {
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _apply,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.pink,
+                  backgroundColor: Colors.black, // لون أسود فخم
                   foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 50),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   elevation: 0,
                 ),
-                child: const Text(
-                  "عرض النتائج",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      "تطبيق الفلتر",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(width: 8),
+                    Icon(Icons.check_circle_outline, size: 20),
+                  ],
                 ),
               ),
             ),
@@ -417,13 +546,31 @@ class _ProductFilterDrawerState extends State<ProductFilterDrawer> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
-      child: Text(
-        title,
-        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-      ),
+  Widget _buildSectionHeader(String title, String? subtitle) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        if (subtitle != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              subtitle,
+              style: TextStyle(
+                color: Colors.pink.shade700,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

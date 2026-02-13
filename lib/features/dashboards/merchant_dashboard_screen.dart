@@ -7,9 +7,9 @@ import 'package:linyora_project/features/dashboards/MyStore/my_store_screen.dart
 import 'package:linyora_project/features/dropshipping/screens/merchant_dropshipping_screen.dart';
 import 'package:linyora_project/features/layout/main_layout_screen.dart';
 import 'package:linyora_project/features/settings/screens/settings_screen.dart';
+import 'package:linyora_project/features/shared/wallet/screens/wallet_screen.dart';
 import 'package:linyora_project/features/shipping/screens/merchant_shipping_screen.dart';
 import 'package:linyora_project/features/subscriptions/screens/my_subscription_screen.dart';
-import 'package:linyora_project/features/wallet/screens/merchant_wallet_screen.dart';
 // ✅ 1. استيراد شاشة الإشعارات
 import 'package:linyora_project/features/home/screens/notifications_screen.dart';
 import 'package:provider/provider.dart';
@@ -157,7 +157,7 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
       {
         'title': 'المحادثات',
         'icon': Icons.history_edu_outlined,
-        'page': ChatScreen(currentUserId: user.id),
+        'page': ChatListScreen(currentUserId: user.id),
         'show': isVerified,
         'isLocked': !isSubscribed,
       },
@@ -193,7 +193,7 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
       {
         'title': 'المحفظة',
         'icon': Icons.account_balance_wallet_outlined,
-        'page': const MerchantWalletScreen(),
+        'page': const WalletScreen(),
         'show': isVerified,
         'isLocked': !isSubscribed,
       },

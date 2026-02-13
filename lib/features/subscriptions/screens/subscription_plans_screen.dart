@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:linyora_project/features/subscriptions/services/subscription_service.dart';
+import './payment_services.dart' hide PaymentService;
 import 'package:provider/provider.dart';
 import 'package:linyora_project/features/auth/providers/auth_provider.dart';
-import 'package:linyora_project/features/subscriptions/screens/payment_webview_screen.dart';
-import 'package:linyora_project/features/subscriptions/services/subscription_service.dart';
 import 'package:linyora_project/models/subscription_plan_model.dart';
+import 'package:linyora_project/features/subscriptions/screens/payment_Services.dart'; // تأكد من المسار
 
 class SubscriptionPlansScreen extends StatefulWidget {
   const SubscriptionPlansScreen({Key? key}) : super(key: key);
@@ -14,14 +15,17 @@ class SubscriptionPlansScreen extends StatefulWidget {
 }
 
 class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
-  final SubscriptionService _service = SubscriptionService();
+  final SubscriptionService _dataService =
+      SubscriptionService(); // لجلب الباقات
+  final PaymentService _paymentService = PaymentService(); // ✅ للدفع
+
   List<SubscriptionPlan> _plans = [];
   bool _isLoading = true;
-  int? _selectedPlanId;
+  int? _selectedPlanId; // لتحديد الزر الذي يتم تحميله
 
-  // الألوان الاحترافية
-  final Color _activeColor = const Color(0xFF10B981); // الأخضر (للباقة النشطة)
-  final Color _primaryColor = const Color(0xFFF43F5E); // الوردي (اللون الأساسي)
+  // الألوان
+  final Color _activeColor = const Color(0xFF10B981);
+  final Color _primaryColor = const Color(0xFFF43F5E);
   final Color _darkText = const Color(0xFF1E293B);
 
   @override
@@ -32,7 +36,7 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
 
   Future<void> _fetchPlans() async {
     try {
-      final plans = await _service.getPlans();
+      final plans = await _dataService.getPlans();
       if (mounted) {
         setState(() {
           _plans = plans;
@@ -44,57 +48,47 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
     }
   }
 
+  // ✅ دالة الاشتراك الجديدة
+  // داخل الكلاس _SubscriptionPlansScreenState
+
   Future<void> _handleSubscribe(int planId) async {
     setState(() => _selectedPlanId = planId);
-    try {
-      final String? checkoutUrl = await _service.createCheckoutSession(planId);
-      if (checkoutUrl != null && checkoutUrl.isNotEmpty) {
-        if (!mounted) return;
 
-        // الانتقال لصفحة الدفع
-        final bool? result = await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder:
-                (context) => PaymentWebViewScreen(checkoutUrl: checkoutUrl),
-          ),
-        );
+    // ✅ لم نعد بحاجة لجلب التوكن هنا
+    // final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-        // التحقق من النتيجة
-        if (result == true) {
-          setState(() => _isLoading = true);
-          // تحديث بيانات المستخدم
-          await Provider.of<AuthProvider>(context, listen: false).refreshUser();
+    // استدعاء الخدمة مباشرة (أنظف وأسهل)
+    await _paymentService.subscribeToPlan(
+      context: context,
+      planId: planId,
+      paymentMethodId: null,
+      onSuccess: () async {
+        // تحديث البيانات بعد النجاح
+        await Provider.of<AuthProvider>(context, listen: false).refreshUser();
 
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('✅ تم الاشتراك بنجاح!'),
-                backgroundColor: Colors.green,
-              ),
-            );
-            Navigator.pop(context); // العودة للخلف بعد النجاح
-          }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ تم تفعيل الاشتراك بنجاح!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.pop(context);
         }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('خطأ: $e')));
-      }
-    } finally {
-      if (mounted) setState(() => _selectedPlanId = null);
+      },
+    );
+
+    if (mounted) {
+      setState(() => _selectedPlanId = null);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // ✅ 1. المنطق الصحيح لاستخراج رقم الباقة الحالية
+    // قراءة بيانات المستخدم لمعرفة الباقة الحالية
     final user = Provider.of<AuthProvider>(context).user;
     final subscription = user?.subscription;
 
-    // نستخرج الـ ID من داخل كائن الاشتراك، ونتأكد أن الحالة active
     int? currentPlanId;
     if (subscription != null && subscription.status == 'active') {
       currentPlanId = subscription.planId;
@@ -110,7 +104,6 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
-        // ✅ 2. زر الرجوع يعمل دائماً
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black),
           onPressed: () => Navigator.maybePop(context),
@@ -139,7 +132,6 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                     ),
                     const SizedBox(height: 30),
 
-                    // قائمة الباقات
                     ListView.separated(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
@@ -147,10 +139,8 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                       separatorBuilder: (c, i) => const SizedBox(height: 24),
                       itemBuilder: (context, index) {
                         final plan = _plans[index];
-                        // مقارنة الـ ID للباقة الحالية مع الـ ID في القائمة
                         final bool isMyPlan =
                             (currentPlanId != null && plan.id == currentPlanId);
-
                         return _buildProfessionalCard(plan, isMyPlan);
                       },
                     ),
@@ -162,11 +152,8 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
   }
 
   Widget _buildProfessionalCard(SubscriptionPlan plan, bool isMyPlan) {
+    // هل يتم معالجة هذا الزر حالياً؟
     final bool isProcessing = _selectedPlanId == plan.id;
-
-    // تصميم مختلف إذا كانت الباقة الحالية
-    final Color borderColor = isMyPlan ? _activeColor : Colors.transparent;
-    final double elevation = isMyPlan ? 0 : 5;
 
     return Stack(
       clipBehavior: Clip.none,
@@ -186,7 +173,7 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
           ),
           child: Column(
             children: [
-              // رأس البطاقة
+              // الهيدر
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
@@ -276,7 +263,6 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   children: [
-                    // الميزات
                     ...plan.features.map(
                       (feature) => Padding(
                         padding: const EdgeInsets.only(bottom: 12),
@@ -303,14 +289,13 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // ✅ 3. الزر الذكي
                     SizedBox(
                       width: double.infinity,
                       height: 50,
                       child: ElevatedButton(
                         onPressed:
                             (isMyPlan || _selectedPlanId != null)
-                                ? null // تعطيل الزر إذا كانت الباقة الحالية أو جاري التحميل
+                                ? null
                                 : () => _handleSubscribe(plan.id),
                         style: ElevatedButton.styleFrom(
                           backgroundColor:
@@ -326,7 +311,7 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                                   ? Colors.green.shade50
                                   : Colors.grey[300],
                           disabledForegroundColor:
-                              isMyPlan ? Colors.green : Colors.grey,
+                              isMyPlan ? Colors.green : Colors.grey[600],
                         ),
                         child:
                             isProcessing
@@ -353,11 +338,7 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
             ],
           ),
         ),
-
-        // شارة "الأكثر شعبية" (اختياري، يمكنك وضع شرط لظهورها)
-        if (!isMyPlan &&
-            plan.price > 0 &&
-            plan.price < 500) // مثال: إظهارها للباقة المتوسطة
+        if (!isMyPlan && plan.price > 0 && plan.price < 500)
           Positioned(
             top: -12,
             left: 0,

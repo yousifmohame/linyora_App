@@ -383,9 +383,25 @@ class AuthService {
     }
   }
 
+  Future<String?> getToken() async {
+    return await _storage.read(key: 'auth_token');
+  }
+
   // --- تسجيل الخروج ---
   Future<void> logout() async {
     await _storage.delete(key: 'auth_token');
     _currentUser = null;
+  }
+
+  // داخل AuthService أو UserService
+  Future<Map<String, dynamic>> getUserStats() async {
+    try {
+      // ✅ استدعاء الرابط الذي أرسلته لي
+      final response = await _apiClient.get('/users/stats');
+      return response.data;
+    } catch (e) {
+      print("Error fetching user stats: $e");
+      return {}; // إرجاع خريطة فارغة عند الخطأ
+    }
   }
 }

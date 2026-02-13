@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart'; // للأيقونات الاجتماعية
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:linyora_project/features/browse/screens/model_profile_screen.dart';
 import '../models/browsed_model.dart';
 import '../services/browse_service.dart';
@@ -14,6 +15,7 @@ class BrowseModelsScreen extends StatefulWidget {
 
 class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
   final BrowseService _service = BrowseService();
+  final ScrollController _scrollController = ScrollController();
 
   List<BrowsedModel> _allModels = [];
   List<BrowsedModel> _filteredModels = [];
@@ -22,8 +24,12 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
   // Filters State
   String _searchTerm = '';
   String _selectedCategory = 'all';
-  String _sortBy = 'name'; // name, rating, followers
+  String _sortBy = 'rating'; // Default to rating for better quality
   List<String> _categories = ['all'];
+
+  // Colors
+  final Color _primaryColor = const Color(0xFFE11D48); // Rose
+  final Color _darkColor = const Color(0xFF1F2937);
 
   @override
   void initState() {
@@ -33,25 +39,26 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
 
   Future<void> _fetchModels() async {
     setState(() => _isLoading = true);
-    final models = await _service.getModels();
+    try {
+      final models = await _service.getModels();
+      final categorySet = <String>{'all'};
+      for (var m in models) {
+        categorySet.addAll(m.categories);
+      }
 
-    // استخراج التصنيفات
-    final categorySet = <String>{'all'};
-    for (var m in models) {
-      categorySet.addAll(m.categories);
-    }
-
-    if (mounted) {
-      setState(() {
-        _allModels = models;
-        _categories = categorySet.toList();
-        _applyFilters(); // تطبيق الفلاتر المبدئية
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _allModels = models;
+          _categories = categorySet.toList();
+          _applyFilters();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // ✅ منطق الفلترة والترتيب (مثل useMemo في React)
   void _applyFilters() {
     List<BrowsedModel> temp =
         _allModels.where((model) {
@@ -69,7 +76,6 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
           return matchesSearch && matchesCategory;
         }).toList();
 
-    // الترتيب
     temp.sort((a, b) {
       switch (_sortBy) {
         case 'rating':
@@ -89,7 +95,6 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
     });
   }
 
-  // دالة مساعدة لتحويل 10K إلى 10000 للترتيب
   int _parseFollowers(String followers) {
     String clean = followers.toUpperCase().replaceAll(',', '');
     double multiplier = 1;
@@ -106,531 +111,340 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFFFFF1F2),
-              Color(0xFFF3E8FF),
-            ], // Rose-50 to Purple-50
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // 1. Header & Search & Filters
-              _buildHeaderSection(),
+      backgroundColor: const Color(0xFFFAFAFA), // خلفية بيضاء نقية
+      body: NestedScrollView(
+        controller: _scrollController,
+        headerSliverBuilder: (context, innerBoxIsScrolled) {
+          return [_buildStickySearchBar(), _buildCategoriesBar()];
+        },
+        body:
+            _isLoading
+                ? const Center(
+                  child: CircularProgressIndicator(color: Color(0xFFE11D48)),
+                )
+                : _filteredModels.isEmpty
+                ? _buildEmptyState()
+                : _buildImmersiveGrid(),
+      ),
+    );
+  }
 
-              // 2. Results List
-              Expanded(
-                child:
-                    _isLoading
-                        ? const Center(
-                          child: CircularProgressIndicator(
-                            color: Color(0xFFF43F5E),
-                          ),
-                        )
-                        : _filteredModels.isEmpty
-                        ? _buildEmptyState()
-                        : _buildModelsGrid(),
+  // 2. Sticky Search Bar
+  Widget _buildStickySearchBar() {
+    return SliverAppBar(
+      pinned: true,
+      floating: true,
+      backgroundColor: const Color(0xFFFAFAFA),
+      elevation: 0,
+      toolbarHeight: 80,
+      titleSpacing: 0,
+      title: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        child: Container(
+          height: 50,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 15,
+                offset: const Offset(0, 5),
               ),
             ],
+          ),
+          child: TextField(
+            onChanged: (val) {
+              _searchTerm = val;
+              _applyFilters();
+            },
+            decoration: InputDecoration(
+              hintText: "ابحث عن اسم، أو تخصص...",
+              hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+              prefixIcon: Icon(Icons.search_rounded, color: _primaryColor),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.sort_rounded, color: Colors.grey),
+                onPressed: _showSortPicker,
+              ),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 14,
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildHeaderSection() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        children: [
-          // Title
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.group, color: Color(0xFFE11D48)),
-              SizedBox(width: 8),
-              Text(
-                "استكشف المواهب",
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+  // 3. Categories List
+  Widget _buildCategoriesBar() {
+    return SliverToBoxAdapter(
+      child: Container(
+        height: 60,
+        margin: const EdgeInsets.only(bottom: 10),
+        child: ListView.separated(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          scrollDirection: Axis.horizontal,
+          itemCount: _categories.length,
+          separatorBuilder: (c, i) => const SizedBox(width: 10),
+          itemBuilder: (context, index) {
+            final cat = _categories[index];
+            final isSelected = _selectedCategory == cat;
+            return Center(
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _selectedCategory = cat;
+                    _applyFilters();
+                  });
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected ? _primaryColor : Colors.white,
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(
+                      color: isSelected ? _primaryColor : Colors.grey.shade200,
+                    ),
+                    boxShadow:
+                        isSelected
+                            ? [
+                              BoxShadow(
+                                color: _primaryColor.withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ]
+                            : [],
+                  ),
+                  child: Text(
+                    cat == 'all' ? 'الكل' : cat,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.grey[600],
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Search Bar
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                ),
-              ],
-            ),
-            child: TextField(
-              onChanged: (val) {
-                _searchTerm = val;
-                _applyFilters();
-              },
-              decoration: InputDecoration(
-                hintText: "ابحث عن اسم، تخصص، أو كلمة مفتاحية...",
-                prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Filters Row
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                // Category Dropdown
-                _buildFilterChip(
-                  label:
-                      "التصنيف: ${_selectedCategory == 'all' ? 'الكل' : _selectedCategory}",
-                  icon: Icons.filter_list,
-                  isActive: _selectedCategory != 'all',
-                  onTap: () => _showCategoryPicker(),
-                ),
-                const SizedBox(width: 8),
-                // Sort Dropdown
-                _buildFilterChip(
-                  label: "ترتيب حسب: ${_getSortLabel(_sortBy)}",
-                  icon: Icons.sort,
-                  isActive: _sortBy != 'name',
-                  onTap: () => _showSortPicker(),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 10),
-          // Results Count
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              "تم العثور على ${_filteredModels.length} نتيجة",
-              style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-            ),
-          ),
-        ],
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildModelsGrid() {
+  // 4. Immersive Grid System (The Core)
+  Widget _buildImmersiveGrid() {
     return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2, // عمودين
-        childAspectRatio: 0.60, // نسبة الطول للعرض (بطاقة طويلة)
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+        crossAxisCount: 2,
+        childAspectRatio: 0.65, // بطاقات طويلة (Portrait)
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
       ),
       itemCount: _filteredModels.length,
       itemBuilder: (context, index) {
-        return _buildModelCard(_filteredModels[index]);
+        return _buildPremiumCard(_filteredModels[index]);
       },
     );
   }
 
-  Widget _buildModelCard(BrowsedModel model) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+  Widget _buildPremiumCard(BrowsedModel model) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ModelProfileScreen(modelId: model.id),
           ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          // 1. Cover & Avatar Area
-          Stack(
-            alignment: Alignment.bottomCenter,
-            clipBehavior: Clip.none,
-            children: [
-              // Background Gradient
-              Container(
-                height: 80,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFFFFF1F2), Color(0xFFF3E8FF)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias, // لضمان قص الصورة داخل الحواف
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // 1. Background Image
+            Hero(
+              tag: 'profile_${model.id}', // Hero Animation
+              child: CachedNetworkImage(
+                imageUrl: model.profilePictureUrl ?? '',
+                fit: BoxFit.cover,
+                placeholder: (c, u) => Container(color: Colors.grey[200]),
+                errorWidget:
+                    (c, u, e) => Container(
+                      color: Colors.grey[100],
+                      child: Icon(
+                        Icons.person,
+                        color: Colors.grey[300],
+                        size: 40,
+                      ),
+                    ),
               ),
-              // Featured Badge
-              if (model.isFeatured)
-                Positioned(
-                  top: 8,
-                  left: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Colors.amber, Colors.orange],
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.star, size: 10, color: Colors.white),
-                        SizedBox(width: 2),
-                        Text(
-                          "مميز",
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              // Verified Badge (Next to Avatar logic handled below)
+            ),
 
-              // Avatar
-              Positioned(
-                bottom: -30,
-                child: Stack(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(3),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                      child: CircleAvatar(
-                        radius: 32,
-                        backgroundColor: Colors.grey.shade200,
-                        backgroundImage:
-                            (model.profilePictureUrl != null &&
-                                    model.profilePictureUrl!.isNotEmpty)
-                                ? CachedNetworkImageProvider(
-                                  model.profilePictureUrl!,
-                                )
-                                : null,
-                        child:
-                            (model.profilePictureUrl == null ||
-                                    model.profilePictureUrl!.isEmpty)
-                                ? Text(
-                                  model.name[0].toUpperCase(),
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    color: Colors.purple,
-                                  ),
-                                )
-                                : null,
-                      ),
-                    ),
-                    if (model.isVerified)
-                      const Positioned(
-                        bottom: 2,
-                        right: 2,
-                        child: CircleAvatar(
-                          radius: 10,
-                          backgroundColor: Colors.blue,
-                          child: Icon(
-                            Icons.check,
-                            size: 12,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
+            // 2. Gradient Overlay (Bottom)
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withOpacity(0.0),
+                    Colors.black.withOpacity(0.5),
+                    Colors.black.withOpacity(0.8),
                   ],
+                  stops: const [0.0, 0.5, 0.8, 1.0],
                 ),
               ),
-            ],
-          ),
+            ),
 
-          const SizedBox(height: 35), // Space for Avatar
-          // 2. Info Content
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+            // 3. Featured Badge (Top Left)
+            if (model.isFeatured)
+              Positioned(
+                top: 12,
+                left: 12,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.star_rounded,
+                        color: Colors.amber,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        "مميز",
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: _darkColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // 4. Content (Bottom)
+            Positioned(
+              bottom: 16,
+              left: 16,
+              right: 16,
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Name & Role
-                  Text(
-                    model.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.pink.shade50,
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.pink.shade100),
-                    ),
-                    child: Text(
-                      model.roleId == 3 ? "عارضة أزياء" : "مؤثرة",
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.pink.shade800,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 6),
-
-                  // Bio
-                  Text(
-                    model.bio,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                  ),
-
-                  // Categories Chips
-                  if (model.categories.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 4,
-                        runSpacing: 4,
-                        children:
-                            model.categories
-                                .take(2)
-                                .map(
-                                  (cat) => Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 4,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.purple.shade50,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      cat,
-                                      style: TextStyle(
-                                        fontSize: 9,
-                                        color: Colors.purple.shade700,
-                                      ),
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                      ),
-                    ),
-
-                  const Spacer(),
-
-                  // Stats Grid
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    decoration: const BoxDecoration(
-                      border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _buildStatItem(
-                          model.stats.followers,
-                          "متابع",
-                          Icons.group,
-                        ),
-                        _buildStatItem(
-                          model.stats.rating.toString(),
-                          "تقييم",
-                          Icons.star,
-                          iconColor: Colors.amber,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Social Icons
-                  if (model.socialLinks != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (model.socialLinks!.instagram != null)
-                            _socialIcon(
-                              FontAwesomeIcons.instagram,
-                              Colors.pink,
-                            ),
-                          if (model.socialLinks!.twitter != null)
-                            _socialIcon(FontAwesomeIcons.twitter, Colors.blue),
-                          if (model.socialLinks!.facebook != null)
-                            _socialIcon(
-                              FontAwesomeIcons.facebook,
-                              Colors.blue.shade800,
-                            ),
-                        ],
-                      ),
-                    ),
-
-                  // Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 32,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder:
-                                (context) =>
-                                    ModelProfileScreen(modelId: model.id),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.transparent,
-                        padding: EdgeInsets.zero,
-                        shadowColor: Colors.transparent,
-                      ),
-                      child: Ink(
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFF43F5E), Color(0xFF9333EA)],
-                          ),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Container(
-                          alignment: Alignment.center,
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.visibility,
-                                size: 14,
-                                color: Colors.white,
-                              ),
-                              SizedBox(width: 4),
-                              Text(
-                                "عرض الملف",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          model.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            shadows: [
+                              Shadow(color: Colors.black45, blurRadius: 4),
                             ],
                           ),
                         ),
                       ),
+                      if (model.isVerified)
+                        const Icon(
+                          Icons.verified,
+                          color: Colors.blue,
+                          size: 16,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    model.roleId == 3 ? "عارضة ازياء" : "منشئة محتوي",
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
+                  // Stats Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildGlassStat(
+                        Icons.star_rounded,
+                        model.stats.rating.toString(),
+                        Colors.amber,
+                      ),
+                      _buildGlassStat(
+                        Icons.group_rounded,
+                        model.stats.followers,
+                        Colors.white,
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildStatItem(
-    String value,
-    String label,
-    IconData icon, {
-    Color iconColor = Colors.grey,
-  }) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 10, color: iconColor),
-            const SizedBox(width: 2),
-            Text(
-              value,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+  Widget _buildGlassStat(IconData icon, String value, Color iconColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2), // Glass effect
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: iconColor),
+          const SizedBox(width: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
             ),
-          ],
-        ),
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 9)),
-      ],
-    );
-  }
-
-  Widget _socialIcon(IconData icon, Color color) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Icon(icon, size: 14, color: color),
-    );
-  }
-
-  Widget _buildFilterChip({
-    required String label,
-    required IconData icon,
-    required bool isActive,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isActive ? Colors.pink.shade50 : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isActive ? Colors.pink.shade200 : Colors.grey.shade300,
           ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: isActive ? Colors.pink.shade600 : Colors.grey.shade600,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: isActive ? Colors.pink.shade700 : Colors.grey.shade700,
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -640,20 +454,16 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.pink.shade50,
-              shape: BoxShape.circle,
+          Icon(Icons.person_search_rounded, size: 80, color: Colors.grey[200]),
+          const SizedBox(height: 20),
+          Text(
+            "لم نجد أي نتائج",
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[400],
             ),
-            child: Icon(Icons.group_off, size: 40, color: Colors.pink.shade300),
           ),
-          const SizedBox(height: 16),
-          const Text(
-            "لا توجد نتائج مطابقة",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          const SizedBox(height: 8),
           TextButton(
             onPressed: () {
               setState(() {
@@ -662,119 +472,51 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
                 _applyFilters();
               });
             },
-            child: const Text("إعادة تعيين الفلاتر"),
+            child: Text("إعادة تعيين", style: TextStyle(color: _primaryColor)),
           ),
         ],
       ),
     );
   }
 
-  // Bottom Sheets for Pickers
-  void _showCategoryPicker() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return ListView(
-          padding: const EdgeInsets.all(20),
-          shrinkWrap: true,
-          children: [
-            const Text(
-              "اختر التصنيف",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children:
-                  _categories
-                      .map(
-                        (cat) => ChoiceChip(
-                          label: Text(cat == 'all' ? 'الكل' : cat),
-                          selected: _selectedCategory == cat,
-                          selectedColor: Colors.pink.shade100,
-                          onSelected: (val) {
-                            setState(() {
-                              _selectedCategory = cat;
-                              _applyFilters();
-                            });
-                            Navigator.pop(context);
-                          },
-                        ),
-                      )
-                      .toList(),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   void _showSortPicker() {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (context) {
         return Container(
-          padding: const EdgeInsets.all(20),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 24),
               const Text(
                 "ترتيب النتائج حسب",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 20),
-              ListTile(
-                leading: const Icon(Icons.sort_by_alpha),
-                title: const Text("الاسم"),
-                trailing:
-                    _sortBy == 'name'
-                        ? const Icon(Icons.check, color: Colors.green)
-                        : null,
-                onTap: () {
-                  setState(() {
-                    _sortBy = 'name';
-                    _applyFilters();
-                  });
-                  Navigator.pop(context);
-                },
+              const SizedBox(height: 24),
+              _buildSortOption("الأعلى تقييماً", 'rating', Icons.star_rounded),
+              _buildSortOption(
+                "الأكثر متابعة",
+                'followers',
+                Icons.group_rounded,
               ),
-              ListTile(
-                leading: const Icon(Icons.star_outline),
-                title: const Text("التقييم"),
-                trailing:
-                    _sortBy == 'rating'
-                        ? const Icon(Icons.check, color: Colors.green)
-                        : null,
-                onTap: () {
-                  setState(() {
-                    _sortBy = 'rating';
-                    _applyFilters();
-                  });
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.group_outlined),
-                title: const Text("عدد المتابعين"),
-                trailing:
-                    _sortBy == 'followers'
-                        ? const Icon(Icons.check, color: Colors.green)
-                        : null,
-                onTap: () {
-                  setState(() {
-                    _sortBy = 'followers';
-                    _applyFilters();
-                  });
-                  Navigator.pop(context);
-                },
+              _buildSortOption(
+                "الاسم (أ-ي)",
+                'name',
+                Icons.sort_by_alpha_rounded,
               ),
             ],
           ),
@@ -783,14 +525,36 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
     );
   }
 
-  String _getSortLabel(String sort) {
-    switch (sort) {
-      case 'rating':
-        return 'التقييم';
-      case 'followers':
-        return 'المتابعين';
-      default:
-        return 'الاسم';
-    }
+  Widget _buildSortOption(String label, String value, IconData icon) {
+    final isSelected = _sortBy == value;
+    return ListTile(
+      onTap: () {
+        setState(() {
+          _sortBy = value;
+          _applyFilters();
+        });
+        Navigator.pop(context);
+      },
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isSelected ? _primaryColor.withOpacity(0.1) : Colors.grey[100],
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          icon,
+          color: isSelected ? _primaryColor : Colors.grey[600],
+          size: 20,
+        ),
+      ),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      trailing:
+          isSelected ? Icon(Icons.check_circle, color: _primaryColor) : null,
+    );
   }
 }

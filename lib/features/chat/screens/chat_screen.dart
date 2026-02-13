@@ -1,80 +1,504 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:linyora_project/features/auth/services/auth_service.dart';
 
 import '../models/conversation_model.dart';
 import '../models/message_model.dart';
 import '../services/chat_service.dart';
 
-class ChatScreen extends StatefulWidget {
-  final int? initialActiveConversationId;
-  final int currentUserId;
+// ==========================================
+// 🎨 Constants & Theme (Blue Identity)
+// ==========================================
+const Color kPrimaryBlue = Color(0xFF2563EB); // Royal Blue
+const Color kLightBlue = Color(0xFFEFF6FF); // Very Light Blue Background
+const Color kAccentBlue = Color(0xFF3B82F6); // Buttons
+const Color kChatBackground = Color(0xFFF1F5F9); // Slate 100
+const Color kMyBubbleColor = Color(0xFF2563EB);
+const Color kOtherBubbleColor = Colors.white;
+const Color kTextColor = Color(0xFF1E293B);
 
-  const ChatScreen({
+// ==========================================
+// 1. شاشة قائمة المحادثات (Main List)
+// ==========================================
+class ChatListScreen extends StatefulWidget {
+  final int currentUserId;
+  final int? initialActiveConversationId;
+
+  const ChatListScreen({
     Key? key,
-    this.initialActiveConversationId,
     required this.currentUserId,
+    this.initialActiveConversationId,
   }) : super(key: key);
 
   @override
-  State<ChatScreen> createState() => _ChatScreenState();
+  State<ChatListScreen> createState() => _ChatListScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatListScreenState extends State<ChatListScreen>
+    with WidgetsBindingObserver {
   final ChatService _chatService = ChatService();
   late IO.Socket _socket;
 
   List<Conversation> _conversations = [];
-  Conversation? _activeConversation;
-  List<Message> _messages = [];
-
-  bool _isLoadingConversations = true;
-  bool _isLoadingMessages = false;
-  bool _isUploading = false;
-
-  final TextEditingController _messageController = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
-
-  final Color roseColor = const Color(0xFFE11D48);
-  final Color purpleColor = const Color(0xFF9333EA);
+  bool _isLoading = true;
+  bool _isSocketConnected = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initSocket();
-    _fetchConversations();
+
+    // التعامل الذكي مع الفتح المباشر لمحادثة
+    _fetchConversations().then((_) {
+      if (widget.initialActiveConversationId != null &&
+          _conversations.isNotEmpty) {
+        try {
+          final convo = _conversations.firstWhere(
+            (c) => c.id == widget.initialActiveConversationId,
+          );
+          _openChat(convo);
+        } catch (e) {
+          // إذا لم نجد المحادثة (ربما جديدة)، يمكن تجاهل الأمر أو فتح الأولى
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    if (_socket.connected) _socket.disconnect();
     _socket.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (!_socket.connected) _socket.connect();
+      _fetchConversations();
+    }
+  }
+
+  // --- Socket Logic ---
+  void _initSocket() async {
+    const String socketUrl = 'https://linyora.cloud/';
+    String? token = await AuthService.instance.getToken();
+    if (token == null) return;
+
+    _socket = IO.io(
+      socketUrl,
+      IO.OptionBuilder()
+          .setTransports(['websocket'])
+          .disableAutoConnect()
+          .setExtraHeaders({'Authorization': 'Bearer $token'})
+          .enableForceNew()
+          .setReconnectionDelay(1000)
+          .setReconnectionAttempts(9999)
+          .build(),
+    );
+
+    _socket.connect();
+
+    _socket.onConnect((_) {
+      if (mounted) setState(() => _isSocketConnected = true);
+      _socket.emit('authenticate', token);
+    });
+
+    _socket.onDisconnect((_) {
+      if (mounted) setState(() => _isSocketConnected = false);
+    });
+
+    _socket.on(
+      'userOnline',
+      (data) => _updateUserStatus(int.parse(data['userId'].toString()), true),
+    );
+    _socket.on(
+      'userOffline',
+      (data) => _updateUserStatus(
+        int.parse(data['userId'].toString()),
+        false,
+        data['last_seen'],
+      ),
+    );
+
+    _socket.on('newMessage', (data) {
+      final newMsg = Message.fromJson(data);
+      _updateConversationList(newMsg);
+    });
+  }
+
+  void _updateUserStatus(int userId, bool isOnline, [String? lastSeen]) {
+    if (!mounted) return;
+    setState(() {
+      final index = _conversations.indexWhere((c) => c.participantId == userId);
+      if (index != -1) {
+        _conversations[index].isOnline = isOnline;
+        if (lastSeen != null) _conversations[index].lastSeen = lastSeen;
+      }
+    });
+  }
+
+  void _updateConversationList(Message msg) {
+    if (!mounted) return;
+    setState(() {
+      final index = _conversations.indexWhere(
+        (c) => c.id == msg.conversationId,
+      );
+      if (index != -1) {
+        var convo = _conversations[index];
+        convo.lastMessage = msg.body ?? 'مرفق 📎';
+        convo.unreadCount += 1;
+        _conversations.removeAt(index);
+        _conversations.insert(0, convo);
+      } else {
+        _fetchConversations();
+      }
+    });
+  }
+
+  Future<void> _fetchConversations() async {
+    try {
+      final convos = await _chatService.getConversations();
+      if (mounted) {
+        setState(() {
+          _conversations = convos;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _openChat(Conversation convo) async {
+    setState(() {
+      final index = _conversations.indexOf(convo);
+      if (index != -1) _conversations[index].unreadCount = 0;
+    });
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (_) => ChatDetailScreen(
+              conversation: convo,
+              currentUserId: widget.currentUserId,
+              socket: _socket,
+            ),
+      ),
+    );
+    _fetchConversations();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: false,
+        title: const Text(
+          "المحادثات",
+          style: TextStyle(
+            color: kTextColor,
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            fontFamily: 'Cairo', // يفضل استخدام خط عربي
+          ),
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Center(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 500),
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color:
+                      _isSocketConnected
+                          ? Colors.greenAccent[700]
+                          : Colors.redAccent,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: (_isSocketConnected ? Colors.green : Colors.red)
+                          .withOpacity(0.3),
+                      blurRadius: 8,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body:
+          _isLoading
+              ? const Center(
+                child: CircularProgressIndicator(color: kPrimaryBlue),
+              )
+              : _conversations.isEmpty
+              ? _buildEmptyState()
+              : ListView.separated(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                itemCount: _conversations.length,
+                separatorBuilder:
+                    (c, i) => const Padding(
+                      padding: EdgeInsets.only(left: 80, right: 20),
+                      child: Divider(height: 1, color: Color(0xFFF1F5F9)),
+                    ),
+                itemBuilder:
+                    (context, index) =>
+                        _buildConversationTile(_conversations[index]),
+              ),
+    );
+  }
+
+  Widget _buildConversationTile(Conversation convo) {
+    return InkWell(
+      onTap: () => _openChat(convo),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Row(
+          children: [
+            // Avatar
+            Hero(
+              tag: 'avatar_${convo.participantId}',
+              child: Stack(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: CircleAvatar(
+                      radius: 28,
+                      backgroundColor: kLightBlue,
+                      backgroundImage:
+                          convo.participantAvatar != null
+                              ? CachedNetworkImageProvider(
+                                convo.participantAvatar!,
+                              )
+                              : null,
+                      child:
+                          convo.participantAvatar == null
+                              ? Text(
+                                convo.participantName?[0] ?? "?",
+                                style: const TextStyle(
+                                  color: kPrimaryBlue,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
+                              : null,
+                    ),
+                  ),
+                  if (convo.isOnline)
+                    Positioned(
+                      bottom: 2,
+                      right: 2,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF22C55E), // Bright Green
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2.5),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    convo.participantName ?? "مستخدم",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      color: kTextColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    convo.lastMessage ?? "",
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color:
+                          convo.unreadCount > 0 ? kTextColor : Colors.grey[500],
+                      fontWeight:
+                          convo.unreadCount > 0
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Time & Badge
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (convo.unreadCount > 0)
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: const BoxDecoration(
+                      color: kPrimaryBlue,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      "${convo.unreadCount}",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: kLightBlue,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.chat_bubble_outline_rounded,
+              size: 40,
+              color: kPrimaryBlue,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            "ابدأ محادثة جديدة",
+            style: TextStyle(color: Colors.grey, fontSize: 16),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ==========================================
+// 2. شاشة المحادثة (Details) - The Blue UX
+// ==========================================
+class ChatDetailScreen extends StatefulWidget {
+  final Conversation conversation;
+  final int currentUserId;
+  final IO.Socket socket;
+
+  const ChatDetailScreen({
+    Key? key,
+    required this.conversation,
+    required this.currentUserId,
+    required this.socket,
+  }) : super(key: key);
+
+  @override
+  State<ChatDetailScreen> createState() => _ChatDetailScreenState();
+}
+
+class _ChatDetailScreenState extends State<ChatDetailScreen> {
+  final ChatService _chatService = ChatService();
+  final TextEditingController _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  final List<Message> _messages = []; // Reverse Order
+
+  bool _isLoading = true;
+  bool _isUploading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupSocketListeners();
+    _fetchMessages();
+  }
+
+  @override
+  void dispose() {
+    widget.socket.off('newMessage');
+    widget.socket.off('userOnline');
+    widget.socket.off('userOffline');
+    widget.socket.off('messagesRead');
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  // --- Socket Logic ---
-  void _initSocket() {
-    // استبدل هذا بالرابط الحقيقي للسوكيت الخاص بك
-    _socket = IO.io('YOUR_SOCKET_URL', <String, dynamic>{
-      'transports': ['websocket'],
-      'autoConnect': false,
-    });
-    _socket.connect();
-
-    _socket.on('newMessage', (data) {
-      if (mounted) {
-        final newMessage = Message.fromJson(data);
-        _handleNewMessageSocket(newMessage);
+  void _setupSocketListeners() {
+    widget.socket.on('newMessage', (data) {
+      if (!mounted) return;
+      final msg = Message.fromJson(data);
+      if (msg.conversationId == widget.conversation.id) {
+        setState(() => _messages.insert(0, msg));
+        // ✅ تشغيل النزول الذكي إذا كان المستخدم يرى آخر رسالة
+        if (_scrollController.hasClients && _scrollController.offset < 100) {
+          _scrollToBottom(isImage: msg.attachmentUrl != null);
+        }
+        widget.socket.emit('markAsRead', {
+          'conversationId': widget.conversation.id,
+        });
       }
     });
 
-    _socket.on('messagesRead', (data) {
-      if (_activeConversation?.id == data['conversationId']) {
+    widget.socket.on('userOnline', (data) {
+      if (!mounted) return;
+      if (int.parse(data['userId'].toString()) ==
+          widget.conversation.participantId) {
+        setState(() => widget.conversation.isOnline = true);
+      }
+    });
+
+    widget.socket.on('userOffline', (data) {
+      if (!mounted) return;
+      if (int.parse(data['userId'].toString()) ==
+          widget.conversation.participantId) {
+        setState(() {
+          widget.conversation.isOnline = false;
+          widget.conversation.lastSeen = data['last_seen'];
+        });
+      }
+    });
+
+    widget.socket.on('messagesRead', (data) {
+      if (data['conversationId'] == widget.conversation.id && mounted) {
         setState(() {
           for (var msg in _messages) msg.isRead = true;
         });
@@ -82,62 +506,39 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  void _handleNewMessageSocket(Message newMessage) {
-    setState(() {
-      // تحديث آخر رسالة في القائمة
-      final index = _conversations.indexWhere(
-        (c) => c.id == newMessage.conversationId,
-      );
-      if (index != -1) {
-        _conversations[index].lastMessage = newMessage.body ?? 'مرفق';
-        if (_activeConversation?.id != newMessage.conversationId) {
-          _conversations[index].unreadCount += 1;
-        }
-        final convo = _conversations.removeAt(index);
-        _conversations.insert(0, convo);
-      }
-      // إضافة الرسالة إذا كانت المحادثة مفتوحة
-      if (_activeConversation?.id == newMessage.conversationId) {
-        _messages.add(newMessage);
-        _scrollToBottom();
-        _socket.emit('markAsRead', {
-          'conversationId': newMessage.conversationId,
+  Future<void> _fetchMessages() async {
+    try {
+      final msgs = await _chatService.getMessages(widget.conversation.id);
+      if (mounted) {
+        setState(() {
+          _messages.clear();
+          _messages.addAll(msgs.reversed.toList());
+          _isLoading = false;
+        });
+        widget.socket.emit('markAsRead', {
+          'conversationId': widget.conversation.id,
         });
       }
-    });
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
-  // --- Service Calls ---
-  Future<void> _fetchConversations() async {
-    final convos = await _chatService.getConversations();
-    if (mounted) {
-      setState(() {
-        _conversations = convos;
-        _isLoadingConversations = false;
-      });
-
-      // منطق فتح المحادثة التلقائي (Active Loader)
-      if (widget.initialActiveConversationId != null && convos.isNotEmpty) {
-        final target = convos.firstWhere(
-          (c) => c.id == widget.initialActiveConversationId,
-          orElse: () => convos.first,
+  // ✅ الدالة السحرية للنزول السلس
+  void _scrollToBottom({bool isImage = false}) {
+    if (!_scrollController.hasClients) return;
+    // لأن القائمة معكوسة، النزول للأسفل يعني الذهاب إلى offset 0
+    // ولكن في بعض الحالات نريد التأكد من العرض
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // للقائمة المعكوسة (reverse: true)، الـ bottom هو 0.0
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          0.0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutQuad,
         );
-        _selectConversation(target);
       }
-    }
-  }
-
-  Future<void> _fetchMessages(int conversationId) async {
-    setState(() => _isLoadingMessages = true);
-    final msgs = await _chatService.getMessages(conversationId);
-    if (mounted) {
-      setState(() {
-        _messages = msgs;
-        _isLoadingMessages = false;
-      });
-      _scrollToBottom();
-      _socket.emit('markAsRead', {'conversationId': conversationId});
-    }
+    });
   }
 
   Future<void> _sendMessage({
@@ -146,12 +547,10 @@ class _ChatScreenState extends State<ChatScreen> {
     String? type,
   }) async {
     if ((body == null || body.trim().isEmpty) && attachmentUrl == null) return;
-    if (_activeConversation == null) return;
 
-    // Optimistic Update (إضافة وهمية للسرعة)
     final tempMsg = Message(
       id: DateTime.now().millisecondsSinceEpoch,
-      conversationId: _activeConversation!.id,
+      conversationId: widget.conversation.id,
       senderId: widget.currentUserId,
       body: body,
       attachmentUrl: attachmentUrl,
@@ -161,499 +560,275 @@ class _ChatScreenState extends State<ChatScreen> {
     );
 
     setState(() {
-      _messages.add(tempMsg);
+      _messages.insert(0, tempMsg);
       _messageController.clear();
     });
-    _scrollToBottom();
+
+    // ✅ النزول دائماً عند الإرسال
+    _scrollToBottom(isImage: attachmentUrl != null);
 
     try {
       await _chatService.sendMessage(
-        receiverId: _activeConversation!.participantId,
+        receiverId: widget.conversation.participantId,
         body: body,
         attachmentUrl: attachmentUrl,
         attachmentType: type,
       );
     } catch (e) {
-      setState(() => _messages.remove(tempMsg)); // تراجع عند الخطأ
+      setState(() => _messages.remove(tempMsg));
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('فشل الإرسال')));
     }
   }
 
-  Future<void> _handleFileUpload(String source) async {
+  Future<void> _handleAttachment(String type) async {
     File? file;
-    String attachmentType = 'file'; // النوع الافتراضي
+    String attachmentType = type == 'image' ? 'image' : 'file';
 
     try {
-      if (source == 'image') {
-        // 1. اختيار صورة من المعرض
+      if (type == 'image') {
         final picked = await ImagePicker().pickImage(
           source: ImageSource.gallery,
         );
-        if (picked != null) {
-          file = File(picked.path);
-          attachmentType = 'image';
-        }
+        if (picked != null) file = File(picked.path);
       } else {
-        // 2. اختيار ملف (PDF, Doc, أو حتى صورة من الملفات)
-        final result = await FilePicker.platform.pickFiles(
-          type: FileType.any, // السماح بجميع أنواع الملفات
-        );
-
-        if (result != null && result.files.single.path != null) {
-          file = File(result.files.single.path!);
-
-          // فحص ذكي: هل الملف المختار هو صورة؟
-          String path = file.path.toLowerCase();
-          if (path.endsWith('.jpg') ||
-              path.endsWith('.jpeg') ||
-              path.endsWith('.png') ||
-              path.endsWith('.gif') ||
-              path.endsWith('.webp')) {
-            attachmentType = 'image';
-          } else {
-            attachmentType = 'file';
-          }
-        }
+        final result = await FilePicker.platform.pickFiles();
+        if (result != null) file = File(result.files.single.path!);
       }
 
-      // 3. عملية الرفع
       if (file != null) {
         setState(() => _isUploading = true);
-
-        // استدعاء السيرفس لرفع الملف
-        final result = await _chatService.uploadAttachment(file);
-
+        final res = await _chatService.uploadAttachment(file);
         setState(() => _isUploading = false);
-
-        if (result != null) {
-          // إرسال الرسالة مع الرابط والنوع
+        if (res != null) {
           _sendMessage(
-            attachmentUrl: result['attachment_url'],
-            // نفضل النوع القادم من السيرفر، وإلا نستخدم النوع الذي اكتشفناه محلياً
-            type: result['attachment_type'] ?? attachmentType,
+            attachmentUrl: res['attachment_url'],
+            type: res['attachment_type'] ?? attachmentType,
           );
         }
       }
     } catch (e) {
       setState(() => _isUploading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('حدث خطأ أثناء اختيار الملف: $e')));
     }
   }
 
-  void _selectConversation(Conversation convo) {
-    setState(() {
-      _activeConversation = convo;
-      // تصفير العداد محلياً
-      final index = _conversations.indexOf(convo);
-      if (index != -1) _conversations[index].unreadCount = 0;
-    });
-    _fetchMessages(convo.id);
+  String _formatLastSeen(String? lastSeen) {
+    if (lastSeen == null) return "غير متصل";
+    try {
+      final date = DateTime.parse(lastSeen).toLocal();
+      return "آخر ظهور ${DateFormat('hh:mm a').format(date)}";
+    } catch (e) {
+      return "غير متصل";
+    }
   }
 
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-  }
-
-  // --- UI Building ---
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFFFF1F2), Color(0xFFFAF5FF)],
-        ),
-      ),
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar:
-            _activeConversation != null &&
-                    MediaQuery.of(context).size.width < 800
-                ? null // إخفاء الـ Appbar الافتراضي عند فتح الشات في الموبايل واستخدام الهيدر المخصص
-                : AppBar(
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  title: ShaderMask(
-                    shaderCallback:
-                        (bounds) => LinearGradient(
-                          colors: [roseColor, purpleColor],
-                        ).createShader(bounds),
-                    child: const Text(
-                      "الرسائل",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  iconTheme: const IconThemeData(color: Colors.black),
-                ),
-        body: LayoutBuilder(
-          builder: (context, constraints) {
-            if (constraints.maxWidth > 800) {
-              // Tablet/Desktop Split View
-              return Row(
-                children: [
-                  SizedBox(width: 350, child: _buildConversationsList()),
-                  const VerticalDivider(width: 1),
-                  Expanded(
-                    child:
-                        _activeConversation == null
-                            ? _buildEmptyState()
-                            : _buildChatWindow(),
-                  ),
-                ],
-              );
-            } else {
-              // Mobile View
-              return _activeConversation == null
-                  ? _buildConversationsList()
-                  : WillPopScope(
-                    onWillPop: () async {
-                      setState(() => _activeConversation = null);
-                      return false;
-                    },
-                    child: SafeArea(child: _buildChatWindow(isMobile: true)),
-                  );
-            }
-          },
-        ),
-      ),
-    );
-  }
-
-  // ... (Widgets: _buildConversationsList, _buildChatWindow, etc.)
-  // سأضع الـ Widgets هنا بشكل مختصر لضمان عمل الملف
-
-  Widget _buildConversationsList() {
-    return Card(
-      margin: const EdgeInsets.all(8),
-      color: Colors.white.withOpacity(0.9),
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child:
-          _isLoadingConversations
-              ? Center(child: CircularProgressIndicator(color: roseColor))
-              : _conversations.isEmpty
-              ? const Center(child: Text("لا توجد محادثات"))
-              : ListView.builder(
-                itemCount: _conversations.length,
-                itemBuilder: (ctx, i) {
-                  final convo = _conversations[i];
-                  final isActive = _activeConversation?.id == convo.id;
-                  return ListTile(
-                    onTap: () => _selectConversation(convo),
-                    tileColor: isActive ? roseColor.withOpacity(0.05) : null,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    leading: CircleAvatar(
-                      backgroundImage:
-                          convo.participantAvatar != null
-                              ? CachedNetworkImageProvider(
-                                convo.participantAvatar!,
-                              )
-                              : null,
-                      child:
-                          convo.participantAvatar == null
-                              ? Text(convo.participantName?[0] ?? "?")
-                              : null,
-                    ),
-                    title: Text(convo.participantName ?? "مستخدم"),
-                    subtitle: Text(convo.lastMessage ?? "", maxLines: 1),
-                    trailing:
-                        convo.unreadCount > 0
-                            ? CircleAvatar(
-                              radius: 10,
-                              backgroundColor: Colors.red,
-                              child: Text(
-                                "${convo.unreadCount}",
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            )
-                            : null,
-                  );
-                },
+    return Scaffold(
+      backgroundColor: kChatBackground, // خلفية رمادية فاتحة جداً
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: kTextColor,
+        leadingWidth: 40,
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            Hero(
+              tag: 'avatar_${widget.conversation.participantId}',
+              child: CircleAvatar(
+                radius: 20,
+                backgroundColor: kLightBlue,
+                backgroundImage:
+                    widget.conversation.participantAvatar != null
+                        ? CachedNetworkImageProvider(
+                          widget.conversation.participantAvatar!,
+                        )
+                        : null,
+                child:
+                    widget.conversation.participantAvatar == null
+                        ? const Icon(
+                          Icons.person,
+                          size: 20,
+                          color: kPrimaryBlue,
+                        )
+                        : null,
               ),
-    );
-  }
-
-  // --- Widgets: Chat Window ---
-  Widget _buildChatWindow({bool isMobile = false}) {
-    return Card(
-      margin: const EdgeInsets.all(8),
-      color: Colors.white.withOpacity(0.95),
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Column(
-        children: [
-          // 1. Header
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: Colors.black12)),
             ),
-            child: Row(
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (isMobile)
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back),
-                    onPressed: () => setState(() => _activeConversation = null),
+                Text(
+                  widget.conversation.participantName ?? "مستخدم",
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
                   ),
-                CircleAvatar(
-                  radius: 20,
-                  backgroundImage:
-                      _activeConversation!.participantAvatar != null
-                          ? CachedNetworkImageProvider(
-                            _activeConversation!.participantAvatar!,
-                          )
-                          : null,
-                  child:
-                      _activeConversation!.participantAvatar == null
-                          ? Text(
-                            _activeConversation!.participantName?[0] ?? "?",
-                          )
-                          : null,
                 ),
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _activeConversation!.participantName ?? "",
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color:
-                                _activeConversation!.isOnline
-                                    ? Colors.green
-                                    : Colors.grey,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _activeConversation!.isOnline
-                              ? "متصل الآن"
-                              : "غير متصل",
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                Text(
+                  widget.conversation.isOnline
+                      ? "متصل الآن"
+                      : _formatLastSeen(widget.conversation.lastSeen),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color:
+                        widget.conversation.isOnline
+                            ? Colors.green
+                            : Colors.grey[500],
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.videocam_outlined, color: kPrimaryBlue),
+            onPressed: () {},
           ),
-
-          // 2. Messages List
+          IconButton(
+            icon: const Icon(Icons.call_outlined, color: kPrimaryBlue),
+            onPressed: () {},
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // 1. Messages Area
           Expanded(
             child:
-                _isLoadingMessages
-                    ? Center(
-                      child: CircularProgressIndicator(color: purpleColor),
+                _isLoading
+                    ? const Center(
+                      child: CircularProgressIndicator(color: kPrimaryBlue),
                     )
                     : ListView.builder(
                       controller: _scrollController,
+                      reverse: true, // ✅ القائمة تبدأ من الأسفل
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 20,
                       ),
                       itemCount: _messages.length,
-                      itemBuilder: (ctx, i) {
-                        final msg = _messages[i];
+                      itemBuilder: (context, index) {
+                        final msg = _messages[index];
                         final isMe = msg.senderId == widget.currentUserId;
-                        return _buildMessageBubble(msg, isMe);
+                        // فحص لتجميع الرسائل المتتالية (تقليل المسافات)
+                        final bool isNextSame =
+                            index > 0 &&
+                            _messages[index - 1].senderId == msg.senderId;
+                        return _buildBlueBubble(msg, isMe, isNextSame);
                       },
                     ),
           ),
 
-          // 3. Input Area
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: Colors.grey.shade200)),
-              borderRadius: const BorderRadius.vertical(
-                bottom: Radius.circular(16),
-              ),
-            ),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.image_outlined, color: Colors.grey),
-                  onPressed: () => _handleFileUpload('image'),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.attach_file, color: Colors.grey),
-                  onPressed: () => _handleFileUpload('file'),
-                ),
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    minLines: 1,
-                    maxLines: 4,
-                    decoration: InputDecoration(
-                      hintText: "اكتب رسالة...",
-                      hintStyle: const TextStyle(fontSize: 14),
-                      filled: true,
-                      fillColor: Colors.grey.shade100,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                InkWell(
-                  onTap: () => _sendMessage(body: _messageController.text),
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [roseColor, purpleColor],
-                      ),
-                      shape: BoxShape.circle,
-                    ),
-                    child:
-                        _isUploading
-                            ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                            : const Icon(
-                              Icons.send,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          // 2. Modern Input Area
+          _buildBlueInputArea(),
         ],
       ),
     );
   }
 
-  // --- دالة تصميم الفقاعة (Message Bubble) ---
-  Widget _buildMessageBubble(Message msg, bool isMe) {
-    // تحديد شكل الحواف بناءً على المرسل
-    final borderRadius = BorderRadius.only(
-      topLeft: const Radius.circular(16),
-      topRight: const Radius.circular(16),
-      bottomLeft: isMe ? const Radius.circular(16) : Radius.zero,
-      bottomRight: isMe ? Radius.zero : const Radius.circular(16),
-    );
-
+  // 💎 The Blue Bubble Design
+  Widget _buildBlueBubble(Message msg, bool isMe, bool isNextSame) {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
+        margin: EdgeInsets.only(bottom: isNextSame ? 4 : 12),
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.75,
         ),
         decoration: BoxDecoration(
-          gradient:
-              isMe ? LinearGradient(colors: [roseColor, purpleColor]) : null,
-          color: isMe ? null : Colors.white,
-          borderRadius: borderRadius,
+          color: isMe ? kPrimaryBlue : kOtherBubbleColor,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(isMe ? 16 : 4),
+            bottomRight: Radius.circular(isMe ? 4 : 16),
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
-              blurRadius: 4,
+              blurRadius: 5,
               offset: const Offset(0, 2),
             ),
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.all(4.0), // Padding صغير للحاوية
+          padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. عرض الصورة أو الملف
               if (msg.attachmentUrl != null)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: _buildAttachmentView(msg, isMe),
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: CachedNetworkImage(
+                      imageUrl: msg.attachmentUrl!,
+                      placeholder:
+                          (c, u) => Container(
+                            height: 150,
+                            width: 200,
+                            color: Colors.grey[200],
+                            child: const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                      // ✅ عند تحميل الصورة، اطلب النزول للأسفل إذا لزم الأمر
+                      imageBuilder: (ctx, provider) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (_scrollController.hasClients &&
+                              _scrollController.offset < 50) {
+                            _scrollToBottom(isImage: true);
+                          }
+                        });
+                        return Image(image: provider, fit: BoxFit.cover);
+                      },
+                      errorWidget: (c, u, e) => const Icon(Icons.error),
+                    ),
+                  ),
                 ),
-
-              // 2. عرض النص
               if (msg.body != null && msg.body!.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
+                Text(
+                  msg.body!,
+                  style: TextStyle(
+                    color: isMe ? Colors.white : kTextColor,
+                    fontSize: 15,
+                    height: 1.4,
                   ),
-                  child: Text(
-                    msg.body!,
+                ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    DateFormat(
+                      'hh:mm a',
+                    ).format(DateTime.parse(msg.createdAt).toLocal()),
                     style: TextStyle(
-                      color: isMe ? Colors.white : Colors.black87,
-                      fontSize: 15,
+                      fontSize: 10,
+                      color:
+                          isMe
+                              ? Colors.white.withOpacity(0.7)
+                              : Colors.grey[500],
                     ),
                   ),
-                ),
-
-              // 3. الوقت وحالة القراءة
-              Padding(
-                padding: const EdgeInsets.only(right: 8, left: 8, bottom: 4),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Text(
-                      DateFormat(
-                        'hh:mm a',
-                      ).format(DateTime.parse(msg.createdAt)),
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: isMe ? Colors.white70 : Colors.grey,
-                      ),
+                  if (isMe) ...[
+                    const SizedBox(width: 4),
+                    Icon(
+                      msg.isRead ? Icons.done_all_rounded : Icons.check_rounded,
+                      size: 14,
+                      color:
+                          msg.isRead
+                              ? Colors.white
+                              : Colors.white.withOpacity(0.6),
                     ),
-                    if (isMe) ...[
-                      const SizedBox(width: 4),
-                      Icon(
-                        msg.isRead ? Icons.done_all : Icons.done,
-                        size: 14,
-                        color:
-                            msg.isRead ? Colors.blue.shade100 : Colors.white70,
-                      ),
-                    ],
                   ],
-                ),
+                ],
               ),
             ],
           ),
@@ -662,75 +837,107 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // --- دالة مساعدة لعرض المرفقات ---
-  Widget _buildAttachmentView(Message msg, bool isMe) {
-    // إذا كان المرفق صورة
-    if (msg.attachmentType == 'image') {
-      return GestureDetector(
-        onTap: () {
-          // فتح الصورة بحجم كامل عند الضغط عليها
-          showDialog(
-            context: context,
-            builder:
-                (_) => Dialog(
-                  backgroundColor: Colors.transparent,
-                  child: InteractiveViewer(
-                    child: CachedNetworkImage(imageUrl: msg.attachmentUrl!),
+  // 💎 Modern Input
+  Widget _buildBlueInputArea() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(
+        16,
+        12,
+        16,
+        30,
+      ), // Extra bottom padding for iOS home bar
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.emoji_emotions_outlined,
+                      color: Colors.grey[500],
+                    ),
+                    onPressed: () {},
                   ),
-                ),
-          );
-        },
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: CachedNetworkImage(
-            imageUrl: msg.attachmentUrl!,
-            placeholder:
-                (context, url) => Container(
-                  height: 150,
-                  width: 200,
-                  color: Colors.black12,
-                  child: const Center(child: CircularProgressIndicator()),
-                ),
-            errorWidget: (context, url, error) => const Icon(Icons.error),
-            fit: BoxFit.cover,
-            width: double.infinity, // تأخذ عرض الفقاعة
-          ),
-        ),
-      );
-    }
-    // إذا كان المرفق ملف آخر
-    else {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isMe ? Colors.white.withOpacity(0.2) : Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.insert_drive_file,
-              color: isMe ? Colors.white : Colors.grey.shade700,
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                "ملف مرفق",
-                style: TextStyle(
-                  color: isMe ? Colors.white : Colors.black87,
-                  decoration: TextDecoration.underline,
-                ),
-                overflow: TextOverflow.ellipsis,
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      minLines: 1,
+                      maxLines: 5,
+                      style: const TextStyle(color: kTextColor),
+                      decoration: InputDecoration(
+                        hintText: "اكتب رسالة...",
+                        hintStyle: TextStyle(color: Colors.grey[400]),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.attach_file_rounded,
+                      color: Colors.grey[500],
+                    ),
+                    onPressed: () => _handleAttachment('file'),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.camera_alt_outlined,
+                      color: Colors.grey[500],
+                    ),
+                    onPressed: () => _handleAttachment('image'),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      );
-    }
+          ),
+          const SizedBox(width: 12),
+          GestureDetector(
+            onTap: () => _sendMessage(body: _messageController.text),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: kPrimaryBlue,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: kPrimaryBlue.withOpacity(0.4),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child:
+                  _isUploading
+                      ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                      : const Icon(
+                        Icons.send_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
-
-  Widget _buildEmptyState() => Center(
-    child: Text("اختر محادثة", style: TextStyle(color: Colors.grey.shade400)),
-  );
 }

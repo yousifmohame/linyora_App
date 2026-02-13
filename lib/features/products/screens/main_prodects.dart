@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:linyora_project/features/layout/main_layout_screen.dart';
+import 'package:linyora_project/models/product_details_model.dart';
 import 'package:provider/provider.dart';
 import 'package:linyora_project/features/auth/providers/auth_provider.dart';
 import 'package:linyora_project/features/cart/providers/cart_provider.dart';
@@ -10,7 +11,6 @@ import 'package:linyora_project/features/home/widgets/search_screen.dart';
 import 'package:linyora_project/features/products/widgets/product_filter_drawer.dart';
 import 'package:linyora_project/features/shared/widgets/product_card.dart';
 import 'package:linyora_project/models/product_model.dart';
-import 'package:linyora_project/models/product_details_model.dart';
 import 'package:linyora_project/features/products/services/product_service.dart';
 
 class ProductsScreen extends StatefulWidget {
@@ -83,10 +83,30 @@ class _ProductsScreenState extends State<ProductsScreen> {
         detail.variants.isNotEmpty ? detail.variants.first : null;
 
     double rating = 0.0;
+
+    // ✅ التعديل هنا:
+    // 1. نحاول الحساب من المراجعات إذا كانت موجودة (كما كان سابقاً)
     if (detail.reviews.isNotEmpty) {
       final total = detail.reviews.fold(0.0, (sum, item) => sum + item.rating);
       rating = total / detail.reviews.length;
     }
+    // 2. إذا كانت المصفوفة فارغة، نحاول أخذ القيمة الجاهزة من المودل
+    // (تأكد أن ProductDetailsModel يحتوي على حقل rating، أو قم بجلبه من الـ JSON مباشرة إذا لم يكن معرفاً)
+    else {
+      rating = detail.avgRating ?? 0.0;
+      // محاولة قراءة التقييم مباشرة إذا كان المودل يدعمه أو عبر الـ json
+      // يمكنك استبدال السطر التالي بـ rating = detail.rating; إذا كان الحقل موجوداً في المودل
+      try {
+        // نفترض هنا أنك قد تحتاج للوصول للبيانات الخام إذا لم يكن الحقل معرفاً في الكلاس
+        // أو ببساطة اعتمد على أن القيمة 0 إذا لم تأتِ
+        // rating = detail.rating ?? 0.0;
+      } catch (e) {
+        rating = 0.0;
+      }
+    }
+
+    // حل بديل سريع: إذا كان لديك حقل rating في ProductDetailsModel
+    // rating = detail.reviews.isNotEmpty ? (calculated...) : (detail.rating ?? 0.0);
 
     return ProductModel(
       id: detail.id,
@@ -98,8 +118,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
           (firstVariant != null && firstVariant.images.isNotEmpty)
               ? firstVariant.images.first
               : '',
-      rating: rating,
-      reviewCount: detail.reviews.length,
+      rating: rating, // ✅ الآن سيتم تمرير التقييم الصحيح
+      reviewCount:
+          detail.reviews.length, // ملاحظة: قد يكون 0 في القائمة وهذا طبيعي
       merchantName: detail.merchantName,
       isNew: false,
       merchantId: detail.merchantId,

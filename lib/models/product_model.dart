@@ -17,13 +17,12 @@ class ProductModel {
   final double price;
   final double? compareAtPrice;
   final int stock;
-  final List<ProductVariant>? variants;
+  final List<ProductVariant> variants; // جعلتها غير null دائماً لتسهيل التعامل
 
   final String? promotionEndsAt;
   final List<int>? categoryIds;
 
   final bool isDropshipping;
-  // ✅ الحقل الذي كان يسبب الخطأ في شاشة التاجر
   final int? originalProductId;
 
   ProductModel({
@@ -41,14 +40,15 @@ class ProductModel {
     required this.price,
     this.compareAtPrice,
     this.stock = 0,
-    this.variants,
+    this.variants = const [], // Default empty list
     this.promotionEndsAt,
     this.categoryIds,
     this.isDropshipping = false,
-    this.originalProductId, // ✅
+    this.originalProductId,
   });
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
+    // 1. معالجة المتغيرات (Variants) أولاً
     List<ProductVariant> variantsList = [];
     if (json['variants'] != null && json['variants'] is List) {
       variantsList =
@@ -57,21 +57,46 @@ class ProductModel {
               .toList();
     }
 
+    // 2. إعداد القيم الافتراضية
     double displayPrice =
         double.tryParse(json['price']?.toString() ?? '0') ?? 0.0;
     String displayImage = '';
-    int totalStock = 0;
+    int totalStock = int.tryParse(json['stock']?.toString() ?? '0') ?? 0;
 
+    // ✅ المتغير الذكي للخصم
+    double? resolvedCompareAtPrice;
+
+    // محاولة قراءة الخصم من الجذر أولاً
+    if (json['compare_at_price'] != null) {
+      resolvedCompareAtPrice = double.tryParse(
+        json['compare_at_price'].toString(),
+      );
+    }
+
+    // 3. المنطق الذكي: إذا وجدنا متغيرات، نأخذ البيانات منها إذا كانت البيانات الرئيسية ناقصة
     if (variantsList.isNotEmpty) {
       final first = variantsList.first;
+
+      // إذا السعر الرئيسي 0، خذ سعر الفارينت
       if (displayPrice == 0) displayPrice = first.price;
+
+      // ✅ إذا لم نجد خصم في الجذر، نبحث في الفارينت
+      if (resolvedCompareAtPrice == null) {
+        resolvedCompareAtPrice = first.compareAtPrice;
+      }
+
+      // الصورة
       if (first.images.isNotEmpty) displayImage = first.images.first;
+
+      // المخزون التراكمي
       totalStock = variantsList.fold(
         0,
         (sum, item) => sum + item.stockQuantity,
       );
-    } else {
-      totalStock = int.tryParse(json['stock']?.toString() ?? '0') ?? 0;
+    }
+
+    // 4. معالجة الصورة إذا لم نأخذها من الفارينت
+    if (displayImage.isEmpty) {
       if (json['image_url'] != null) {
         displayImage = json['image_url'].toString();
       } else if (json['images'] != null &&
@@ -109,20 +134,16 @@ class ProductModel {
       isNew: json['is_new'] == true || json['is_new'] == 1,
       brand: json['brand']?.toString(),
       status: json['status']?.toString() ?? 'active',
+
       price: displayPrice,
-      compareAtPrice:
-          json['compare_at_price'] != null
-              ? double.tryParse(json['compare_at_price'].toString())
-              : null,
+      compareAtPrice: resolvedCompareAtPrice, // ✅ استخدام القيمة المحسوبة
+
       stock: totalStock,
       variants: variantsList,
-
       promotionEndsAt: json['promotion_ends_at']?.toString(),
       categoryIds: catIds,
       isDropshipping:
           json['is_dropshipping'] == true || json['is_dropshipping'] == 1,
-
-      // ✅ قراءة الحقل الجديد
       originalProductId: int.tryParse(
         json['original_product_id']?.toString() ?? '',
       ),

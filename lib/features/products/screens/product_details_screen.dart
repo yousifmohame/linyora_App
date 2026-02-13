@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
@@ -766,7 +767,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
               // منتجات مشابهة
               RelatedProductsSection(currentProductId: _product!.id),
 
-              const SizedBox(height: 100),
+              const SizedBox(height: 8),
+
+              ReviewsSection(reviews: _product!.reviews),
+
+              const SizedBox(height: 20),
             ]),
           ),
         ],
@@ -857,5 +862,332 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         ),
       ),
     );
+  }
+}
+
+class ReviewsSection extends StatelessWidget {
+  final List<ProductReview> reviews;
+
+  const ReviewsSection({Key? key, required this.reviews}) : super(key: key);
+
+  // حساب توزيع النجوم (كم شخص أعطى 5 نجوم، 4 نجوم...)
+  Map<int, int> _calculateStarDistribution() {
+    Map<int, int> distribution = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0};
+    for (var review in reviews) {
+      int rating = review.rating.round();
+      if (rating >= 1 && rating <= 5) {
+        distribution[rating] = (distribution[rating] ?? 0) + 1;
+      }
+    }
+    return distribution;
+  }
+
+  // حساب متوسط التقييم
+  double _calculateAverage() {
+    if (reviews.isEmpty) return 0.0;
+    double total = reviews.fold(0, (sum, item) => sum + item.rating);
+    return total / reviews.length;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (reviews.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+        color: Colors.white,
+        width: double.infinity,
+        child: Column(
+          children: [
+            Icon(Icons.rate_review_outlined, size: 60, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            Text(
+              "لا توجد تقييمات بعد",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "كن أول من يقيم هذا المنتج!",
+              style: TextStyle(color: Colors.grey[500]),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final double averageRating = _calculateAverage();
+    final Map<int, int> distribution = _calculateStarDistribution();
+
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "تقييمات العملاء",
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 24),
+
+          // 1. قسم الملخص (الرقم الكبير + الشرائط)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // العمود الأيمن: الرقم الكبير
+              Expanded(
+                flex: 2,
+                child: Column(
+                  children: [
+                    Text(
+                      averageRating.toStringAsFixed(1),
+                      style: const TextStyle(
+                        fontSize: 48,
+                        fontWeight: FontWeight.bold,
+                        height: 1.0,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(5, (index) {
+                        return Icon(
+                          index < averageRating.round()
+                              ? Icons.star
+                              : Icons.star_border,
+                          color: Colors.amber,
+                          size: 18,
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "${reviews.length} تقييم",
+                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 20),
+              // العمود الأيسر: أشرطة التقدم
+              Expanded(
+                flex: 3,
+                child: Column(
+                  children:
+                      [5, 4, 3, 2, 1].map((star) {
+                        final count = distribution[star] ?? 0;
+                        final percentage =
+                            reviews.isEmpty ? 0.0 : count / reviews.length;
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            children: [
+                              Text(
+                                "$star",
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.star,
+                                size: 10,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: LinearProgressIndicator(
+                                    value: percentage,
+                                    minHeight: 6,
+                                    backgroundColor: Colors.grey[100],
+                                    color: Colors.amber,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                "$count",
+                                style: TextStyle(
+                                  color: Colors.grey[400],
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                ),
+              ),
+            ],
+          ),
+
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Divider(thickness: 1, height: 1),
+          ),
+
+          // 2. قائمة التعليقات
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: reviews.length > 5 ? 5 : reviews.length, // عرض أول 5 فقط
+            separatorBuilder: (context, index) => const Divider(height: 30),
+            itemBuilder: (context, index) {
+              return _buildReviewItem(reviews[index]);
+            },
+          ),
+
+          // زر عرض المزيد
+          if (reviews.length > 5)
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () {
+                    // هنا يمكنك فتح صفحة تحتوي على كل التقييمات
+                  },
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    side: BorderSide(color: Colors.grey.shade300),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    "عرض جميع التقييمات",
+                    style: TextStyle(color: Colors.black),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ويدجت لبناء كارت التعليق الواحد
+  Widget _buildReviewItem(ProductReview review) {
+    // تنسيق التاريخ
+    String formattedDate = review.createdAt;
+    try {
+      final date = DateTime.parse(review.createdAt);
+      formattedDate = DateFormat(
+        'dd MMM yyyy',
+        'en',
+      ).format(date); // استخدم 'ar' إذا كانت المكتبة تدعم العربية
+    } catch (_) {}
+
+    // استخراج الحرف الأول للاسم
+    String firstLetter =
+        review.userName.isNotEmpty ? review.userName[0].toUpperCase() : "U";
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            // صورة المستخدم (دائرة بالحرف الأول)
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: _getColorForName(review.userName),
+              child: Text(
+                firstLetter,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // الاسم والتاريخ
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  review.userName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                // النجوم الصغيرة بجانب الاسم
+                Row(
+                  children: List.generate(5, (index) {
+                    return Icon(
+                      index < review.rating ? Icons.star : Icons.star_border,
+                      color: Colors.amber,
+                      size: 12,
+                    );
+                  }),
+                ),
+              ],
+            ),
+            const Spacer(),
+            Text(
+              formattedDate,
+              style: TextStyle(color: Colors.grey[400], fontSize: 12),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (review.comment.isNotEmpty)
+          Text(
+            review.comment,
+            style: const TextStyle(
+              color: Color(0xFF444444),
+              height: 1.5,
+              fontSize: 14,
+            ),
+          ),
+
+        // أزرار تفاعلية وهمية (للمنظر الجمالي فقط)
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Icon(
+              Icons.thumb_up_alt_outlined,
+              size: 16,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(width: 4),
+            Text(
+              "مفيد",
+              style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+            ),
+            const SizedBox(width: 16),
+            Text(
+              "إبلاغ",
+              style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // دالة لتوليد لون عشوائي ثابت بناءً على الاسم
+  Color _getColorForName(String name) {
+    final colors = [
+      Colors.blue,
+      Colors.red,
+      Colors.green,
+      Colors.orange,
+      Colors.purple,
+      Colors.teal,
+      Colors.pink,
+      Colors.indigo,
+    ];
+    final hash = name.codeUnits.fold(0, (sum, code) => sum + code);
+    return colors[hash % colors.length].withOpacity(0.8);
   }
 }

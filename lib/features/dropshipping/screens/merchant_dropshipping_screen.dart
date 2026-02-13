@@ -108,20 +108,55 @@ class _MerchantDropshippingScreenState
     setState(() => _importingIds.add(id));
     try {
       await _service.importProduct(id, price);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('✅ تم إضافة المنتج لمتجرك بنجاح!'),
             backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating, // تحسين مظهر التنبيه
           ),
         );
       }
     } catch (e) {
       if (mounted) {
+        String errorMessage = '❌ فشل الاستيراد';
+        Color snackBarColor = Colors.red;
+
+        // تحويل الخطأ لنص للتحقق من محتواه
+        final errorString = e.toString().toLowerCase();
+
+        // 1. التحقق مما إذا كان الخطأ بسبب التكرار
+        // (قم بتعديل الكلمات المفتاحية هنا بناءً على ما يرسله الباك إند لديك)
+        if (errorString.contains('exist') ||
+            errorString.contains('duplicate') ||
+            errorString.contains('already')) {
+          errorMessage = '⚠️ هذا المنتج موجود بالفعل في متجرك!';
+          snackBarColor = Colors.orange; // لون تحذيري بدلاً من الأحمر
+        }
+        // تحقق إضافي إذا كانت الرسالة تأتي مباشرة بالعربية
+        else if (errorString.contains('موجود مسبقا')) {
+          errorMessage = '⚠️ هذا المنتج موجود بالفعل في متجرك!';
+          snackBarColor = Colors.orange;
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('❌ فشل الاستيراد'),
-            backgroundColor: Colors.red,
+          SnackBar(
+            content: Row(
+              children: [
+                // تغيير الأيقونة حسب نوع الخطأ
+                Icon(
+                  snackBarColor == Colors.orange
+                      ? Icons.warning_amber
+                      : Icons.error_outline,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 10),
+                Expanded(child: Text(errorMessage)),
+              ],
+            ),
+            backgroundColor: snackBarColor,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }

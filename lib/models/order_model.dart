@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+
 class OrderModel {
   final int id;
   final String orderNumber;
@@ -18,40 +21,27 @@ class OrderModel {
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
-    // 1. تحديد مكان البيانات (هل هي مباشرة أم داخل 'details' كما في صفحة التفاصيل)
+    // 1. التعامل مع اختلاف هيكلية الرد (سواء كانت البيانات مباشرة أو داخل 'details')
     final data = json['details'] != null ? json['details'] : json;
 
-    // 2. معالجة المنتجات (Items)
+    // 2. معالجة قائمة المنتجات (Items) بحذر
     var itemsList = <OrderItemModel>[];
+    var rawItems = json['items'] ?? data['items'];
 
-    // في صفحة التفاصيل، المنتجات تأتي في مفتاح 'items' بجانب 'details'
-    if (json['items'] != null) {
-      itemsList =
-          (json['items'] as List)
-              .map((i) => OrderItemModel.fromJson(i))
-              .toList();
-    }
-    // في صفحة القائمة (بعد تعديل الباك إند أعلاه)، وضعنا صورة وهمية داخل items
-    else if (data['items'] != null) {
-      itemsList =
-          (data['items'] as List)
-              .map((i) => OrderItemModel.fromJson(i))
-              .toList();
+    if (rawItems != null && rawItems is List) {
+      itemsList = rawItems.map((i) => OrderItemModel.fromJson(i)).toList();
     }
 
-    // 3. قراءة الحقول مع مراعاة اختلاف التسميات (camelCase vs snake_case)
     return OrderModel(
-      id: data['id'],
-      orderNumber: '#${data['id']}',
+      id: data['id'] ?? 0,
+      orderNumber: '#${data['id'] ?? '0'}',
       status: data['status'] ?? 'pending',
-      // الباك إند يرسل totalAmount في التفاصيل و totalPrice في القائمة (بعد تعديلنا)
       totalPrice:
           double.tryParse(
             (data['totalPrice'] ?? data['totalAmount'] ?? 0).toString(),
           ) ??
           0.0,
-      // الباك إند يرسل created_at في التفاصيل و date في القائمة
-      date: data['date'] ?? data['created_at'] ?? '',
+      date: data['created_at'] ?? data['date'] ?? '',
       shippingCost:
           double.tryParse(
             (data['shipping_cost'] ?? data['shippingCost'] ?? 0).toString(),
@@ -63,41 +53,63 @@ class OrderModel {
 }
 
 class OrderItemModel {
-  final int id;
+  final int productId;
   final String productName;
   final String productImage;
   final double price;
   final int quantity;
+  final bool isReviewed;
+  final int? myRating;
+  final String? myComment;
 
   OrderItemModel({
-    required this.id,
+    required this.productId,
     required this.productName,
     required this.productImage,
     required this.price,
     required this.quantity,
+    this.isReviewed = false,
+    this.myRating,
+    this.myComment,
   });
 
   factory OrderItemModel.fromJson(Map<String, dynamic> json) {
-    // معالجة الصور القادمة من الباك إند
+    // 🔥 الحل النهائي لمشكلة الصور (String vs List)
     String image = '';
+    var rawImages = json['images'];
 
-    // الحالة 1: في صفحة التفاصيل، الصور تأتي مصفوفة ['url1', 'url2']
-    if (json['images'] != null &&
-        json['images'] is List &&
-        (json['images'] as List).isNotEmpty) {
-      image = json['images'][0];
-    }
-    // الحالة 2: في القائمة (بعد تعديل الباك إند)، أرسلناها باسم productImage
-    else if (json['productImage'] != null) {
-      image = json['productImage'];
+    try {
+      if (rawImages != null) {
+        if (rawImages is String && rawImages.isNotEmpty) {
+          // إذا كان نصاً، نحاول فكه كمصفوفة JSON
+          var decoded = jsonDecode(rawImages);
+          if (decoded is List && decoded.isNotEmpty) {
+            image = decoded[0].toString();
+          }
+        } else if (rawImages is List && rawImages.isNotEmpty) {
+          // إذا كانت مصفوفة جاهزة
+          image = rawImages[0].toString();
+        }
+      } else if (json['productImage'] != null) {
+        image = json['productImage'].toString();
+      }
+    } catch (e) {
+      debugPrint("❌ Error parsing images in OrderItem: $e");
     }
 
     return OrderItemModel(
-      id: json['product_id'] ?? 0, // الباك إند يرسل product_id
+      productId: json['product_id'] ?? json['id'] ?? 0,
       productName: json['productName'] ?? '',
       productImage: image,
       price: double.tryParse((json['price'] ?? 0).toString()) ?? 0.0,
       quantity: json['quantity'] ?? 1,
+      // 🔥 قراءة حالة التقييم بشكل آمن (الباك إند يرسلها كـ 0/1 أو true/false)
+      isReviewed: json['isReviewed'] == 1 || json['isReviewed'] == true,
+      myRating:
+          json['myRating'] != null
+              ? int.tryParse(json['myRating'].toString())
+              : null,
+      myComment: json['myComment']?.toString(),
     );
   }
 }

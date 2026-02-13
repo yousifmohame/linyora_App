@@ -2,15 +2,14 @@ import '../../../core/api/api_client.dart';
 import '../../../models/subscription_plan_model.dart';
 
 class SubscriptionService {
-  final ApiClient _apiClient = ApiClient();
+  final ApiClient _apiClient = ApiClient(); // يستخدم التوكن تلقائياً
 
-  // 1. جلب الخطط الحقيقية
+  // 1. جلب الخطط (ما زلنا نحتاجها لعرض الشاشة)
   Future<List<SubscriptionPlan>> getPlans() async {
     try {
       final response = await _apiClient.get('/subscriptions/plans');
 
       if (response.statusCode == 200) {
-        // البيانات تأتي مباشرة كمصفوفة حسب كود React
         return (response.data as List)
             .map((e) => SubscriptionPlan.fromJson(e))
             .toList();
@@ -18,33 +17,18 @@ class SubscriptionService {
       return [];
     } catch (e) {
       print("Error fetching plans: $e");
-      return []; // إرجاع قائمة فارغة عند الخطأ
+      return [];
     }
   }
 
-  // 2. إنشاء جلسة الدفع والحصول على الرابط
-  Future<String?> createCheckoutSession(int planId) async {
-    try {
-      final response = await _apiClient.post(
-        '/subscriptions/create-session',
-        data: {'planId': planId},
-      );
+  // ❌ تم حذف createCheckoutSession لأننا نستخدم PaymentService الآن
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return response.data['checkoutUrl']; // الرابط الذي سنفتحه
-      }
-      return null;
-    } catch (e) {
-      print("Error creating session: $e");
-      throw Exception('فشل إنشاء رابط الدفع');
-    }
-  }
-
+  // 2. إلغاء الاشتراك
   Future<bool> cancelSubscription() async {
     try {
-      // تأكد من الرابط الصحيح في الباك إند
+      // نتصل بالباك إند لإلغاء التجديد التلقائي
       final response = await _apiClient.post(
-        '/payments/cancel-subscription',
+        '/payments/cancel-subscription', // تأكد أن هذا المسار يطابق الباك إند
         data: {},
       );
 

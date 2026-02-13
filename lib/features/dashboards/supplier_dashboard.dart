@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:linyora_project/features/layout/main_layout_screen.dart';
+import 'package:linyora_project/features/shared/wallet/screens/wallet_screen.dart';
 import 'package:linyora_project/features/supplier/Verification/screens/verification_screen.dart';
 import 'package:linyora_project/features/supplier/bank/screens/supplier_bank_screen.dart';
 import 'package:linyora_project/features/supplier/orders/screens/supplier_orders_screen.dart';
@@ -123,7 +124,7 @@ class _SupplierDashboardScreenState extends State<SupplierDashboardScreen> {
       {
         'title': 'المحفظة والأرباح',
         'icon': Icons.account_balance_wallet_outlined,
-        'page': const SupplierWalletScreen(),
+        'page': const WalletScreen(),
         'show': true,
         'isLocked': !isVerified,
       },

@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:linyora_project/features/address/screens/add_edit_address_screen.dart';
-import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
 
 // Services & Screens
 import 'package:linyora_project/features/auth/services/auth_service.dart';
 import 'package:linyora_project/features/auth/screens/login_screen.dart';
 import 'package:linyora_project/features/auth/screens/register_screen.dart';
+import 'package:linyora_project/features/address/screens/add_edit_address_screen.dart'; // Ensure this path is correct
 import '../services/checkout_service.dart';
 
 // Models
 import '../../../models/checkout_models.dart';
-import '../../../models/cart_item_model.dart';
 import '../../../models/payment_card_model.dart';
 
 // Providers
@@ -36,9 +35,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   List<AddressModel> _addresses = [];
   int? _selectedAddressId;
-  List<MerchantGroup> _merchantGroups = []; // القائمة المقسمة
+  List<MerchantGroup> _merchantGroups = []; // The grouped list
   String _paymentMethodType = 'card'; // 'card' or 'cod'
   String? _selectedCardId;
+
+  // 🔥 New Variable for COD Fee
+  double _codFee = 0.0;
 
   // Colors
   final Color _primaryColor = const Color(0xFFF105C6);
@@ -49,18 +51,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _checkAuth();
   }
 
-  // 1️⃣ التحقق من حالة تسجيل الدخول
+  // 1️⃣ Check Login Status
   void _checkAuth() {
     final isLoggedIn = AuthService.instance.isLoggedIn;
     setState(() => _isLoggedIn = isLoggedIn);
 
-    // إذا كان مسجلاً، ابدأ بجلب البيانات
     if (isLoggedIn) {
       _initData();
     }
   }
 
-  // 2️⃣ جلب البيانات (عناوين، بطاقات، تقسيم السلة)
+  // 2️⃣ Fetch Data (Addresses, Cards, Settings, Cart Grouping)
   Future<void> _initData() async {
     setState(() => _isLoading = true);
     final cart = Provider.of<CartProvider>(context, listen: false);
@@ -75,13 +76,41 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
 
     try {
-      // جلب العناوين والبطاقات بالتوازي
-      await Future.wait([_fetchAddresses(), paymentProvider.fetchCards()]);
+      // Fetch addresses, cards, and payment settings in parallel
+      final results = await Future.wait([
+        _checkoutService.getAddresses(),
+        paymentProvider.fetchCards(),
+        _checkoutService.getPaymentSettings(), // Fetch settings from backend
+      ]);
 
-      // تقسيم السلة وجلب خيارات الشحن لكل مجموعة
+      // Handle Addresses
+      final addresses = results[0] as List<AddressModel>;
+      if (mounted) {
+        setState(() {
+          _addresses = addresses;
+          if (addresses.isNotEmpty) {
+            final defaultAddr = addresses.firstWhere(
+              (a) => a.isDefault,
+              orElse: () => addresses.first,
+            );
+            _selectedAddressId = defaultAddr.id;
+          }
+        });
+      }
+
+      // Handle Payment Settings (COD Fee)
+      final settings = results[2] as Map<String, dynamic>;
+      if (mounted) {
+        setState(() {
+          // Adjust key based on your backend response (e.g., 'cod_fee', 'codFee')
+          _codFee = double.tryParse(settings['cod_fee'].toString()) ?? 0.0;
+        });
+      }
+
+      // Group Cart Items & Fetch Shipping Options
       await _prepareMerchantGroups(cart);
 
-      // تعيين البطاقة الافتراضية
+      // Set Default Card
       if (paymentProvider.cards.isNotEmpty) {
         final defaultCard = paymentProvider.cards.firstWhere(
           (c) => c.isDefault,
@@ -101,29 +130,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-  Future<void> _fetchAddresses() async {
-    final addresses = await _checkoutService.getAddresses();
-    if (mounted) {
-      setState(() {
-        _addresses = addresses;
-        if (addresses.isNotEmpty) {
-          final defaultAddr = addresses.firstWhere(
-            (a) => a.isDefault,
-            orElse: () => addresses.first,
-          );
-          _selectedAddressId = defaultAddr.id;
-        }
-      });
-    }
-  }
-
-  // 🔥 3️⃣ منطق تقسيم المنتجات وجلب الشحن المستقل
+  // 🔥 3️⃣ Logic to Group Items & Fetch Independent Shipping
   Future<void> _prepareMerchantGroups(CartProvider cart) async {
     final Map<String, MerchantGroup> groupsMap = {};
 
-    // أ. التجميع المحلي
+    // A. Local Grouping
     for (var item in cart.items) {
-      // تحديد المالك (تاجر أو مورد)
+      // Identify Owner (Merchant or Supplier)
       final bool isDropshipping = item.product.isDropshipping ?? false;
       final String ownerId =
           isDropshipping
@@ -149,7 +162,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     final List<MerchantGroup> tempGroups = groupsMap.values.toList();
 
-    // ب. جلب خيارات الشحن لكل مجموعة من السيرفر
+    // B. Fetch Shipping Options for each group from Server
     await Future.wait(
       tempGroups.map((group) async {
         try {
@@ -158,7 +171,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
           group.shippingOptions = options;
 
-          // اختيار أول خيار شحن افتراضياً
+          // Select first option by default
           if (options.isNotEmpty) {
             group.selectedShipping = options.first;
           }
@@ -175,13 +188,30 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
+  Future<void> _fetchAddresses() async {
+    final addresses = await _checkoutService.getAddresses();
+    if (mounted) {
+      setState(() {
+        _addresses = addresses;
+        // Logic to re-select address if current selection is invalid or null
+        if (_selectedAddressId == null && addresses.isNotEmpty) {
+          final defaultAddr = addresses.firstWhere(
+            (a) => a.isDefault,
+            orElse: () => addresses.first,
+          );
+          _selectedAddressId = defaultAddr.id;
+        }
+      });
+    }
+  }
+
   double get _totalShippingCost {
     return _merchantGroups.fold(0.0, (sum, group) {
       return sum + (group.selectedShipping?.cost ?? 0.0);
     });
   }
 
-  // التنقل
+  // Navigation Helpers
   void _goToLogin() {
     Navigator.push(
       context,
@@ -196,9 +226,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     ).then((_) => _checkAuth());
   }
 
-  // 4️⃣ تنفيذ الدفع
+  Future<void> _navigateToAddAddress() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AddEditAddressScreen()),
+    );
+
+    if (result == true) {
+      await _fetchAddresses();
+    }
+  }
+
+  // 4️⃣ Execute Payment
   Future<void> _handlePayment() async {
-    // التحقق من البيانات
+    // Validations
     if (_selectedAddressId == null) {
       _showError('الرجاء اختيار عنوان شحن');
       return;
@@ -221,9 +262,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     try {
       final cart = Provider.of<CartProvider>(context, listen: false);
-      final totalAmount = cart.totalAmount + _totalShippingCost;
+      // Calculate Total Amount (Backend usually recalculates for security, but good for UI/Preliminary check)
+      final currentCodFee = _paymentMethodType == 'cod' ? _codFee : 0.0;
+      final totalAmount = cart.totalAmount + _totalShippingCost + currentCodFee;
 
-      // تجهيز البيانات للباك إند
+      // Prepare Shipping Selections
       final shippingSelections =
           _merchantGroups.map((g) {
             return {
@@ -238,7 +281,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           addressId: _selectedAddressId!,
           shippingSelections: shippingSelections,
           shippingCost: _totalShippingCost,
-          totalAmount: totalAmount,
+
+          codFee: _codFee, // 🔥 Sending COD Fee to backend
         );
       } else {
         await _checkoutService.placeCardOrder(
@@ -246,12 +290,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           addressId: _selectedAddressId!,
           shippingSelections: shippingSelections,
           shippingCost: _totalShippingCost,
-          totalAmount: totalAmount,
+          // totalAmount is often calculated on backend for card payments to ensure integrity
           paymentMethodId: _selectedCardId!,
+          totalAmount: totalAmount,
         );
       }
 
-      // نجاح
+      // Success
       cart.clearCart();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -260,10 +305,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context); // أو الانتقال لصفحة النجاح
+        Navigator.pop(context); // Navigate to Success Screen or Home
       }
     } catch (e) {
-      _showError('حدث خطأ: ${e.toString()}');
+      _showError('حدث خطأ: ${e.toString().replaceAll('Exception:', '')}');
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
@@ -279,7 +324,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // الحالة 1: غير مسجل دخول (Soft Auth Wall)
+    // State 1: Not Logged In (Soft Auth Wall)
     if (!_isLoggedIn) {
       return Scaffold(
         backgroundColor: Colors.white,
@@ -296,15 +341,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
     }
 
-    // الحالة 2: جاري التحميل
+    // State 2: Loading
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    // الحالة 3: عرض صفحة الدفع
+    // State 3: Checkout Form
     final cart = Provider.of<CartProvider>(context);
     final subTotal = cart.totalAmount;
-    final total = subTotal + _totalShippingCost;
+
+    // 🔥 Calculate Total Including COD Fee if selected
+    final currentCodFee = _paymentMethodType == 'cod' ? _codFee : 0.0;
+    final total = subTotal + _totalShippingCost + currentCodFee;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
@@ -480,10 +528,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  // في ملف CheckoutScreen.dart
-  // لا تنسَ استيراد الصفحة الجديدة في الأعلى
-  // import 'add_address_screen.dart';
-
   Widget _buildAddressSection() {
     return Card(
       elevation: 0,
@@ -496,7 +540,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // الهيدر وزر الإضافة
+            // Header & Add Button
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -513,7 +557,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ),
                   ],
                 ),
-                // ✅ زر إضافة صغير يظهر دائماً حتى لو هناك عناوين
                 if (_addresses.isNotEmpty)
                   TextButton(
                     onPressed: _navigateToAddAddress,
@@ -529,7 +572,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             if (_addresses.isEmpty)
               Center(
                 child: TextButton.icon(
-                  // ✅ تفعيل الزر في حالة القائمة الفارغة
                   onPressed: _navigateToAddAddress,
                   icon: const Icon(Icons.add),
                   label: const Text("إضافة عنوان جديد"),
@@ -638,27 +680,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  // ✅ دالة الانتقال والتحديث
-  // في ملف CheckoutScreen.dart
-
-  Future<void> _navigateToAddAddress() async {
-    // 1. ننتظر النتيجة باستخدام await
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const AddEditAddressScreen()),
-    );
-
-    // 2. نتحقق إذا كانت النتيجة true
-    if (result == true) {
-      // 3. نعيد تحميل العناوين
-      await _fetchAddresses();
-
-      // (اختياري) تحسين إضافي: تحديد العنوان الجديد تلقائياً إذا كان هو الوحيد أو الافتراضي
-      // هذا يحدث تلقائياً داخل _fetchAddresses إذا كنت قد كتبت المنطق هناك
-    }
-  }
-
-  // ✅ بطاقة التاجر مع خيارات الشحن
   Widget _buildMerchantGroupCard(MerchantGroup group) {
     return Card(
       elevation: 0,
@@ -672,7 +693,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // رأس البطاقة (اسم التاجر)
+            // Merchant Header
             Row(
               children: [
                 const Icon(Icons.store, color: Colors.blue),
@@ -688,18 +709,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             const Divider(height: 24),
 
-            // قائمة المنتجات
+            // Item List
             ...group.items.map((item) {
-              // ✅ 1. استخراج المتغير (Variant) بشكل آمن
               final variant = item.selectedVariant;
-
-              // ✅ 2. تحديد الصورة: إذا وجد فارينت وله صور نستخدمها، وإلا صورة المنتج
               final String image =
                   (variant != null && variant.images.isNotEmpty)
                       ? variant.images[0]
                       : item.product.imageUrl;
-
-              // ✅ 3. تحديد السعر: سعر الفارينت أو سعر المنتج
               final double price = variant?.price ?? item.product.price;
 
               return Padding(
@@ -709,7 +725,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: CachedNetworkImage(
-                        imageUrl: image, // ✅ استخدام الصورة الآمنة
+                        imageUrl: image,
                         width: 50,
                         height: 50,
                         fit: BoxFit.cover,
@@ -731,7 +747,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontWeight: FontWeight.w500),
                           ),
-                          // ✅ عرض تفاصيل الفارينت إذا وجد
                           if (variant != null)
                             Text(
                               variant.name,
@@ -741,7 +756,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               ),
                             ),
                           Text(
-                            // ✅ استخدام السعر الآمن
                             "${item.quantity} x ${price.toStringAsFixed(0)} ر.س",
                             style: TextStyle(
                               fontSize: 12,
@@ -752,7 +766,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ),
                     ),
                     Text(
-                      // ✅ حساب المجموع بالسعر الآمن
                       "${(item.quantity * price).toStringAsFixed(0)} ر.س",
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
@@ -763,7 +776,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
             const SizedBox(height: 12),
 
-            // قسم الشحن
+            // Shipping Options
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -875,6 +888,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
+
+                // Credit Card Option
                 InkWell(
                   onTap: () => setState(() => _paymentMethodType = 'card'),
                   child: Row(
@@ -893,6 +908,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ],
                   ),
                 ),
+
                 if (_paymentMethodType == 'card') ...[
                   if (paymentProvider.cards.isEmpty)
                     Padding(
@@ -930,7 +946,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ),
                   ),
                 ],
+
                 const Divider(height: 24),
+
+                // COD Option
                 InkWell(
                   onTap:
                       () => setState(() {
@@ -950,6 +969,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             }),
                       ),
                       const Text("الدفع عند الاستلام"),
+                      if (_codFee > 0)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: Text(
+                            "(+${_codFee.toStringAsFixed(0)} ر.س رسوم)",
+                            style: TextStyle(
+                              color: Colors.orange.shade800,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
                       const Spacer(),
                       const Icon(Icons.money, color: Colors.grey),
                     ],
@@ -1019,6 +1050,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             _summaryRow("المجموع الفرعي", subTotal),
             const SizedBox(height: 8),
             _summaryRow("الشحن", _totalShippingCost),
+
+            // 🔥 Show COD fee if active
+            if (_paymentMethodType == 'cod' && _codFee > 0) ...[
+              const SizedBox(height: 8),
+              _summaryRow("رسوم الدفع عند الاستلام", _codFee, isFee: true),
+            ],
+
             const Divider(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1063,14 +1101,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _summaryRow(String label, double amount) {
+  Widget _summaryRow(String label, double amount, {bool isFee = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: TextStyle(color: Colors.grey[600])),
+        Text(
+          label,
+          style: TextStyle(
+            color: isFee ? Colors.orange.shade800 : Colors.grey[600],
+          ),
+        ),
         Text(
           "${amount.toStringAsFixed(2)} ر.س",
-          style: const TextStyle(fontWeight: FontWeight.w600),
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: isFee ? Colors.orange.shade800 : Colors.black,
+          ),
         ),
       ],
     );

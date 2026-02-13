@@ -21,10 +21,10 @@ class SubscriptionState {
       status: json['status'] ?? 'inactive',
       hasDropshippingAccess:
           json['permissions']?['hasDropshippingAccess'] ?? false,
-      
+
       // ✅ 2. قراءة الـ ID من داخل كائن 'plan' بشكل آمن
       planId: int.tryParse(json['plan']?['id']?.toString() ?? ''),
-      
+
       planName: json['plan']?['name'],
       startDate: json['startDate'],
       endDate: json['endDate'],
@@ -51,6 +51,7 @@ class UserModel {
   final String? phone;
   final String? avatar;
   final String? token;
+  final int points;
 
   // رقم الدور من الباك إند
   final int roleId;
@@ -69,6 +70,7 @@ class UserModel {
     this.phone,
     this.avatar,
     this.token,
+    this.points = 0,
     this.roleId = 5, // الافتراضي عميل
     this.verificationStatus = 'not_submitted',
     this.hasAcceptedAgreement = false,
@@ -127,6 +129,7 @@ class UserModel {
       phone: json['phone'] ?? json['mobile'],
       avatar: json['profile_picture_url'] ?? json['avatar'],
       token: json['access_token'] ?? json['token'],
+      points: json['points'] ?? 0,
 
       // قراءة Role ID
       roleId:

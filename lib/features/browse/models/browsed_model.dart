@@ -28,15 +28,17 @@ class SocialLinks {
   final String? instagram;
   final String? twitter;
   final String? facebook;
+  final String? tiktok;   // ✅ تمت الإضافة
   final String? snapchat;
 
-  SocialLinks({this.instagram, this.twitter, this.facebook, this.snapchat});
+  SocialLinks({this.instagram, this.twitter, this.facebook, this.tiktok, this.snapchat});
 
   factory SocialLinks.fromJson(Map<String, dynamic> json) {
     return SocialLinks(
       instagram: json['instagram'],
       twitter: json['twitter'],
       facebook: json['facebook'],
+      tiktok: json['tiktok']?.toString(),
       snapchat: json['snapchat'],
     );
   }

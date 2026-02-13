@@ -13,8 +13,8 @@ import 'package:linyora_project/features/influencers/verification/screens/verifi
 import 'package:linyora_project/features/layout/main_layout_screen.dart';
 import 'package:linyora_project/features/models/analytics/screens/model_analytics_screen.dart';
 import 'package:linyora_project/features/models/reels/screens/model_reels_screen.dart';
-import 'package:linyora_project/features/models/wallet/screens/model_wallet_screen.dart';
 import 'package:linyora_project/features/public_profiles/screens/model_profile_screen.dart';
+import 'package:linyora_project/features/shared/wallet/screens/wallet_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
@@ -163,14 +163,14 @@ class _InfluencerDashboardScreenState extends State<InfluencerDashboardScreen> {
       {
         'title': 'المحفظة المالية',
         'icon': Icons.account_balance_wallet_outlined,
-        'page': const ModelWalletScreen(),
+        'page': const WalletScreen(),
         'show': isVerified,
         'isLocked': !isSubscribed,
       },
       {
         'title': 'الرسائل',
         'icon': Icons.chat_bubble_outline,
-        'page': ChatScreen(currentUserId: user.id),
+        'page': ChatListScreen(currentUserId: user.id),
         'show': isVerified,
         'isLocked': !isSubscribed,
       },

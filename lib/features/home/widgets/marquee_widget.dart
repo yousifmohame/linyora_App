@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:marquee/marquee.dart'; // 1. استيراد المكتبة
+import 'package:marquee/marquee.dart';
 import 'package:linyora_project/features/home/services/home_service.dart';
 
 class MarqueeWidget extends StatefulWidget {
@@ -13,35 +13,75 @@ class MarqueeWidget extends StatefulWidget {
 class _MarqueeWidgetState extends State<MarqueeWidget> {
   final HomeService _homeService = HomeService();
 
-  // بدلاً من قائمة ورقم حالي، سنستخدم نصاً واحداً طويلاً
   String combinedMessage = "";
   bool _isLoading = true;
+
+  // المتغيرات الجديدة للسرعة واللون
+  double _velocity = 30.0;
+  Color _backgroundColor = Colors.black; // لون افتراضي
 
   @override
   void initState() {
     super.initState();
-    _loadMessages();
+    _loadData();
   }
 
-  // لا نحتاج لـ dispose للتايمر لأنه تم حذفه
-
-  Future<void> _loadMessages() async {
+  // دالة مساعدة لتحويل Hex String (#FFFFFF) إلى Color في Flutter
+  Color _parseColor(String hexColor) {
     try {
-      final fetchedMessages = await _homeService.getMarqueeMessages();
+      hexColor = hexColor.toUpperCase().replaceAll("#", "");
+      if (hexColor.length == 6) {
+        hexColor = "FF$hexColor"; // إضافة الشفافية (Alpha) إذا لم تكن موجودة
+      }
+      return Color(int.parse(hexColor, radix: 16));
+    } catch (e) {
+      return Colors.black; // لون احتياطي في حال الخطأ
+    }
+  }
+
+  Future<void> _loadData() async {
+    try {
+      // 1. استخدام Future.wait لجلب كل البيانات في نفس الوقت (مثل Promise.all)
+      final results = await Future.wait([
+        _homeService.getMarqueeMessages(), // index 0
+        _homeService.getMarqueeSpeed(), // index 1
+        _homeService.getMarqueeColor(), // index 2
+      ]);
 
       if (mounted) {
         setState(() {
-          // 2. دمج جميع الرسائل في نص واحد مع فواصل
-          if (fetchedMessages.isNotEmpty) {
-            // نضع مسافات ونقطة بين كل رسالة والأخرى
-            combinedMessage = fetchedMessages.join("       •       ");
+          // معالجة الرسائل
+          final messages = results[0] as List<String>;
+          if (messages.isNotEmpty) {
+            combinedMessage = messages.join("       •       ");
+          } else {
+            combinedMessage = "Welcome to Linora!";
           }
+
+          // معالجة السرعة
+          // ملاحظة: في الويب (CSS duration) الرقم الأعلى يعني أبطأ
+          // في Flutter (Velocity) الرقم الأعلى يعني أسرع
+          // لذا قد تحتاج لضبط المعادلة حسب رغبتك، هنا سنستخدم القيمة كما هي كسرعة بكسل/ثانية
+          int speedFromApi = results[1] as int;
+          _velocity = speedFromApi.toDouble() * 20.0;
+          // إذا كانت السرعة بطيئة جداً في التطبيق مقارنة بالموقع، يمكنك ضربها في معامل:
+          // _velocity = speedFromApi.toDouble() * 2;
+
+          // معالجة اللون
+          String colorString = results[2] as String;
+          _backgroundColor = _parseColor(colorString);
+
           _isLoading = false;
         });
       }
     } catch (e) {
-      debugPrint("Error in MarqueeWidget: $e");
-      if (mounted) setState(() => _isLoading = false);
+      debugPrint("Error loading marquee data: $e");
+      if (mounted) {
+        setState(() {
+          combinedMessage = "Welcome to Linora!";
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -53,12 +93,10 @@ class _MarqueeWidgetState extends State<MarqueeWidget> {
 
     return Container(
       width: double.infinity,
-      height: 40, // 3. ضروري تحديد ارتفاع ثابت للشريط المتحرك
-      margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 0),
-      // إزالة الـ padding العمودي الداخلي لأن Marquee يحتاج مساحة للحركة
+      height: 40,
+      margin: const EdgeInsets.symmetric(vertical: 0, horizontal: 0),
       decoration: BoxDecoration(
-        color: Colors.blueAccent,
-
+        color: _backgroundColor, // ✅ استخدام اللون القادم من الباك اند
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
@@ -67,21 +105,24 @@ class _MarqueeWidgetState extends State<MarqueeWidget> {
           ),
         ],
       ),
-      // 4. قص المحتوى لضمان عدم خروج النص عن الحواف الدائرية
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(25),
+        // إزالة الحواف الدائرية ليطابق تصميم الويب (اختياري)
+        // أو إبقاؤها حسب تصميم التطبيق
+        // borderRadius: BorderRadius.circular(25),
         child: Marquee(
           text: combinedMessage,
           style: const TextStyle(
-            color: Colors.white,
+            color: Colors.white, // النص أبيض ليناسب الخلفيات الداكنة
             fontWeight: FontWeight.bold,
             fontSize: 14,
           ),
-          scrollAxis: Axis.horizontal, // اتجاه الحركة
+          scrollAxis: Axis.horizontal,
           crossAxisAlignment: CrossAxisAlignment.center,
-          blankSpace: 50.0, // مسافة فارغة بعد انتهاء النص وقبل بدايته مجدداً
-          velocity: 30.0, // سرعة الحركة (كلما زاد الرقم زادت السرعة)
-          pauseAfterRound: const Duration(seconds: 1), // توقف لحظي بعد كل دورة
+          blankSpace: 50.0,
+          velocity: _velocity, // ✅ استخدام السرعة القادمة من الباك اند
+          pauseAfterRound: const Duration(
+            seconds: 0,
+          ), // الويب عادة لا يتوقف، جعلناه 0 ليكون مستمراً
           startPadding: 10.0,
           accelerationDuration: const Duration(seconds: 1),
           accelerationCurve: Curves.linear,

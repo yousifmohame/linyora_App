@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:linyora_project/features/products/screens/product_details_screen.dart';
-import 'package:linyora_project/features/subscriptions/screens/payment_webview_screen.dart'; // تأكد من المسار
+import 'package:linyora_project/features/subscriptions/screens/payment_Services.dart'; // تأكد من المسار
 import '../../../models/product_model.dart';
 import '../../products/services/product_service.dart';
 import 'add_edit_product_screen.dart';
@@ -16,6 +16,8 @@ class MerchantProductsScreen extends StatefulWidget {
 
 class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
   final ProductService _productService = ProductService();
+
+  final PaymentService _paymentService = PaymentService();
 
   List<ProductModel> _products = [];
   bool _isLoading = true;
@@ -147,31 +149,21 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
   }
 
   Future<void> _processPromotionPayment(int productId, int tierId) async {
-    try {
-      final url = await _productService.promoteProduct(productId, tierId);
-      if (url != null && mounted) {
-        final result = await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PaymentWebViewScreen(checkoutUrl: url),
+    await _paymentService.promoteProduct(
+      context: context,
+      productId: productId,
+      tierId: tierId,
+      onSuccess: () {
+        // عند نجاح الدفع
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم ترويج المنتج بنجاح! 🚀'),
+            backgroundColor: Colors.green,
           ),
         );
-
-        if (result == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('تم ترويج المنتج بنجاح! 🚀'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          _fetchProducts(); // تحديث لعرض حالة الترويج الجديدة
-        }
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('فشل عملية الدفع: $e')));
-    }
+        _fetchProducts(); // تحديث القائمة لعرض الشارة الجديدة
+      },
+    );
   }
 
   @override
@@ -582,7 +574,8 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
 
                           // ✅ ونأخذ حالة الدروب شيبينج من السيرفر
                           isDropshipping: fetchedProduct.isDropshipping,
-                          originalProductId: fetchedProduct.originalProductId, merchantId: fetchedProduct.merchantId,
+                          originalProductId: fetchedProduct.originalProductId,
+                          merchantId: fetchedProduct.merchantId,
                         );
 
                         // نرسل المنتج المدمج لصفحة التعديل

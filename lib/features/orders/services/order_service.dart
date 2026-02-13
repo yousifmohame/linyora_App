@@ -41,4 +41,22 @@ class OrderService {
       return null;
     }
   }
+
+  // في ملف services/order_service.dart
+
+  Future<void> submitProductReview({
+    required int productId,
+    required int rating,
+    required String comment,
+  }) async {
+    try {
+      // نستخدم نفس المسار والبيانات الموجودة في كود React
+      await _apiClient.post(
+        '/customer/reviews',
+        data: {'productId': productId, 'rating': rating, 'comment': comment},
+      );
+    } catch (e) {
+      rethrow;
+    }
+  }
 }

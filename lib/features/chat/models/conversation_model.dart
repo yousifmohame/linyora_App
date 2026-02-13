@@ -1,11 +1,14 @@
 class Conversation {
   final int id;
   final int participantId;
-  final String? participantName;
-  final String? participantAvatar;
+
+  // جعلنا هذه الحقول غير final لتتمكن من تحديثها
+  // عند وصول بيانات جديدة من السوكيت دون إعادة تحميل القائمة
+  String? participantName;
+  String? participantAvatar;
   String? lastMessage;
-  final bool isOnline;
-  final String? lastSeen;
+  bool isOnline; // ⚠️ حذفنا final
+  String? lastSeen; // ⚠️ حذفنا final
   int unreadCount;
 
   Conversation({
@@ -21,18 +24,28 @@ class Conversation {
 
   factory Conversation.fromJson(Map<String, dynamic> json) {
     return Conversation(
-      id: json['id'],
-      participantId: json['participantId'] ?? 0,
+      // استخدام tryParse للأمان
+      id: int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      participantId:
+          int.tryParse(json['participantId']?.toString() ?? '0') ?? 0,
+
       participantName: json['participantName'],
       participantAvatar: json['participantAvatar'],
       lastMessage: json['lastMessage'],
 
-      // --- التعديل هنا ---
-      // نقوم بفحص إذا كانت القيمة تساوي 1 (رقم) أو true (بوليان)
+      // ✅ المنطق الصحيح الذي كتبته أنت
       isOnline: json['is_online'] == 1 || json['is_online'] == true,
 
       lastSeen: json['last_seen'],
-      unreadCount: json['unread_count'] ?? 0,
+
+      // ✅ دعم التسميتين (CamelCase أو SnakeCase) حسب الباك إند
+      unreadCount:
+          int.tryParse(
+            json['unreadCount']?.toString() ??
+                json['unread_count']?.toString() ??
+                '0',
+          ) ??
+          0,
     );
   }
 }

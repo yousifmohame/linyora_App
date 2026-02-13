@@ -22,6 +22,32 @@ class CheckoutService {
       return [];
     }
   }
+
+  // 2. جلب إعدادات الدفع
+  Future<Map<String, dynamic>> getPaymentSettings() async {
+    try {
+      // ✅ استخدم الرابط الذي جربته ويعمل معك
+      final response = await _apiClient.get('/settings/cod_fee');
+
+      // الحالة 1: إذا عاد السيرفر برقم مباشر أو نص (مثل 3 أو "3")
+      if (response.data is int ||
+          response.data is double ||
+          response.data is String) {
+        return {'cod_fee': response.data};
+      }
+
+      // الحالة 2: إذا عاد السيرفر بـ JSON (مثل {"cod_fee": 3})
+      if (response.data is Map<String, dynamic>) {
+        return response.data;
+      }
+
+      return {'cod_fee': 0.0};
+    } catch (e) {
+      print('⚠️ Error fetching settings: $e');
+      return {'cod_fee': 0.0}; // القيمة الافتراضية عند الخطأ
+    }
+  }
+
   // 3. جلب خيارات الشحن
   Future<List<ShippingOption>> getShippingOptions(List<int> productIds) async {
     try {
@@ -70,13 +96,15 @@ class CheckoutService {
           'amount': totalAmount,
           'currency': 'sar',
           'payment_method_id': paymentMethodId,
-          'merchant_id': cartItems.isNotEmpty ? cartItems.first.product.merchantId : null,
+          'merchant_id':
+              cartItems.isNotEmpty ? cartItems.first.product.merchantId : null,
           ...orderPayload,
         },
       );
 
       final String clientSecret = intentResponse.data['clientSecret'];
-      final String paymentIntentId = intentResponse.data['id'] ??
+      final String paymentIntentId =
+          intentResponse.data['id'] ??
           intentResponse.data['paymentIntentId'] ??
           clientSecret.split('_secret')[0];
 
@@ -108,18 +136,19 @@ class CheckoutService {
     required int addressId,
     required List<Map<String, dynamic>> shippingSelections,
     required double shippingCost,
-    required double totalAmount,
+    required double codFee, // الرسوم التي تم جلبها وعرضها للمستخدم
   }) async {
     try {
-      // ✅ استخدام نفس الدالة المساعدة
       final itemsPayload = _buildCartItemsPayload(cartItems);
 
       final orderPayload = {
         'cartItems': itemsPayload,
         'shippingAddressId': addressId,
         'shipping_cost': shippingCost,
-        'total_amount': totalAmount,
-        'merchant_shipping_selections': shippingSelections,
+        'cod_fee': codFee, // إرسال رسوم الدفع عند الاستلام
+        'payment_method': 'cod',
+        // يمكن إرسال تفاصيل الشحن التفصيلية لكي يخزنها الباك إند
+        'shipping_selections': shippingSelections,
       };
 
       await _apiClient.post('/orders/create-cod', data: orderPayload);
@@ -131,22 +160,24 @@ class CheckoutService {
   // --- دوال مساعدة (Private Helpers) ---
 
   // ✅ دالة لتجهيز بيانات المنتجات بشكل آمن (تحل مشكلة Null Safety)
-  List<Map<String, dynamic>> _buildCartItemsPayload(List<CartItemModel> cartItems) {
+  List<Map<String, dynamic>> _buildCartItemsPayload(
+    List<CartItemModel> cartItems,
+  ) {
     return cartItems.map((item) {
       // السعر: إذا وجد للمتغير سعر نأخذه، وإلا نأخذ سعر المنتج
       final double price = item.selectedVariant?.price ?? item.product.price;
-      
+
       // معرف المتغير: قد يكون null
       final int? variantId = item.selectedVariant?.id;
 
       return {
         'product_id': item.product.id,
         'productId': item.product.id, // للتوافق
-        
+
         'variant_id': variantId,
         'variantId': variantId, // للتوافق
         'id': variantId, // بعض الباك إند القديم قد يطلب id فقط
-        
+
         'quantity': item.quantity,
         'price': price,
       };
