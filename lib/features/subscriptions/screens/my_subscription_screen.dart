@@ -93,6 +93,107 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
     }
   }
 
+  Future<void> _onRefresh() async {
+    await Provider.of<AuthProvider>(context, listen: false).refreshUser();
+  }
+
+  Widget _buildNoSubscriptionView() {
+    return Center(
+      child: SingleChildScrollView(
+        // AlwaysScrollableScrollPhysics ضرورية لكي يعمل السحب للتحديث حتى لو كانت الصفحة فارغة
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 50),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // أيقونة توضيحية جذابة
+            Container(
+              padding: const EdgeInsets.all(30),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.card_membership_rounded,
+                size: 80,
+                color: Colors.grey.shade400,
+              ),
+            ),
+            const SizedBox(height: 30),
+
+            // نصوص توضيحية
+            const Text(
+              "لا يوجد اشتراك نشط",
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              "اشتركي الآن في إحدى باقات لينيورا للحصول على صلاحيات الدروب شيبينج ومميزات حصرية لتنمية أعمالك.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.grey.shade600,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 40),
+
+            // زر التوجه لصفحة الخطط
+            SizedBox(
+              width: double.infinity,
+              height: 55,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SubscriptionPlansScreen(),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF43F5E), // Primary Color
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  elevation: 2,
+                ),
+                child: const Text(
+                  "استعراض خطط الاشتراك",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // نص مساعد للسحب للتحديث
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.arrow_downward,
+                  size: 14,
+                  color: Colors.grey.shade400,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  "اسحبي للأسفل للتحديث إذا كنتِ قد اشتركتِ للتو",
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // جلب بيانات الاشتراك من المستخدم الحالي
@@ -123,221 +224,252 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            // 1. بطاقة الحالة (Active Badge)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: isActive ? Colors.green.shade100 : Colors.red.shade100,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    isActive ? Icons.check_circle : Icons.error,
-                    color: isActive ? Colors.green : Colors.red,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    isActive ? "اشتراك نشط" : "اشتراك غير نشط",
-                    style: TextStyle(
-                      color:
-                          isActive
-                              ? Colors.green.shade800
-                              : Colors.red.shade800,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // 2. بطاقة تفاصيل الباقة (VIP Card Design)
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFFF43F5E),
-                    Color(0xFF9333EA),
-                  ], // Rose to Purple
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFF43F5E).withOpacity(0.4),
-                    blurRadius: 15,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Stack(
-                children: [
-                  Positioned(
-                    right: -20,
-                    top: -20,
-                    child: Icon(
-                      Icons.star,
-                      size: 150,
-                      color: Colors.white.withOpacity(0.1),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          "الباقة الحالية",
-                          style: TextStyle(color: Colors.white70, fontSize: 14),
+      body: RefreshIndicator(
+        onRefresh: _onRefresh,
+        color: Colors.purple,
+        child:
+            sub == null
+                ? _buildNoSubscriptionView() // ويدجت يعرض رسالة لا يوجد اشتراك
+                : SingleChildScrollView(
+                  physics:
+                      const AlwaysScrollableScrollPhysics(), // ضروري لعمل الـ Refresh
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      // 1. بطاقة الحالة (Active Badge)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          planName.toUpperCase(), // اسم الباقة
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1,
-                          ),
+                        decoration: BoxDecoration(
+                          color:
+                              isActive
+                                  ? Colors.green.shade100
+                                  : Colors.red.shade100,
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                        const SizedBox(height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  "تاريخ البدء",
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  _formatDate(user?.subscription?.startDate),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
+                            Icon(
+                              isActive ? Icons.check_circle : Icons.error,
+                              color: isActive ? Colors.green : Colors.red,
+                              size: 20,
                             ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                const Text(
-                                  "تاريخ التجديد",
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  endDate,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
+                            const SizedBox(width: 8),
+                            Text(
+                              isActive ? "اشتراك نشط" : "اشتراك غير نشط",
+                              style: TextStyle(
+                                color:
+                                    isActive
+                                        ? Colors.green.shade800
+                                        : Colors.red.shade800,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // 3. الصلاحيات (Permissions)
-            if (sub.hasDropshippingAccess)
-              Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.purple.withOpacity(0.2)),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.cloud_download, color: Colors.purple),
-                    SizedBox(width: 12),
-                    Text(
-                      "صلاحية الدروب شيبينج مفعلة ✅",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ),
-
-            // 4. أزرار التحكم
-            const SizedBox(height: 20),
-            if (isActive) ...[
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    // توجيه لصفحة الخطط للترقية
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const SubscriptionPlansScreen(),
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.upgrade),
-                  label: const Text("ترقية الباقة"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
-                    elevation: 1,
-                    side: const BorderSide(color: Colors.grey),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: TextButton.icon(
-                  onPressed: _isLoading ? null : _handleCancelSubscription,
-                  icon:
-                      _isLoading
-                          ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                          : const Icon(
-                            Icons.cancel_outlined,
-                            color: Colors.red,
+                      const SizedBox(height: 20),
+
+                      // 2. بطاقة تفاصيل الباقة (VIP Card Design)
+                      Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [
+                              Color(0xFFF43F5E),
+                              Color(0xFF9333EA),
+                            ], // Rose to Purple
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                  label: Text(
-                    _isLoading ? "جاري المعالجة..." : "إلغاء تجديد الاشتراك",
-                    style: const TextStyle(color: Colors.red),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFF43F5E).withOpacity(0.4),
+                              blurRadius: 15,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: Stack(
+                          children: [
+                            Positioned(
+                              right: -20,
+                              top: -20,
+                              child: Icon(
+                                Icons.star,
+                                size: 150,
+                                color: Colors.white.withOpacity(0.1),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(24.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    "الباقة الحالية",
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    planName.toUpperCase(), // اسم الباقة
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            "تاريخ البدء",
+                                            style: TextStyle(
+                                              color: Colors.white70,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            _formatDate(
+                                              user?.subscription?.startDate,
+                                            ),
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.end,
+                                        children: [
+                                          const Text(
+                                            "تاريخ التجديد",
+                                            style: TextStyle(
+                                              color: Colors.white70,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            endDate,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // 3. الصلاحيات (Permissions)
+                      if (sub.hasDropshippingAccess)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.purple.withOpacity(0.2),
+                            ),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.cloud_download, color: Colors.purple),
+                              SizedBox(width: 12),
+                              Text(
+                                "صلاحية الدروب شيبينج مفعلة ✅",
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      // 4. أزرار التحكم
+                      const SizedBox(height: 20),
+                      if (isActive) ...[
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              // توجيه لصفحة الخطط للترقية
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder:
+                                      (_) => const SubscriptionPlansScreen(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.upgrade),
+                            label: const Text("ترقية الباقة"),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: Colors.black,
+                              elevation: 1,
+                              side: const BorderSide(color: Colors.grey),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: TextButton.icon(
+                            onPressed:
+                                _isLoading ? null : _handleCancelSubscription,
+                            icon:
+                                _isLoading
+                                    ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                    : const Icon(
+                                      Icons.cancel_outlined,
+                                      color: Colors.red,
+                                    ),
+                            label: Text(
+                              _isLoading
+                                  ? "جاري المعالجة..."
+                                  : "إلغاء تجديد الاشتراك",
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-              ),
-            ],
-          ],
-        ),
       ),
     );
   }

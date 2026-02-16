@@ -52,34 +52,61 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
   // داخل الكلاس _SubscriptionPlansScreenState
 
   Future<void> _handleSubscribe(int planId) async {
+    // 1. بدء حالة التحميل للزر المختار
     setState(() => _selectedPlanId = planId);
 
-    // ✅ لم نعد بحاجة لجلب التوكن هنا
-    // final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
-    // استدعاء الخدمة مباشرة (أنظف وأسهل)
-    await _paymentService.subscribeToPlan(
-      context: context,
-      planId: planId,
-      paymentMethodId: null,
-      onSuccess: () async {
-        // تحديث البيانات بعد النجاح
-        await Provider.of<AuthProvider>(context, listen: false).refreshUser();
-
-        if (mounted) {
+    try {
+      await _paymentService.subscribeToPlan(
+        context: context,
+        planId: planId,
+        paymentMethodId: null, // سيتم فتحه عبر Stripe Sheet
+        onSuccess: () async {
+          // 2. إظهار رسالة انتظار بسيطة للمستخدم
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('✅ تم تفعيل الاشتراك بنجاح!'),
-              backgroundColor: Colors.green,
+              content: Text('⏳ جاري تأكيد الاشتراك مع البنك...'),
+              duration: Duration(seconds: 2),
             ),
           );
-          Navigator.pop(context);
-        }
-      },
-    );
 
-    if (mounted) {
-      setState(() => _selectedPlanId = null);
+          // 3. 🔥 أهم خطوة: انتظار بسيط ثم تحديث بيانات المستخدم
+          // ننتظر قليلاً لضمان وصول الـ Webhook من Stripe إلى السيرفر الخاص بك
+          await Future.delayed(const Duration(seconds: 2));
+
+          final authProvider = Provider.of<AuthProvider>(
+            context,
+            listen: false,
+          );
+          await authProvider.refreshUser();
+
+          if (mounted) {
+            // 4. إغلاق الشاشة والعودة لصفحة "اشتراكي" التي ستتحدث تلقائياً
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('✅ مبروك! تم تفعيل باقتك الجديدة بنجاح'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 3),
+              ),
+            );
+
+            // العودة للصفحة السابقة
+            Navigator.of(context).pop();
+          }
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ فشلت العملية: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _selectedPlanId = null);
+      }
     }
   }
 

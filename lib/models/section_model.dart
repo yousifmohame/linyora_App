@@ -8,6 +8,9 @@ class SectionSlide {
   final String buttonText;
   final String buttonLink;
 
+  // ✅ Getter لربط الرابط مع واجهة المستخدم بسهولة
+  String get linkUrl => buttonLink;
+
   SectionSlide({
     required this.title,
     required this.description,
@@ -35,7 +38,12 @@ class SectionCategory {
   final String slug;
   final String imageUrl;
 
-  SectionCategory({required this.id, required this.name, required this.slug, required this.imageUrl});
+  SectionCategory({
+    required this.id,
+    required this.name,
+    required this.slug,
+    required this.imageUrl,
+  });
 
   factory SectionCategory.fromJson(Map<String, dynamic> json) {
     return SectionCategory(
@@ -54,7 +62,7 @@ class SectionModel {
   final String icon;
   final String themeColor;
   final bool isActive;
-  
+
   // Featured Product Data
   final int? featuredProductId;
   final String? productName;
@@ -65,7 +73,12 @@ class SectionModel {
   // Lists
   final List<SectionSlide> slides;
   final List<SectionCategory> categories;
+
   List<int> get categoryIds => categories.map((e) => e.id).toList();
+
+  // ✅ Getter لإنشاء رابط المنتج تلقائياً
+  String get productLink =>
+      featuredProductId != null ? '/products/$featuredProductId' : '';
 
   SectionModel({
     required this.id,
@@ -89,23 +102,28 @@ class SectionModel {
       title: json['title_ar'] ?? json['title_en'] ?? '',
       description: json['description_ar'] ?? json['description_en'] ?? '',
       icon: ImageHelper.getValidUrl(json['icon']),
-      themeColor: json['theme_color'] ?? '#ea580c', // اللون الافتراضي (برتقالي)
+      themeColor: json['theme_color'] ?? '#ea580c', // اللون الافتراضي
       isActive: json['is_active'] == 1 || json['is_active'] == true,
-      
+
       // المنتج المميز
-      featuredProductId: json['featured_product_id'], // قد يكون null
+      featuredProductId: json['featured_product_id'],
       productName: json['product_name_ar'] ?? json['product_name_en'],
-      productImage: json['product_image'] != null ? ImageHelper.getValidUrl(json['product_image']) : null,
-      productPrice: double.tryParse(json['product_price'].toString()),
+      productImage:
+          json['product_image'] != null
+              ? ImageHelper.getValidUrl(json['product_image'])
+              : null,
+      productPrice: double.tryParse(json['product_price']?.toString() ?? '0'),
       productDescription: json['product_description'],
 
       // القوائم
-      slides: (json['slides'] as List? ?? [])
-          .map((e) => SectionSlide.fromJson(e))
-          .toList(),
-      categories: (json['categories'] as List? ?? [])
-          .map((e) => SectionCategory.fromJson(e))
-          .toList(),
+      slides:
+          (json['slides'] as List? ?? [])
+              .map((e) => SectionSlide.fromJson(e))
+              .toList(),
+      categories:
+          (json['categories'] as List? ?? [])
+              .map((e) => SectionCategory.fromJson(e))
+              .toList(),
     );
   }
 }

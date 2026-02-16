@@ -3,6 +3,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:linyora_project/features/categories/screens/category_products_screen.dart';
 import 'package:linyora_project/features/home/screens/section_products_screen.dart';
+import 'package:linyora_project/features/products/screens/product_details_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/utils/color_helper.dart';
 import '../../../models/section_model.dart';
 import '../widgets/banner_video_player.dart';
@@ -11,6 +13,56 @@ class SectionDisplay extends StatelessWidget {
   final SectionModel section;
 
   const SectionDisplay({super.key, required this.section});
+
+  Future<void> _handleLinkTap(BuildContext context, String? link) async {
+    if (link == null || link.isEmpty) return;
+
+    // 1. معالجة الروابط الداخلية
+    if (link.startsWith('/')) {
+      // ✅ أ: إذا كان الرابط يخص منتجاً (مثال: /products/123)
+      if (link.startsWith('/products/')) {
+        // استخراج الـ ID من نهاية الرابط
+        final String productId = link.split('/').last;
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductDetailsScreen(productId: productId),
+          ),
+        );
+        return;
+      }
+
+      // ✅ ب: إذا كان الرابط يخص قسماً (مثال: /sections/5)
+      if (link.startsWith('/sections/')) {
+        final int sectionId = int.tryParse(link.split('/').last) ?? 0;
+        if (sectionId != 0) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SectionDetailsScreen(sectionId: sectionId),
+            ),
+          );
+        }
+        return;
+      }
+
+      // يمكن إضافة المزيد من الحالات هنا (مثل التصنيفات)
+      return;
+    }
+
+    // 2. الروابط الخارجية (كما هي)
+    final Uri url = Uri.parse(link);
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('تعذر فتح الرابط')));
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -262,100 +314,108 @@ class SectionDisplay extends StatelessWidget {
     Color themeColor,
     bool isTablet,
   ) {
-    return GestureDetector(
-      onTap: () {},
+    return InkWell(
+      onTap: () {
+        // يمكنك هنا فتح صفحة تفاصيل المنتج بدلاً من الرابط العام
+        // أو استخدام الرابط الموجود في القسم
+        _handleLinkTap(context, section.productLink);
+      },
       child: Stack(
+        fit: StackFit.expand,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: CachedNetworkImage(
-              imageUrl: section.productImage ?? '',
-              width: double.infinity,
-              height: double.infinity,
-              fit: BoxFit.cover,
-              errorWidget: (_, __, ___) => Container(color: Colors.grey[200]),
-            ),
+          // الخلفية (صورة المنتج)
+          CachedNetworkImage(
+            imageUrl: section.productImage ?? '',
+            fit: BoxFit.cover,
+            placeholder: (_, __) => Container(color: Colors.grey[200]),
+            errorWidget: (_, __, ___) => const Icon(Icons.image_not_supported),
           ),
+
+          // تدرج لوني للنص
           Container(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
               gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.transparent, Colors.black.withOpacity(0.8)],
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [Colors.black.withOpacity(0.8), Colors.transparent],
+                stops: const [0.0, 0.6],
               ),
             ),
           ),
+
+          // تفاصيل المنتج والزر
           Positioned(
-            top: 12,
+            bottom: 12,
+            left: 12,
             right: 12,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: themeColor,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.star, color: Colors.white, size: 14),
-                  SizedBox(width: 4),
-                  Text(
-                    "مميز",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: isTablet ? 24 : 16, // رفع النص قليلاً في التابلت
-            left: 16,
-            right: 16,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(
-                  section.productName ?? '',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: isTablet ? 22 : 18, // خط أكبر
-                    fontWeight: FontWeight.bold,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (section.productPrice != null)
-                  Text(
-                    "${section.productPrice} ﷼",
-                    style: TextStyle(
-                      color: themeColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: themeColor,
-                      padding: EdgeInsets.symmetric(
-                        vertical: isTablet ? 14 : 10,
-                      ), // زر أكبر
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: themeColor,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          "عرض خاص",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
+                      const SizedBox(height: 4),
+                      Text(
+                        section.productName ?? '',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (section.productPrice != null)
+                        Text(
+                          "${section.productPrice} ﷼",
+                          style: const TextStyle(
+                            color: Colors.white, // لون أصفر للسعر
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+                // زر الشراء الصغير
+                ElevatedButton(
+                  onPressed: () => _handleLinkTap(context, section.productLink),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
                     ),
-                    child: Text(
-                      "تسوق الآن",
-                      style: TextStyle(fontSize: isTablet ? 16 : 14),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
                     ),
+                  ),
+                  child: const Text(
+                    "شراء",
+                    style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -368,33 +428,24 @@ class SectionDisplay extends StatelessWidget {
 
   // ويدجت السلايدر
   Widget _buildSlideshow(BuildContext context, bool isTablet) {
-    // ارتفاع ديناميكي
-    final double sliderHeight = isTablet ? 320 : 250;
-
-    if (section.slides.isEmpty) {
-      return Container(
-        height: sliderHeight,
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: const Center(
-          child: Icon(Icons.image, size: 50, color: Colors.grey),
-        ),
-      );
-    }
+    if (section.slides.isEmpty) return const SizedBox();
 
     return CarouselSlider(
       options: CarouselOptions(
-        height: sliderHeight,
         viewportFraction: 1.0,
         autoPlay: true,
+        height: double.infinity, // لملء الحاوية الأب
+        autoPlayInterval: const Duration(seconds: 4),
         enableInfiniteScroll: section.slides.length > 1,
       ),
       items:
           section.slides.map((slide) {
-            return ClipRRect(
-              borderRadius: BorderRadius.circular(16),
+            return InkWell(
+              onTap:
+                  () => _handleLinkTap(
+                    context,
+                    slide.linkUrl,
+                  ), // ✅ تشغيل رابط السلايد
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -407,27 +458,33 @@ class SectionDisplay extends StatelessWidget {
                       : CachedNetworkImage(
                         imageUrl: slide.imageUrl,
                         fit: BoxFit.cover,
+                        width: double.infinity,
                       ),
 
-                  Container(
-                    alignment: Alignment.bottomRight,
-                    padding: const EdgeInsets.all(16),
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.black54, Colors.transparent],
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
+                  // تراكب خفيف للنص (اختياري)
+                  if (slide.title.isNotEmpty)
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Colors.black54, Colors.transparent],
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                          ),
+                        ),
+                        child: Text(
+                          slide.title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
-                    child: Text(
-                      slide.title,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: isTablet ? 18 : 16, // خط أكبر
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
                 ],
               ),
             );
