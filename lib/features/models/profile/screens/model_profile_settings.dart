@@ -3,6 +3,10 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../services/profile_service.dart';
 import '../models/profile_model.dart';
 
@@ -22,18 +26,15 @@ class _ModelProfileSettingsScreenState
   ProfileData? _profile;
   bool _isLoading = true;
   bool _isSaving = false;
-  String? _uploadingType; // 'profile', 'cover', 'portfolio'
+  String? _uploadingType;
 
-  // Controllers
   late TextEditingController _nameController;
   late TextEditingController _bioController;
   late TextEditingController _followersController;
   late TextEditingController _engagementController;
 
-  // Social Controllers
   final Map<String, TextEditingController> _socialControllers = {};
 
-  // Colors
   final Color _roseColor = const Color(0xFFE11D48);
   final Color _purpleColor = const Color(0xFF9333EA);
 
@@ -49,28 +50,20 @@ class _ModelProfileSettingsScreenState
       final data = await _service.getProfile();
       _profile = data;
 
-      // Initialize Controllers
       _nameController = TextEditingController(text: data.name);
       _bioController = TextEditingController(text: data.bio);
 
-      // ✅✅ 1. حساب مجموع المتابعين (الخارجي + الداخلي)
-      // تنظيف النص من أي رموز غير رقمية (مثل k, +, ,) لتحويله لرقم
       int externalFollowers =
           int.tryParse(
             data.stats.followers.replaceAll(RegExp(r'[^0-9]'), ''),
           ) ??
           0;
-      // جلب متابعي المنصة من الموديل (الذي أضفناه سابقاً)
       int platformFollowers = data.followersCount;
-
       int totalFollowers = externalFollowers + platformFollowers;
 
-      // عرض المجموع
       _followersController = TextEditingController(
         text: totalFollowers.toString(),
       );
-
-      // التفاعل يبقى كما هو (أو يمكنك جعله للقراءة فقط أيضاً)
       _engagementController = TextEditingController(
         text: data.stats.engagement,
       );
@@ -100,7 +93,8 @@ class _ModelProfileSettingsScreenState
     }
   }
 
-  Future<void> _pickAndUploadImage(String type) async {
+  // ✅ تمرير l10n
+  Future<void> _pickAndUploadImage(String type, AppLocalizations l10n) async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image == null) return;
 
@@ -116,9 +110,9 @@ class _ModelProfileSettingsScreenState
         else if (type == 'portfolio')
           _profile!.portfolio.add(url);
       });
-      _showMessage("تم رفع الصورة بنجاح");
+      _showMessage(l10n.imageUploadedSuccessMsg); // ✅ مترجم
     } catch (e) {
-      _showMessage("فشل الرفع", isError: true);
+      _showMessage(l10n.uploadFailedMsg, isError: true); // ✅ مترجم
     } finally {
       setState(() => _uploadingType = null);
     }
@@ -130,18 +124,14 @@ class _ModelProfileSettingsScreenState
     });
   }
 
-  Future<void> _saveProfile() async {
+  // ✅ تمرير l10n
+  Future<void> _saveProfile(AppLocalizations l10n) async {
     if (_profile == null) return;
 
     setState(() => _isSaving = true);
 
-    // Update model from controllers
     _profile!.name = _nameController.text;
     _profile!.bio = _bioController.text;
-
-    // ❌ 2. لا نقم بحفظ الإحصائيات لأنها أصبحت محسوبة تلقائياً
-    // _profile!.stats.followers = _followersController.text;
-    // _profile!.stats.engagement = _engagementController.text;
 
     _profile!.socialLinks.instagram = _socialControllers['instagram']!.text;
     _profile!.socialLinks.twitter = _socialControllers['twitter']!.text;
@@ -152,9 +142,9 @@ class _ModelProfileSettingsScreenState
 
     try {
       await _service.updateProfile(_profile!);
-      _showMessage("تم حفظ التغييرات بنجاح ✅");
+      _showMessage("${l10n.savedSuccessfullyMsg} ✅"); // ✅ مترجم
     } catch (e) {
-      _showMessage("فشل الحفظ", isError: true);
+      _showMessage(l10n.saveFailed, isError: true); // ✅ مترجم
     } finally {
       setState(() => _isSaving = false);
     }
@@ -171,13 +161,15 @@ class _ModelProfileSettingsScreenState
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     if (_isLoading)
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     return Scaffold(
       body: Stack(
         children: [
-          // Background Gradient
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -206,17 +198,19 @@ class _ModelProfileSettingsScreenState
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  _buildHeader(),
+                  _buildHeader(l10n), // ✅ تمرير l10n
                   const SizedBox(height: 20),
 
-                  // 1. Basic Info Card
                   _buildCard(
-                    title: "المعلومات الأساسية",
+                    title: l10n.basicInfoTitle, // ✅ مترجم
                     icon: Icons.person,
                     children: [
-                      // Cover Photo
                       InkWell(
-                        onTap: () => _pickAndUploadImage('cover'),
+                        onTap:
+                            () => _pickAndUploadImage(
+                              'cover',
+                              l10n,
+                            ), // ✅ تمرير l10n
                         child: Container(
                           height: 120,
                           width: double.infinity,
@@ -240,11 +234,14 @@ class _ModelProfileSettingsScreenState
                               if (_profile?.storeBannerUrl == null)
                                 Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
-                                  children: const [
-                                    Icon(Icons.camera_alt, color: Colors.grey),
+                                  children: [
+                                    const Icon(
+                                      Icons.camera_alt,
+                                      color: Colors.grey,
+                                    ),
                                     Text(
-                                      "أضف صورة غلاف",
-                                      style: TextStyle(
+                                      l10n.addCoverPhotoMsg, // ✅ مترجم
+                                      style: const TextStyle(
                                         color: Colors.grey,
                                         fontSize: 10,
                                       ),
@@ -262,7 +259,6 @@ class _ModelProfileSettingsScreenState
 
                       const SizedBox(height: 16),
 
-                      // Profile Pic
                       Center(
                         child: Stack(
                           children: [
@@ -291,7 +287,11 @@ class _ModelProfileSettingsScreenState
                               bottom: 0,
                               right: 0,
                               child: InkWell(
-                                onTap: () => _pickAndUploadImage('profile'),
+                                onTap:
+                                    () => _pickAndUploadImage(
+                                      'profile',
+                                      l10n,
+                                    ), // ✅ تمرير l10n
                                 child: CircleAvatar(
                                   radius: 14,
                                   backgroundColor: Colors.white,
@@ -317,21 +317,23 @@ class _ModelProfileSettingsScreenState
                       ),
 
                       const SizedBox(height: 16),
-                      _buildTextField("الاسم الكامل", _nameController),
+                      _buildTextField(
+                        l10n.fullNameLabel,
+                        _nameController,
+                      ), // ✅ مترجم
                       const SizedBox(height: 12),
                       _buildTextField(
-                        "النبذة التعريفية (Bio)",
+                        l10n.bioLabel,
                         _bioController,
                         maxLines: 3,
-                      ),
+                      ), // ✅ مترجم
                     ],
                   ),
 
                   const SizedBox(height: 16),
 
-                  // 2. Portfolio Card
                   _buildCard(
-                    title: "معرض الأعمال",
+                    title: l10n.portfolioTitle, // ✅ مترجم
                     icon: Icons.image,
                     children: [
                       GridView.builder(
@@ -345,10 +347,13 @@ class _ModelProfileSettingsScreenState
                             ),
                         itemCount: (_profile?.portfolio.length ?? 0) + 1,
                         itemBuilder: (ctx, idx) {
-                          // زر الإضافة في النهاية
                           if (idx == (_profile?.portfolio.length ?? 0)) {
                             return InkWell(
-                              onTap: () => _pickAndUploadImage('portfolio'),
+                              onTap:
+                                  () => _pickAndUploadImage(
+                                    'portfolio',
+                                    l10n,
+                                  ), // ✅ تمرير l10n
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: Colors.pink.shade50,
@@ -366,14 +371,14 @@ class _ModelProfileSettingsScreenState
                                         : Column(
                                           mainAxisAlignment:
                                               MainAxisAlignment.center,
-                                          children: const [
-                                            Icon(
+                                          children: [
+                                            const Icon(
                                               Icons.add_photo_alternate,
                                               color: Colors.pink,
                                             ),
                                             Text(
-                                              "إضافة",
-                                              style: TextStyle(
+                                              l10n.addBtn, // ✅ مترجم
+                                              style: const TextStyle(
                                                 fontSize: 10,
                                                 color: Colors.pink,
                                               ),
@@ -384,7 +389,6 @@ class _ModelProfileSettingsScreenState
                             );
                           }
 
-                          // الصور الموجودة
                           final imgUrl = _profile!.portfolio[idx];
                           return Stack(
                             children: [
@@ -422,25 +426,23 @@ class _ModelProfileSettingsScreenState
 
                   const SizedBox(height: 16),
 
-                  // 3. Stats & Socials
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: _buildCard(
-                          title: "الإحصائيات (تلقائي)",
+                          title: l10n.autoStatsTitle, // ✅ مترجم
                           icon: Icons.bar_chart,
                           children: [
-                            // ✅ 3. تفعيل وضع القراءة فقط
                             _buildTextField(
-                              "إجمالي المتابعين",
+                              l10n.totalFollowersLabel, // ✅ مترجم
                               _followersController,
                               icon: Icons.group,
                               readOnly: true,
                             ),
                             const SizedBox(height: 8),
                             _buildTextField(
-                              "التفاعل",
+                              l10n.engagementRateLabel, // ✅ مترجم
                               _engagementController,
                               icon: Icons.bolt,
                               readOnly: true,
@@ -454,7 +456,7 @@ class _ModelProfileSettingsScreenState
                   const SizedBox(height: 16),
 
                   _buildCard(
-                    title: "روابط التواصل",
+                    title: l10n.socialLinksTitle, // ✅ مترجم
                     icon: Icons.link,
                     children: [
                       _buildSocialInput(
@@ -492,12 +494,14 @@ class _ModelProfileSettingsScreenState
 
                   const SizedBox(height: 30),
 
-                  // Save Button
                   SizedBox(
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton.icon(
-                      onPressed: _isSaving ? null : _saveProfile,
+                      onPressed:
+                          _isSaving
+                              ? null
+                              : () => _saveProfile(l10n), // ✅ تمرير l10n
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
                         shadowColor: Colors.transparent,
@@ -524,9 +528,9 @@ class _ModelProfileSettingsScreenState
                                   ? const CircularProgressIndicator(
                                     color: Colors.white,
                                   )
-                                  : const Text(
-                                    "حفظ التغييرات",
-                                    style: TextStyle(
+                                  : Text(
+                                    l10n.saveChangesBtn, // ✅ مترجم
+                                    style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
@@ -547,9 +551,7 @@ class _ModelProfileSettingsScreenState
     );
   }
 
-  // --- Helper Widgets ---
-
-  Widget _buildHeader() {
+  Widget _buildHeader(AppLocalizations l10n) {
     return Column(
       children: [
         Row(
@@ -564,16 +566,16 @@ class _ModelProfileSettingsScreenState
               child: Icon(Icons.person, color: _roseColor, size: 28),
             ),
             const SizedBox(width: 12),
-            const Text(
-              "تعديل الملف الشخصي",
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            Text(
+              l10n.editProfileTitle, // ✅ مترجم
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
           ],
         ),
         const SizedBox(height: 4),
-        const Text(
-          "قم بتحديث معلوماتك لجذب المزيد من العملاء",
-          style: TextStyle(color: Colors.grey),
+        Text(
+          l10n.updateInfoToAttractClientsMsg, // ✅ مترجم
+          style: const TextStyle(color: Colors.grey),
         ),
       ],
     );
@@ -627,7 +629,6 @@ class _ModelProfileSettingsScreenState
     );
   }
 
-  // ✅ 4. تحديث دالة بناء الحقل لدعم القراءة فقط وتغيير اللون
   Widget _buildTextField(
     String label,
     TextEditingController controller, {
@@ -638,13 +639,12 @@ class _ModelProfileSettingsScreenState
     return TextField(
       controller: controller,
       maxLines: maxLines,
-      readOnly: readOnly, // تفعيل القراءة فقط
+      readOnly: readOnly,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon:
             icon != null ? Icon(icon, size: 18, color: Colors.grey) : null,
         filled: true,
-        // تغيير لون الخلفية إذا كان للقراءة فقط
         fillColor: readOnly ? Colors.grey.shade200 : Colors.white,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 12,

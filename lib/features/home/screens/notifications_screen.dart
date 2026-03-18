@@ -4,6 +4,9 @@ import 'package:intl/intl.dart';
 import 'package:linyora_project/models/notification_model.dart';
 import 'package:linyora_project/features/home/services/home_service.dart';
 
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({Key? key}) : super(key: key);
 
@@ -50,8 +53,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  // دالة تحديد الكل كمقروء
-  Future<void> _markAllAsRead() async {
+  // دالة تحديد الكل كمقروء (نمرر لها l10n لعرض رسالة الخطأ مترجمة)
+  Future<void> _markAllAsRead(AppLocalizations l10n) async {
     // 1. تحديث الواجهة فورياً (Optimistic UI)
     setState(() {
       for (var n in _notifications) {
@@ -66,21 +69,29 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (!success) {
       _fetchNotifications(isBackground: true);
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("فشل تحديث الإشعارات")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.notificationsFailed),
+          ), // ✅ رسالة خطأ مترجمة
+        );
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة مرة واحدة في دالة البناء
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
-          "الإشعارات",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        title: Text(
+          l10n.notificationsTitle, // ✅ عنوان مترجم
+          style: const TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
         backgroundColor: Colors.white,
@@ -92,8 +103,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         actions: [
           if (_notifications.isNotEmpty && _notifications.any((n) => !n.isRead))
             TextButton(
-              onPressed: _markAllAsRead,
-              child: const Text("قراءة الكل"),
+              onPressed: () => _markAllAsRead(l10n), // ✅ تمرير الترجمة هنا
+              child: Text(l10n.markAllRead), // ✅ نص الزر مترجم
             ),
         ],
       ),
@@ -104,7 +115,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _notifications.isEmpty
-                ? _buildEmptyState()
+                ? _buildEmptyState(l10n) // ✅ تمرير الترجمة لحالة الفراغ
                 : ListView.separated(
                   physics:
                       const AlwaysScrollableScrollPhysics(), // لضمان عمل السحب حتى لو القائمة قصيرة
@@ -119,7 +130,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  // ✅ استقبال l10n لترجمة نص الشاشة الفارغة
+  Widget _buildEmptyState(AppLocalizations l10n) {
     return Center(
       child: SingleChildScrollView(
         // لضمان عمل RefreshIndicator في الحالة الفارغة
@@ -133,9 +145,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               color: Colors.grey[300],
             ),
             const SizedBox(height: 16),
-            const Text(
-              "لا توجد إشعارات حالياً",
-              style: TextStyle(
+            Text(
+              l10n.noNotifications, // ✅ رسالة حالة الفراغ مترجمة
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Colors.grey,
@@ -201,6 +213,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             ),
             const SizedBox(height: 8),
             Text(
+              // 💡 ملاحظة: تنسيق التاريخ قد يحتاج مستقبلاً للتعديل ليتوافق مع اللغة العربية أكثر باستخدام مكتبة intl، ولكن حالياً هذا كافٍ وممتاز.
               DateFormat('yyyy-MM-dd – hh:mm a').format(notification.createdAt),
               style: TextStyle(color: Colors.grey[400], fontSize: 11),
             ),

@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import 'package:linyora_project/features/browse/screens/model_profile_screen.dart';
 import '../models/browsed_model.dart';
 import '../services/browse_service.dart';
@@ -21,14 +25,12 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
   List<BrowsedModel> _filteredModels = [];
   bool _isLoading = true;
 
-  // Filters State
   String _searchTerm = '';
   String _selectedCategory = 'all';
-  String _sortBy = 'rating'; // Default to rating for better quality
+  String _sortBy = 'rating';
   List<String> _categories = ['all'];
 
-  // Colors
-  final Color _primaryColor = const Color(0xFFE11D48); // Rose
+  final Color _primaryColor = const Color(0xFFE11D48);
   final Color _darkColor = const Color(0xFF1F2937);
 
   @override
@@ -110,12 +112,18 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA), // خلفية بيضاء نقية
+      backgroundColor: const Color(0xFFFAFAFA),
       body: NestedScrollView(
         controller: _scrollController,
         headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [_buildStickySearchBar(), _buildCategoriesBar()];
+          return [
+            _buildStickySearchBar(l10n),
+            _buildCategoriesBar(l10n),
+          ]; // ✅ تمرير l10n
         },
         body:
             _isLoading
@@ -123,14 +131,13 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
                   child: CircularProgressIndicator(color: Color(0xFFE11D48)),
                 )
                 : _filteredModels.isEmpty
-                ? _buildEmptyState()
-                : _buildImmersiveGrid(),
+                ? _buildEmptyState(l10n) // ✅ تمرير l10n
+                : _buildImmersiveGrid(l10n), // ✅ تمرير l10n
       ),
     );
   }
 
-  // 2. Sticky Search Bar
-  Widget _buildStickySearchBar() {
+  Widget _buildStickySearchBar(AppLocalizations l10n) {
     return SliverAppBar(
       pinned: true,
       floating: true,
@@ -159,12 +166,12 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
               _applyFilters();
             },
             decoration: InputDecoration(
-              hintText: "ابحث عن اسم، أو تخصص...",
+              hintText: l10n.searchNameOrSpecialtyHint, // ✅ مترجم
               hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
               prefixIcon: Icon(Icons.search_rounded, color: _primaryColor),
               suffixIcon: IconButton(
                 icon: const Icon(Icons.sort_rounded, color: Colors.grey),
-                onPressed: _showSortPicker,
+                onPressed: () => _showSortPicker(l10n), // ✅ تمرير l10n
               ),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(
@@ -178,8 +185,7 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
     );
   }
 
-  // 3. Categories List
-  Widget _buildCategoriesBar() {
+  Widget _buildCategoriesBar(AppLocalizations l10n) {
     return SliverToBoxAdapter(
       child: Container(
         height: 60,
@@ -224,7 +230,7 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
                             : [],
                   ),
                   child: Text(
-                    cat == 'all' ? 'الكل' : cat,
+                    cat == 'all' ? l10n.allCategory : cat, // ✅ مترجم
                     style: TextStyle(
                       color: isSelected ? Colors.white : Colors.grey[600],
                       fontWeight: FontWeight.bold,
@@ -240,24 +246,23 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
     );
   }
 
-  // 4. Immersive Grid System (The Core)
-  Widget _buildImmersiveGrid() {
+  Widget _buildImmersiveGrid(AppLocalizations l10n) {
     return GridView.builder(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.65, // بطاقات طويلة (Portrait)
+        childAspectRatio: 0.65,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
       ),
       itemCount: _filteredModels.length,
       itemBuilder: (context, index) {
-        return _buildPremiumCard(_filteredModels[index]);
+        return _buildPremiumCard(_filteredModels[index], l10n); // ✅ تمرير l10n
       },
     );
   }
 
-  Widget _buildPremiumCard(BrowsedModel model) {
+  Widget _buildPremiumCard(BrowsedModel model, AppLocalizations l10n) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -279,13 +284,12 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
             ),
           ],
         ),
-        clipBehavior: Clip.antiAlias, // لضمان قص الصورة داخل الحواف
+        clipBehavior: Clip.antiAlias,
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // 1. Background Image
             Hero(
-              tag: 'profile_${model.id}', // Hero Animation
+              tag: 'profile_${model.id}',
               child: CachedNetworkImage(
                 imageUrl: model.profilePictureUrl ?? '',
                 fit: BoxFit.cover,
@@ -302,7 +306,6 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
               ),
             ),
 
-            // 2. Gradient Overlay (Bottom)
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -319,7 +322,6 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
               ),
             ),
 
-            // 3. Featured Badge (Top Left)
             if (model.isFeatured)
               Positioned(
                 top: 12,
@@ -343,7 +345,7 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
                       ),
                       const SizedBox(width: 2),
                       Text(
-                        "مميز",
+                        l10n.featuredBadge, // ✅ مترجم
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
@@ -355,7 +357,6 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
                 ),
               ),
 
-            // 4. Content (Bottom)
             Positioned(
               bottom: 16,
               left: 16,
@@ -390,7 +391,9 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    model.roleId == 3 ? "عارضة ازياء" : "منشئة محتوي",
+                    model.roleId == 3
+                        ? l10n.fashionModelRole
+                        : l10n.contentCreatorRole, // ✅ مترجم
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.8),
                       fontSize: 11,
@@ -398,7 +401,6 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  // Stats Row
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -427,7 +429,7 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2), // Glass effect
+        color: Colors.white.withOpacity(0.2),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.white.withOpacity(0.1)),
       ),
@@ -449,7 +451,7 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(AppLocalizations l10n) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -457,7 +459,7 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
           Icon(Icons.person_search_rounded, size: 80, color: Colors.grey[200]),
           const SizedBox(height: 20),
           Text(
-            "لم نجد أي نتائج",
+            l10n.noResultsFoundMsg, // ✅ مترجم
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -472,14 +474,17 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
                 _applyFilters();
               });
             },
-            child: Text("إعادة تعيين", style: TextStyle(color: _primaryColor)),
+            child: Text(
+              l10n.resetBtn,
+              style: TextStyle(color: _primaryColor),
+            ), // ✅ مترجم
           ),
         ],
       ),
     );
   }
 
-  void _showSortPicker() {
+  void _showSortPicker(AppLocalizations l10n) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -502,22 +507,29 @@ class _BrowseModelsScreenState extends State<BrowseModelsScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              const Text(
-                "ترتيب النتائج حسب",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              Text(
+                l10n.sortResultsByTitle, // ✅ مترجم
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 24),
-              _buildSortOption("الأعلى تقييماً", 'rating', Icons.star_rounded),
               _buildSortOption(
-                "الأكثر متابعة",
+                l10n.highestRatedSort,
+                'rating',
+                Icons.star_rounded,
+              ), // ✅ مترجم
+              _buildSortOption(
+                l10n.mostFollowedSort,
                 'followers',
                 Icons.group_rounded,
-              ),
+              ), // ✅ مترجم
               _buildSortOption(
-                "الاسم (أ-ي)",
+                l10n.nameAZSort,
                 'name',
                 Icons.sort_by_alpha_rounded,
-              ),
+              ), // ✅ مترجم
             ],
           ),
         );

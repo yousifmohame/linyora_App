@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:linyora_project/core/utils/color_parser.dart';
 import 'package:provider/provider.dart';
 import 'package:linyora_project/features/cart/providers/cart_provider.dart'; // 1. استيراد البروفايدر
 import 'package:linyora_project/features/wishlist/providers/wishlist_provider.dart';
@@ -388,42 +389,109 @@ class ProductCard extends StatelessWidget {
 
                   // قائمة الخيارات (Chips)
                   Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
+                    spacing: 12,
+                    runSpacing: 12,
                     children:
                         product.variants!.map((variant) {
                           bool isSelected = selectedVariant == variant;
-                          return ChoiceChip(
-                            label: Text(
-                              variant
-                                  .name, // تأكد أن لديك حقل name أو value في المودل
-                              style: TextStyle(
-                                color: isSelected ? Colors.white : Colors.black,
-                                fontWeight: FontWeight.bold,
+
+                          // 1. محاولة استخراج اللون
+                          Color? variantColor = ColorParser.parse(variant.name);
+
+                          // 2. إذا كان لوناً، نعرض دائرة
+                          if (variantColor != null) {
+                            return GestureDetector(
+                              onTap: () {
+                                setSheetState(() {
+                                  selectedVariant = isSelected ? null : variant;
+                                });
+                              },
+                              child: Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: variantColor,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    // إذا كان اللون أبيض، نضع حدود رمادية ليظهر
+                                    color:
+                                        isSelected
+                                            ? const Color(0xFFF105C6)
+                                            : (variantColor == Colors.white
+                                                ? Colors.grey.shade300
+                                                : Colors.transparent),
+                                    width: isSelected ? 2.5 : 1,
+                                  ),
+                                  boxShadow: [
+                                    if (isSelected)
+                                      BoxShadow(
+                                        color: variantColor.withOpacity(0.4),
+                                        blurRadius: 8,
+                                        spreadRadius: 2,
+                                      ),
+                                  ],
+                                ),
+                                // إضافة علامة "صح" إذا تم الاختيار
+                                child:
+                                    isSelected
+                                        ? Icon(
+                                          Icons.check,
+                                          size: 20,
+                                          // إذا اللون أبيض، الأيقونة سوداء، والعكس
+                                          color:
+                                              variantColor == Colors.white ||
+                                                      variantColor ==
+                                                          Colors.yellow
+                                                  ? Colors.black
+                                                  : Colors.white,
+                                        )
+                                        : null,
                               ),
-                            ),
-                            selected: isSelected,
-                            selectedColor: const Color(0xFFF105C6),
-                            backgroundColor: Colors.grey[100],
-                            onSelected: (val) {
-                              setSheetState(() {
-                                selectedVariant = val ? variant : null;
-                              });
-                            },
-                          );
+                            );
+                          }
+                          // 3. إذا لم يكن لوناً (نص عادي)، نعرض شيب
+                          else {
+                            return ChoiceChip(
+                              label: Text(
+                                variant.name,
+                                style: TextStyle(
+                                  color:
+                                      isSelected ? Colors.white : Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              selected: isSelected,
+                              selectedColor: const Color(0xFFF105C6),
+                              backgroundColor: Colors.grey[100],
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                side: BorderSide(
+                                  color:
+                                      isSelected
+                                          ? Colors.transparent
+                                          : Colors.grey.shade300,
+                                ),
+                              ),
+                              onSelected: (val) {
+                                setSheetState(() {
+                                  selectedVariant = val ? variant : null;
+                                });
+                              },
+                            );
+                          }
                         }).toList(),
                   ),
 
                   const SizedBox(height: 30),
 
-                  // زر التأكيد
+                  // زر الإضافة
                   SizedBox(
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
                       onPressed:
                           selectedVariant == null
-                              ? null // تعطيل الزر إذا لم يتم الاختيار
+                              ? null
                               : () =>
                                   _addToCartDirectly(context, selectedVariant),
                       style: ElevatedButton.styleFrom(
@@ -432,6 +500,7 @@ class ProductCard extends StatelessWidget {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
+                        elevation: 0,
                       ),
                       child: const Text(
                         "إضافة للسلة",

@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+// ✅ استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../providers/address_provider.dart';
 import 'add_edit_address_screen.dart';
 
@@ -14,7 +18,6 @@ class _AddressesScreenState extends State<AddressesScreen> {
   @override
   void initState() {
     super.initState();
-    // جلب العناوين عند فتح الصفحة
     Future.microtask(
       () =>
           Provider.of<AddressProvider>(context, listen: false).fetchAddresses(),
@@ -23,12 +26,18 @@ class _AddressesScreenState extends State<AddressesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text(
-          "عناويني",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        title: Text(
+          l10n.myAddressesTitle, // ✅ مترجم
+          style: const TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
         backgroundColor: Colors.white,
@@ -52,9 +61,9 @@ class _AddressesScreenState extends State<AddressesScreen> {
                     color: Colors.grey[300],
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    "لا توجد عناوين محفوظة",
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                  Text(
+                    l10n.noSavedAddressesMsg, // ✅ مترجم
+                    style: const TextStyle(fontSize: 18, color: Colors.grey),
                   ),
                 ],
               ),
@@ -113,9 +122,9 @@ class _AddressesScreenState extends State<AddressesScreen> {
                                 color: const Color(0xFFF105C6).withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: const Text(
-                                "الافتراضي",
-                                style: TextStyle(
+                              child: Text(
+                                l10n.defaultAddressBadge, // ✅ مترجم
+                                style: const TextStyle(
                                   color: Color(0xFFF105C6),
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
@@ -157,17 +166,23 @@ class _AddressesScreenState extends State<AddressesScreen> {
                               );
                             },
                             icon: const Icon(Icons.edit, size: 18),
-                            label: const Text("تعديل"),
+                            label: Text(l10n.editBtn), // ✅ مترجم
                             style: TextButton.styleFrom(
                               foregroundColor: Colors.blue,
                             ),
                           ),
                           TextButton.icon(
                             onPressed: () {
-                              _showDeleteConfirm(context, address.id);
+                              _showDeleteConfirm(
+                                context,
+                                address.id,
+                                l10n,
+                              ); // ✅ تمرير l10n
                             },
                             icon: const Icon(Icons.delete_outline, size: 18),
-                            label: const Text("حذف"),
+                            label: Text(
+                              l10n.delete,
+                            ), // ✅ مترجم (استخدمنا الكلمة من شاشات سابقة)
                             style: TextButton.styleFrom(
                               foregroundColor: Colors.red,
                             ),
@@ -191,23 +206,23 @@ class _AddressesScreenState extends State<AddressesScreen> {
             ),
           );
         },
-        backgroundColor: Color(0xFFF105C6),
+        backgroundColor: const Color(0xFFF105C6),
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  void _showDeleteConfirm(BuildContext context, int id) {
+  void _showDeleteConfirm(BuildContext context, int id, AppLocalizations l10n) {
     showDialog(
       context: context,
       builder:
           (ctx) => AlertDialog(
-            title: const Text("حذف العنوان"),
-            content: const Text("هل أنت متأكد من حذف هذا العنوان؟"),
+            title: Text(l10n.deleteAddressTitle), // ✅ مترجم
+            content: Text(l10n.deleteAddressConfirmMsg), // ✅ مترجم
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text("إلغاء"),
+                child: Text(l10n.cancelBtn), // ✅ مترجم
               ),
               TextButton(
                 onPressed: () {
@@ -218,7 +233,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
                   ).deleteAddress(id);
                 },
                 style: TextButton.styleFrom(foregroundColor: Colors.red),
-                child: const Text("حذف"),
+                child: Text(l10n.delete), // ✅ مترجم
               ),
             ],
           ),

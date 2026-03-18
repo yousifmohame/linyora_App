@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_credit_card/flutter_credit_card.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:provider/provider.dart';
+
+// ✅ استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../providers/payment_provider.dart';
 
 class AddCardScreen extends StatefulWidget {
@@ -31,49 +35,40 @@ class _AddCardScreenState extends State<AddCardScreen> {
     });
   }
 
-  // --- دالة الحفظ الآمن (Stripe Setup Intent) ---
   Future<void> _saveCard() async {
-    // 1. طباعة البيانات في الكونسول للتأكد من أنها ليست فارغة
-    print("---------------- DEBUG CARD DATA ----------------");
-    print("Number: '$cardNumber'");
-    print("Date: '$expiryDate'");
-    print("CVC: '$cvvCode'");
-    print("Holder: '$cardHolderName'");
-    print("-------------------------------------------------");
+    final l10n =
+        AppLocalizations.of(context)!; // ✅ استدعاء الترجمة لرسائل الخطأ
 
     if (formKey.currentState!.validate()) {
-      // تحقق إضافي يدوي لأن validate قد يمرر قيماً فارغة أحياناً
       if (cardNumber.isEmpty || expiryDate.isEmpty || cvvCode.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('الرجاء تعبئة جميع الحقول')),
+          SnackBar(content: Text(l10n.fillAllFieldsMsg)), // ✅ مترجم
         );
         return;
       }
 
       setState(() => _isLoading = true);
-      
+
       try {
-        // 2. معالجة التاريخ بدقة
-        // التأكد من أن التاريخ يحتوي على /
         if (!expiryDate.contains('/')) {
-          throw Exception("تنسيق التاريخ غير صحيح");
+          throw Exception(l10n.invalidDateFormatMsg); // ✅ مترجم
         }
-        
+
         final dateParts = expiryDate.split('/');
         final int expMonth = int.parse(dateParts[0]);
         int expYear = int.parse(dateParts[1]);
-        
-        // تحويل السنة من رقمين (25) إلى 4 أرقام (2025) إذا لزم الأمر
+
         if (expYear < 100) {
           expYear += 2000;
         }
 
-        // 3. تنظيف رقم البطاقة من المسافات (أهم خطوة)
         final cleanCardNumber = cardNumber.replaceAll(RegExp(r'\s+'), '');
 
-        // 4. استدعاء البروفايدر
-        await Provider.of<PaymentProvider>(context, listen: false).saveCardToStripe(
-          cardNumber: cleanCardNumber, // الرقم المنظف
+        await Provider.of<PaymentProvider>(
+          context,
+          listen: false,
+        ).saveCardToStripe(
+          cardNumber: cleanCardNumber,
           expMonth: expMonth,
           expYear: expYear,
           cvc: cvvCode,
@@ -81,47 +76,50 @@ class _AddCardScreenState extends State<AddCardScreen> {
         );
 
         if (mounted) {
-           Navigator.pop(context);
-           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('تم حفظ البطاقة بنجاح ✅'),
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.cardSavedSuccessMsg), // ✅ مترجم
               backgroundColor: Colors.green,
             ),
           );
         }
-
       } on StripeException catch (e) {
-        print("Stripe Error: ${e.error.localizedMessage}"); // طباعة خطأ سترايب
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('خطأ في البطاقة: ${e.error.localizedMessage}'),
+            content: Text(
+              '${l10n.cardErrorMsg}${e.error.localizedMessage}',
+            ), // ✅ مترجم
             backgroundColor: Colors.red,
           ),
         );
       } catch (e) {
-        print("General Error: $e"); // طباعة الخطأ العام
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تأكد من صحة بيانات البطاقة'),
+          SnackBar(
+            content: Text(l10n.verifyCardDataMsg), // ✅ مترجم
             backgroundColor: Colors.red,
           ),
         );
       } finally {
         if (mounted) setState(() => _isLoading = false);
       }
-    } else {
-      print("Form validation failed");
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // ✅ تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text(
-          "إضافة بطاقة جديدة",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        title: Text(
+          l10n.addNewCardTitle, // ✅ مترجم
+          style: const TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
@@ -130,7 +128,6 @@ class _AddCardScreenState extends State<AddCardScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // 1. شكل البطاقة
             CreditCardWidget(
               cardNumber: cardNumber,
               expiryDate: expiryDate,
@@ -145,8 +142,6 @@ class _AddCardScreenState extends State<AddCardScreen> {
               onCreditCardWidgetChange: (CreditCardBrand creditCardBrand) {},
               customCardTypeIcons: const <CustomCardTypeIcon>[],
             ),
-
-            // 2. نموذج الإدخال
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
@@ -164,18 +159,20 @@ class _AddCardScreenState extends State<AddCardScreen> {
                       expiryDate: expiryDate,
 
                       inputConfiguration: InputConfiguration(
-                        // ✅ التعديل الثاني: حذف labelStyle و inputStyle من هنا
                         cardNumberDecoration: _buildInputDecoration(
-                          'رقم البطاقة',
+                          l10n.cardNumberLabel, // ✅ مترجم
                           'XXXX XXXX XXXX XXXX',
                         ),
                         expiryDateDecoration: _buildInputDecoration(
-                          'تاريخ الانتهاء',
+                          l10n.expiryDateLabel, // ✅ مترجم
                           'XX/XX',
                         ),
-                        cvvCodeDecoration: _buildInputDecoration('CVV', 'XXX'),
+                        cvvCodeDecoration: _buildInputDecoration(
+                          'CVV',
+                          'XXX',
+                        ), // CVV يبقى كما هو عالمياً
                         cardHolderDecoration: _buildInputDecoration(
-                          'اسم حامل البطاقة',
+                          l10n.cardHolderNameLabel, // ✅ مترجم
                           '',
                         ),
                       ),
@@ -185,7 +182,6 @@ class _AddCardScreenState extends State<AddCardScreen> {
 
                     const SizedBox(height: 20),
 
-                    // 3. زر الحفظ
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: SizedBox(
@@ -211,9 +207,9 @@ class _AddCardScreenState extends State<AddCardScreen> {
                                       strokeWidth: 2,
                                     ),
                                   )
-                                  : const Text(
-                                    'حفظ البطاقة',
-                                    style: TextStyle(
+                                  : Text(
+                                    l10n.saveCardBtn, // ✅ مترجم
+                                    style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -236,14 +232,11 @@ class _AddCardScreenState extends State<AddCardScreen> {
     return InputDecoration(
       labelText: label,
       hintText: hint,
-
-      // ✅ التعديل الثالث: تحديد لون العنوان (Label) هنا
       labelStyle: const TextStyle(
         color: Colors.black,
         fontWeight: FontWeight.bold,
       ),
       hintStyle: const TextStyle(color: Colors.grey),
-
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: Colors.grey.shade300),

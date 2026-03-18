@@ -1,6 +1,11 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+
+// ✅ 1. استيراد الترجمة ומزود اللغة
+import 'package:linyora_project/l10n/app_localizations.dart';
+import 'package:linyora_project/features/shared/providers/locale_provider.dart';
+
 import 'package:linyora_project/features/chat/screens/chat_screen.dart';
 import 'package:linyora_project/features/layout/main_layout_screen.dart';
 import 'package:linyora_project/features/models/analytics/screens/model_analytics_screen.dart';
@@ -23,8 +28,8 @@ import 'package:linyora_project/features/auth/providers/auth_provider.dart';
 import 'package:linyora_project/features/models/models/model_dashboard_models.dart';
 import 'package:linyora_project/features/models/services/model_service.dart';
 
-// Screens (Imports assumed based on project structure)
-import 'package:linyora_project/features/models/screens/agreement_model.dart'; // Modal Widget
+// Screens
+import 'package:linyora_project/features/models/screens/agreement_model.dart';
 import 'package:linyora_project/features/subscriptions/screens/subscription_plans_screen.dart';
 import 'package:linyora_project/features/subscriptions/screens/my_subscription_screen.dart';
 import 'package:linyora_project/features/settings/screens/settings_screen.dart';
@@ -40,7 +45,6 @@ class _ModelDashboardScreenState extends State<ModelDashboardScreen> {
   int _currentIndex = 0;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  // الألوان الخاصة بالمودل
   final Color _roseColor = const Color(0xFFE11D48);
   final Color _purpleColor = const Color(0xFF9333EA);
 
@@ -51,9 +55,7 @@ class _ModelDashboardScreenState extends State<ModelDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    // ✅ بدء جلب الإشعارات عند فتح التطبيق
     _updateUnreadCount();
-    // ✅ تحديث كل 45 ثانية
     _notificationTimer = Timer.periodic(const Duration(seconds: 45), (timer) {
       if (mounted) _updateUnreadCount();
     });
@@ -65,7 +67,6 @@ class _ModelDashboardScreenState extends State<ModelDashboardScreen> {
     super.dispose();
   }
 
-  // ✅ دالة التحديث
   Future<void> _updateUnreadCount() async {
     try {
       final notifications = await _notificationsService.getNotifications();
@@ -75,141 +76,128 @@ class _ModelDashboardScreenState extends State<ModelDashboardScreen> {
               notifications.where((n) => !n.isRead).length;
         });
       }
-    } catch (e) {
-      // تجاهل الأخطاء الصامتة
-    }
+    } catch (e) {}
   }
 
   @override
   Widget build(BuildContext context) {
-    // استخدام Provider للحصول على تحديثات المستخدم لحظياً
     final user = Provider.of<AuthProvider>(context).user;
+
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
 
     if (user == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    // ============================================================
-    // 1️⃣ منطق الأقفال (Lock Logic)
-    // ============================================================
     final bool isVerified = user.verificationStatus == 'approved';
-    final bool isSubscribed =
-        user.isSubscribed; // افترضنا وجود هذا الحقل في User Model
+    final bool isSubscribed = user.isSubscribed;
 
-    // عنصر الاشتراك في القائمة (ديناميكي)
     final Map<String, dynamic> subscriptionNavItem =
         isSubscribed
             ? {
-              'title': 'اشتراكي',
+              'title': l10n.mySubscription, // ✅ مترجم
               'icon': Icons.credit_card,
-              'page': const MySubscriptionScreen(), // شاشة تفاصيل الاشتراك
+              'page': const MySubscriptionScreen(),
               'show': isVerified,
               'isLocked': false,
             }
             : {
-              'title': 'ترقية الحساب',
+              'title': l10n.upgradeAccount, // ✅ مترجم (سابقاً)
               'icon': Icons.star_border,
-              'page': const SubscriptionPlansScreen(), // شاشة الباقات
+              'page': const SubscriptionPlansScreen(),
               'show': isVerified,
               'isLocked': false,
             };
 
-    // ============================================================
-    // 2️⃣ تعريف القائمة
-    // ============================================================
     final List<Map<String, dynamic>> allNavLinks = [
       {
-        'title': 'الرئيسية',
+        'title': l10n.homeTab, // ✅ مترجم
         'icon': Icons.dashboard_outlined,
         'page': const _ModelHomeView(),
         'show': true,
         'isLocked': false,
       },
       {
-        'title': 'توثيق الحساب',
+        'title': l10n.accountVerification, // ✅ مترجم (سابقاً)
         'icon': Icons.verified_user_outlined,
         'page': const VerificationScreen(),
-        'show': !isVerified, // يختفي بعد التوثيق
+        'show': !isVerified,
         'isLocked': false,
       },
       {
-        'title': 'العروض',
+        'title': l10n.offersTab, // ✅ مترجم
         'icon': Icons.shopping_bag_outlined,
-        'page': ModelOffersScreen(),
+        'page': const ModelOffersScreen(),
         'show': isVerified,
-        'isLocked': !isSubscribed, // 🔒 مقفل لغير المشتركين
+        'isLocked': !isSubscribed,
       },
       {
-        'title': 'الريلز',
+        'title': l10n.reels, // ✅ مترجم (سابقاً)
         'icon': Icons.video_call_outlined,
         'page': const ModelReelsScreen(),
         'show': isVerified,
         'isLocked': !isSubscribed,
       },
       {
-        'title': 'الطلبات',
+        'title': l10n.requestsTab, // ✅ مترجم
         'icon': Icons.handshake_outlined,
-        'page': ModelRequestsScreen(),
+        'page': const ModelRequestsScreen(),
         'show': isVerified,
-        'isLocked': !isSubscribed, // 🔒 مقفل
+        'isLocked': !isSubscribed,
       },
       {
-        'title': 'القصص',
+        'title': l10n.stories, // ✅ مترجم (سابقاً)
         'icon': Icons.image_outlined,
-        'page': StoriesScreen(),
+        'page': const StoriesScreen(),
         'show': isVerified,
-        'isLocked': !isSubscribed, // 🔒 مقفل
+        'isLocked': !isSubscribed,
       },
       {
-        'title': 'التحليلات',
+        'title': l10n.analyticsTitle, // ✅ مترجم (سابقاً)
         'icon': Icons.bar_chart_outlined,
-        'page': ModelAnalyticsScreen(),
+        'page': const ModelAnalyticsScreen(),
         'show': isVerified,
-        'isLocked': !isSubscribed, // 🔒 مقفل
+        'isLocked': !isSubscribed,
       },
       {
-        'title': 'المحفظة',
+        'title': l10n.financialWallet, // ✅ مترجم (سابقاً)
         'icon': Icons.account_balance_wallet_outlined,
-        'page': WalletScreen(),
+        'page': const WalletScreen(),
         'show': isVerified,
-        'isLocked': !isSubscribed, // 🔒 مقفل
+        'isLocked': !isSubscribed,
       },
       {
-        'title': 'المحادثات',
+        'title': l10n.conversationsTitle, // ✅ مترجم (سابقاً)
         'icon': Icons.message_outlined,
         'page': ChatListScreen(currentUserId: user.id),
         'show': isVerified,
-        'isLocked': !isSubscribed, // 🔒 مقفل
+        'isLocked': !isSubscribed,
       },
-      subscriptionNavItem, // زر الاشتراك المتغير
+      subscriptionNavItem,
       {
-        'title': 'التفاصيل البنكيه',
+        'title': l10n.bankDetailsTitle, // ✅ مترجم (سابقاً)
         'icon': Icons.money,
-        'page': ModelBankSettingsScreen(),
+        'page': const ModelBankSettingsScreen(),
         'show': isVerified,
-        'isLocked': !isSubscribed, // 🔒 مقفل
+        'isLocked': !isSubscribed,
       },
       {
-        'title': 'الملف الشخصي',
+        'title': l10n.profile, // ✅ مترجم (سابقاً)
         'icon': Icons.person_outline,
-        'page': ModelProfileSettingsScreen(),
+        'page': const ModelProfileSettingsScreen(),
         'show': isVerified,
-        'isLocked': !isSubscribed, // 🔒 مقفل
+        'isLocked': !isSubscribed,
       },
     ];
 
-    // تصفية العناصر الظاهرة فقط
     final visibleNavItems =
         allNavLinks.where((item) => item['show'] == true).toList();
-
-    // حماية المؤشر من الخروج عن النطاق
     if (_currentIndex >= visibleNavItems.length) _currentIndex = 0;
 
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: const Color(0xFFF9FAFB),
-
-      // --- AppBar ---
       appBar: AppBar(
         title: Text(
           visibleNavItems[_currentIndex]['title'],
@@ -226,7 +214,6 @@ class _ModelDashboardScreenState extends State<ModelDashboardScreen> {
           onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
         actions: [
-          // ✅ زر الإشعارات يعمل الآن لأن المتغير _unreadNotificationsCount موجود هنا
           if (_currentIndex == 0)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8.0),
@@ -240,7 +227,6 @@ class _ModelDashboardScreenState extends State<ModelDashboardScreen> {
                       size: 28,
                     ),
                     onPressed: () async {
-                      // عند الضغط ننتقل للشاشة وننتظر العودة
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -248,7 +234,6 @@ class _ModelDashboardScreenState extends State<ModelDashboardScreen> {
                               (context) => const ModelNotificationsScreen(),
                         ),
                       );
-                      // عند العودة نحدث العداد
                       _updateUnreadCount();
                     },
                   ),
@@ -289,11 +274,9 @@ class _ModelDashboardScreenState extends State<ModelDashboardScreen> {
         ],
       ),
 
-      // --- Drawer (Sidebar) ---
       drawer: Drawer(
         child: Column(
           children: [
-            // رأس القائمة (Gradient Rose/Purple)
             UserAccountsDrawerHeader(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -324,13 +307,11 @@ class _ModelDashboardScreenState extends State<ModelDashboardScreen> {
               ),
               accountEmail: Row(
                 children: [
-                  // 1. قسم المعلومات (البريد + الأيقونات)
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // البريد الإلكتروني
                         Text(
                           user.email ?? '',
                           style: TextStyle(
@@ -340,17 +321,13 @@ class _ModelDashboardScreenState extends State<ModelDashboardScreen> {
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
-
-                        // الأيقونات (تظهر أسفل البريد بشكل مرتب)
                         if (isVerified || isSubscribed) ...[
                           const SizedBox(height: 4),
                           Row(
                             children: [
                               if (isVerified)
                                 const Padding(
-                                  padding: EdgeInsets.only(
-                                    left: 4,
-                                  ), // مسافة في حالة اللغة العربية
+                                  padding: EdgeInsets.only(left: 4),
                                   child: Icon(
                                     Icons.verified,
                                     color: Colors.blueAccent,
@@ -369,8 +346,6 @@ class _ModelDashboardScreenState extends State<ModelDashboardScreen> {
                       ],
                     ),
                   ),
-
-                  // 2. زر المعاينة (زر شفاف بإطار نحيف)
                   Container(
                     height: 32,
                     margin: const EdgeInsets.only(right: 8),
@@ -402,10 +377,13 @@ class _ModelDashboardScreenState extends State<ModelDashboardScreen> {
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Text('معاينة', style: TextStyle(fontSize: 14)),
-                          SizedBox(width: 4),
-                          Icon(Icons.arrow_forward_ios, size: 10),
+                        children: [
+                          Text(
+                            l10n.previewBtn,
+                            style: const TextStyle(fontSize: 14),
+                          ), // ✅ مترجم (سابقاً)
+                          const SizedBox(width: 4),
+                          const Icon(Icons.arrow_forward_ios, size: 10),
                         ],
                       ),
                     ),
@@ -413,110 +391,130 @@ class _ModelDashboardScreenState extends State<ModelDashboardScreen> {
                 ],
               ),
             ),
-
-            // عناصر القائمة
             Expanded(
-              child: ListView.builder(
+              child: ListView(
                 padding: EdgeInsets.zero,
-                itemCount: visibleNavItems.length + 1,
-                itemBuilder: (context, index) {
-                  // زر تسجيل الخروج في النهاية
-                  if (index == visibleNavItems.length) {
-                    return ListTile(
-                      leading: const Icon(Icons.logout, color: Colors.red),
-                      title: const Text(
-                        'تسجيل الخروج',
-                        style: TextStyle(color: Colors.red),
+                children: [
+                  // ✅✅✅ زر تغيير اللغة المضاف أعلى القائمة ✅✅✅
+                  ListTile(
+                    leading: Icon(Icons.language, color: Colors.orange),
+                    title: Text(
+                      l10n.changeLanguageLabel, // ✅ مترجم
+                      style: TextStyle(
+                        color: Colors.grey[800],
+                        fontWeight: FontWeight.w500,
                       ),
-                      onTap: () async {
-                        // 1. إغلاق القائمة الجانبية (Drawer) أولاً
-                        Navigator.pop(context);
+                    ),
+                    onTap: () {
+                      Provider.of<LocaleProvider>(
+                        context,
+                        listen: false,
+                      ).toggleLocale();
+                      Navigator.pop(context); // إغلاق القائمة الجانبية
+                    },
+                  ),
+                  const Divider(height: 1, indent: 60),
 
-                        // 2. تنفيذ عملية الخروج في البروفايدر
-                        await Provider.of<AuthProvider>(
-                          context,
-                          listen: false,
-                        ).logout();
+                  // عرض عناصر القائمة الحركية
+                  ...List.generate(visibleNavItems.length, (index) {
+                    final item = visibleNavItems[index];
+                    final bool isSelected = _currentIndex == index;
+                    final bool isLocked = item['isLocked'] == true;
 
-                        // 3. التحقق من أن السياق (Context) لا يزال صالحاً قبل الانتقال
-                        if (context.mounted) {
-                          // 4. الانتقال إلى شاشة تسجيل الدخول وحذف كل الصفحات السابقة من الذاكرة
-                          Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute(
-                              builder: (context) => const MainLayoutScreen(),
+                    return ListTile(
+                      leading: Icon(
+                        item['icon'],
+                        color:
+                            isLocked
+                                ? Colors.grey
+                                : (isSelected
+                                    ? _purpleColor
+                                    : Colors.grey[600]),
+                      ),
+                      title: Row(
+                        children: [
+                          Text(
+                            item['title'],
+                            style: TextStyle(
+                              color:
+                                  isLocked
+                                      ? Colors.grey
+                                      : (isSelected
+                                          ? _purpleColor
+                                          : Colors.grey[800]),
+                              fontWeight:
+                                  isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
                             ),
-                            (route) => false,
-                          );
+                          ),
+                          if (isLocked) ...[
+                            const Spacer(),
+                            const Icon(
+                              Icons.lock_outline,
+                              size: 16,
+                              color: Colors.grey,
+                            ),
+                          ],
+                        ],
+                      ),
+                      selected: isSelected,
+                      selectedTileColor: Colors.purple.withOpacity(0.05),
+                      onTap: () {
+                        Navigator.pop(context);
+                        if (isLocked) {
+                          _showSubscriptionLockedDialog(
+                            context,
+                            item['title'],
+                            l10n,
+                          ); // ✅ تمرير l10n
+                        } else {
+                          setState(() => _currentIndex = index);
                         }
                       },
                     );
-                  }
+                  }),
 
-                  final item = visibleNavItems[index];
-                  final bool isSelected = _currentIndex == index;
-                  final bool isLocked = item['isLocked'] == true;
+                  const Divider(),
 
-                  return ListTile(
-                    leading: Icon(
-                      item['icon'],
-                      color:
-                          isLocked
-                              ? Colors.grey
-                              : (isSelected ? _purpleColor : Colors.grey[600]),
+                  // زر تسجيل الخروج
+                  ListTile(
+                    leading: const Icon(Icons.logout, color: Colors.red),
+                    title: Text(
+                      l10n.logout, // ✅ مترجم (سابقاً)
+                      style: const TextStyle(color: Colors.red),
                     ),
-                    title: Row(
-                      children: [
-                        Text(
-                          item['title'],
-                          style: TextStyle(
-                            color:
-                                isLocked
-                                    ? Colors.grey
-                                    : (isSelected
-                                        ? _purpleColor
-                                        : Colors.grey[800]),
-                            fontWeight:
-                                isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await Provider.of<AuthProvider>(
+                        context,
+                        listen: false,
+                      ).logout();
+                      if (context.mounted) {
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(
+                            builder: (context) => const MainLayoutScreen(),
                           ),
-                        ),
-                        if (isLocked) ...[
-                          const Spacer(),
-                          const Icon(
-                            Icons.lock_outline,
-                            size: 16,
-                            color: Colors.grey,
-                          ),
-                        ],
-                      ],
-                    ),
-                    selected: isSelected,
-                    selectedTileColor: Colors.purple.withOpacity(0.05),
-                    onTap: () {
-                      Navigator.pop(context); // إغلاق القائمة
-
-                      if (isLocked) {
-                        _showSubscriptionLockedDialog(context, item['title']);
-                      } else {
-                        setState(() => _currentIndex = index);
+                          (route) => false,
+                        );
                       }
                     },
-                  );
-                },
+                  ),
+                ],
               ),
             ),
           ],
         ),
       ),
-
-      // --- Body ---
       body: visibleNavItems[_currentIndex]['page'] as Widget,
     );
   }
 
-  // نافذة القفل
-  void _showSubscriptionLockedDialog(BuildContext context, String featureName) {
+  void _showSubscriptionLockedDialog(
+    BuildContext context,
+    String featureName,
+    AppLocalizations l10n,
+  ) {
     showDialog(
       context: context,
       builder:
@@ -528,22 +526,21 @@ class _ModelDashboardScreenState extends State<ModelDashboardScreen> {
               children: [
                 Icon(Icons.lock, color: _roseColor),
                 const SizedBox(width: 8),
-                const Text("الميزة مغلقة"),
+                Text(l10n.featureLockedTitle), // ✅ مترجم
               ],
             ),
             content: Text(
-              "عذراً، ميزة ($featureName) متاحة فقط للمشترين في الباقات المميزة.",
+              "${l10n.featureLockedModelDescPart1}$featureName${l10n.featureLockedModelDescPart2}", // ✅ مترجم مدمج
               style: const TextStyle(height: 1.5),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text("إلغاء"),
+                child: Text(l10n.cancelBtn), // ✅ مترجم
               ),
               ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  // الانتقال لصفحة الاشتراك
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -555,7 +552,7 @@ class _ModelDashboardScreenState extends State<ModelDashboardScreen> {
                   backgroundColor: _purpleColor,
                   foregroundColor: Colors.white,
                 ),
-                child: const Text("ترقية الحساب"),
+                child: Text(l10n.upgradeAccount), // ✅ مترجم
               ),
             ],
           ),
@@ -564,7 +561,7 @@ class _ModelDashboardScreenState extends State<ModelDashboardScreen> {
 }
 
 // =============================================================================
-// ✅ محتوى الصفحة الرئيسية للمودل (الإحصائيات والنشاط)
+// ✅ محتوى الصفحة الرئيسية للمودل
 // =============================================================================
 
 class _ModelHomeView extends StatefulWidget {
@@ -592,27 +589,20 @@ class _ModelHomeViewState extends State<_ModelHomeView> {
     });
   }
 
-  // التحقق من الاتفاقية
   Future<void> _checkAgreementAndFetchData() async {
     if (!mounted) return;
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    // 🔄 1. خطوة جديدة: تحديث بيانات المستخدم من السيرفر لضمان دقة الحالة
     try {
       await authProvider.refreshUser();
     } catch (e) {
       debugPrint("Failed to refresh user data: $e");
-      // نستمر حتى لو فشل التحديث (اعتماداً على الكاش)
     }
 
-    // 2. قراءة المستخدم بعد التحديث
     final user = authProvider.user;
-
     if (user == null) return;
 
-    // 3. الآن التحقق دقيق
     if (user.hasAcceptedAgreement == false) {
-      // إظهار الاتفاقية الإجبارية
       await showDialog(
         context: context,
         barrierDismissible: false,
@@ -621,13 +611,10 @@ class _ModelHomeViewState extends State<_ModelHomeView> {
             (context) => WillPopScope(
               onWillPop: () async => false,
               child: AgreementModal(
-                // تأكد من تمرير المفتاح الصحيح هنا إذا كان المودال يطلبه (مثلاً "model_agreement")
                 onAgreed: () async {
                   await _modelService.acceptAgreement();
-                  await authProvider
-                      .refreshUser(); // تحديث مرة أخرى بعد الموافقة
+                  await authProvider.refreshUser();
                   if (mounted) {
-                    // Navigator.pop(context); // قد تحتاج لإغلاق المودال يدوياً هنا
                     _fetchDashboardData();
                   }
                 },
@@ -669,6 +656,9 @@ class _ModelHomeViewState extends State<_ModelHomeView> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ تعريف الترجمة (بداخل المكون الفرعي)
+    final l10n = AppLocalizations.of(context)!;
+
     if (_isLoading) {
       return Container(
         decoration: BoxDecoration(
@@ -688,10 +678,10 @@ class _ModelHomeViewState extends State<_ModelHomeView> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('خطأ: $_error'),
+            Text('${l10n.errorPrefix}$_error'), // ✅ مترجم
             ElevatedButton(
               onPressed: _fetchDashboardData,
-              child: const Text('إعادة المحاولة'),
+              child: Text(l10n.retryBtn), // ✅ مترجم
             ),
           ],
         ),
@@ -702,7 +692,6 @@ class _ModelHomeViewState extends State<_ModelHomeView> {
 
     return Stack(
       children: [
-        // الخلفية الجمالية
         Positioned.fill(
           child: Container(
             decoration: BoxDecoration(
@@ -728,18 +717,17 @@ class _ModelHomeViewState extends State<_ModelHomeView> {
           child: _buildBlurBlob(Colors.purple.shade200),
         ),
 
-        // المحتوى
         SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // بطاقة الترحيب
-              _buildWelcomeCard(user?.name ?? 'المودل'),
-
+              _buildWelcomeCard(
+                user?.name ?? l10n.defaultModelName,
+                l10n,
+              ), // ✅ تمرير l10n
               const SizedBox(height: 20),
 
-              // شبكة الإحصائيات
               if (_stats != null)
                 GridView.count(
                   shrinkWrap: true,
@@ -750,25 +738,25 @@ class _ModelHomeViewState extends State<_ModelHomeView> {
                   childAspectRatio: 1.4,
                   children: [
                     _buildStatCard(
-                      "إجمالي الأرباح",
-                      "${_stats!.totalEarnings} ر.س",
+                      l10n.totalEarningsLabel, // ✅ مترجم (سابقاً)
+                      "${_stats!.totalEarnings} ${l10n.currencySAR}", // ✅ عملة
                       Icons.attach_money,
                       Colors.green,
                     ),
                     _buildStatCard(
-                      "أرباح الشهر",
-                      "${_stats!.monthlyEarnings} ر.س",
+                      l10n.monthlyEarnings, // ✅ مترجم (سابقاً)
+                      "${_stats!.monthlyEarnings} ${l10n.currencySAR}", // ✅ عملة
                       Icons.trending_up,
                       Colors.blue,
                     ),
                     _buildStatCard(
-                      "اتفاقيات",
+                      l10n.agreementsLabel, // ✅ مترجم
                       "${_stats!.completedAgreements}",
                       Icons.check_circle_outline,
                       Colors.purple,
                     ),
                     _buildStatCard(
-                      "قيد الانتظار",
+                      l10n.statusPending, // ✅ مترجم (سابقاً)
                       "${_stats!.pendingRequests}",
                       Icons.access_time,
                       Colors.orange,
@@ -778,18 +766,19 @@ class _ModelHomeViewState extends State<_ModelHomeView> {
 
               const SizedBox(height: 24),
 
-              // النشاط الأخير
               _buildSectionCard(
-                "النشاط الأخير",
+                l10n.recentActivity, // ✅ مترجم (سابقاً)
                 Icons.history,
                 _purpleColor,
                 Column(
                   children:
                       _activities.isEmpty
                           ? [
-                            const Padding(
-                              padding: EdgeInsets.all(16),
-                              child: Text("لا توجد نشاطات حديثة"),
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Text(
+                                l10n.noActivities,
+                              ), // ✅ مترجم (سابقاً)
                             ),
                           ]
                           : _activities
@@ -801,19 +790,21 @@ class _ModelHomeViewState extends State<_ModelHomeView> {
 
               const SizedBox(height: 24),
 
-              // الأداء
               _buildSectionCard(
-                "الأداء",
+                l10n.performanceLabel, // ✅ مترجم
                 Icons.trending_up,
                 _roseColor,
                 Column(
                   children: [
                     _buildPerformanceMetric(
-                      "معدل الرد",
+                      l10n.responseRate,
                       (_stats?.responseRate ?? 0) / 100,
-                    ),
+                    ), // ✅ مترجم (سابقاً)
                     const SizedBox(height: 12),
-                    _buildPerformanceMetric("إكمال الطلبات", 0.95),
+                    _buildPerformanceMetric(
+                      l10n.orderCompletionRate,
+                      0.95,
+                    ), // ✅ مترجم
                   ],
                 ),
               ),
@@ -826,8 +817,7 @@ class _ModelHomeViewState extends State<_ModelHomeView> {
     );
   }
 
-  // --- Widgets مساعدة ---
-  Widget _buildWelcomeCard(String name) {
+  Widget _buildWelcomeCard(String name, AppLocalizations l10n) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -846,7 +836,7 @@ class _ModelHomeViewState extends State<_ModelHomeView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "مرحباً، $name 👋",
+            "${l10n.welcomeHello}$name 👋", // ✅ مترجم ومدمج
             style: const TextStyle(
               color: Colors.white,
               fontSize: 22,
@@ -854,9 +844,9 @@ class _ModelHomeViewState extends State<_ModelHomeView> {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            "إليك ملخص أداء حسابك اليوم.",
-            style: TextStyle(color: Colors.white70, fontSize: 14),
+          Text(
+            l10n.performanceSummaryMsg, // ✅ مترجم
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
           ),
         ],
       ),

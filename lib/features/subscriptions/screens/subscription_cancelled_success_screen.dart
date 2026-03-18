@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:linyora_project/features/dashboards/merchant_dashboard_screen.dart';
 
+// ✅ استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 class SubscriptionCancelledSuccessScreen extends StatelessWidget {
   const SubscriptionCancelledSuccessScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    // ✅ تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Padding(
@@ -13,7 +19,6 @@ class SubscriptionCancelledSuccessScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // أيقونة معبرة
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -28,10 +33,9 @@ class SubscriptionCancelledSuccessScreen extends StatelessWidget {
             ),
             const SizedBox(height: 32),
 
-            // العنوان
-            const Text(
-              "تم إلغاء التجديد التلقائي",
-              style: TextStyle(
+            Text(
+              l10n.autoRenewalCancelledTitle, // ✅ مترجم
+              style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
                 color: Colors.black,
@@ -40,9 +44,8 @@ class SubscriptionCancelledSuccessScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // التفاصيل
             Text(
-              "لقد قمت بإلغاء التجديد التلقائي لاشتراكك بنجاح.\n\nيمكنك الاستمرار في الاستمتاع بمميزات الباقة الحالية حتى تاريخ انتهائها، ولن يتم خصم أي مبالغ منك مستقبلاً.",
+              l10n.autoRenewalCancelledDesc, // ✅ مترجم
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey[600],
@@ -52,31 +55,29 @@ class SubscriptionCancelledSuccessScreen extends StatelessWidget {
             ),
             const SizedBox(height: 48),
 
-            // زر العودة
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
                 onPressed: () {
-                  // العودة للصفحة الرئيسية (إزالة كل الصفحات السابقة والعودة للروت)
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => MerchantDashboardScreen(),
+                      builder: (context) => const MerchantDashboardScreen(),
                     ),
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black, // أو اللون الرئيسي للتطبيق
+                  backgroundColor: Colors.black,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                   elevation: 0,
                 ),
-                child: const Text(
-                  "العودة للرئيسية",
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                child: Text(
+                  l10n.backToHomeBtn, // ✅ مترجم
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             ),

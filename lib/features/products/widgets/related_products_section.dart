@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 // 1. استيراد الموديل والكارت
 import '../../../models/product_model.dart';
 import '../../shared/widgets/product_card.dart';
@@ -27,7 +31,6 @@ class _RelatedProductsSectionState extends State<RelatedProductsSection> {
   final ProductService _productService = ProductService();
   List<ProductDetailsModel> _products = [];
   bool _isLoading = true;
-  String _displayTitle = "";
 
   @override
   void initState() {
@@ -36,16 +39,6 @@ class _RelatedProductsSectionState extends State<RelatedProductsSection> {
   }
 
   Future<void> _fetchRelatedProducts() async {
-    if (widget.title != null) {
-      _displayTitle = widget.title!;
-    } else if (widget.categoryId != null) {
-      _displayTitle = "منتجات مشابهة";
-    } else if (widget.merchantId != null) {
-      _displayTitle = "المزيد من هذا المتجر";
-    } else {
-      _displayTitle = "وصل حديثاً";
-    }
-
     try {
       final products = await _productService.getProducts(
         categoryId: widget.categoryId,
@@ -100,13 +93,28 @@ class _RelatedProductsSectionState extends State<RelatedProductsSection> {
       reviewCount: detail.reviews.length,
       merchantName: detail.merchantName,
       isNew: false,
-      merchantId:
-          detail.merchantId, // يمكن تعديل هذا الشرط حسب تاريخ الإنشاء إذا توفر
+      merchantId: detail.merchantId,
     );
+  }
+
+  // ✅ دالة لتحديد العنوان ديناميكياً بناءً على اللغة الحالية
+  String _getDisplayTitle(AppLocalizations l10n) {
+    if (widget.title != null) {
+      return widget.title!; // إذا تم تمرير عنوان مخصص، نستخدمه كما هو
+    } else if (widget.categoryId != null) {
+      return l10n.similarProducts; // ✅ مترجم
+    } else if (widget.merchantId != null) {
+      return l10n.moreFromThisStore; // ✅ مترجم
+    } else {
+      return l10n.newArrivals; // ✅ مترجم (ترجمناها في الشاشة الرئيسية)
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     if (_isLoading) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 20),
@@ -137,7 +145,7 @@ class _RelatedProductsSectionState extends State<RelatedProductsSection> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Text(
-            _displayTitle,
+            _getDisplayTitle(l10n), // ✅ استخدام الدالة الديناميكية للعنوان
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -151,9 +159,7 @@ class _RelatedProductsSectionState extends State<RelatedProductsSection> {
               320, // زيادة الارتفاع لأن ProductCard يحتوي على ظلال وتفاصيل أكثر
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 4,
-            ), // تقليل الحواف لأن الكارت لديه هامش
+            padding: const EdgeInsets.symmetric(horizontal: 4),
             itemCount: _products.length,
             itemBuilder: (context, index) {
               final detailProduct = _products[index];

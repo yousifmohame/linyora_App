@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
+
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import 'package:linyora_project/features/models/reels/screens/edit_reel_screen.dart';
 import '../models/model_reel.dart';
 import '../services/reels_service.dart';
-import 'upload_reel_screen.dart'; // Create this screen later for the upload action
+import 'upload_reel_screen.dart';
 
 class ModelReelsScreen extends StatefulWidget {
   const ModelReelsScreen({Key? key}) : super(key: key);
@@ -18,11 +22,10 @@ class _ModelReelsScreenState extends State<ModelReelsScreen> {
   List<ModelReel> _reels = [];
   bool _isLoading = true;
 
-  // Colors matching your theme (Rose/Purple)
   final Color _roseColor = const Color(0xFFE11D48);
   final Color _purpleColor = const Color(0xFF9333EA);
-  final Color _bgStart = const Color(0xFFFFF1F2); // Rose-50 (approx)
-  final Color _bgEnd = const Color(0xFFF3E8FF); // Purple-50 (approx)
+  final Color _bgStart = const Color(0xFFFFF1F2);
+  final Color _bgEnd = const Color(0xFFF3E8FF);
 
   @override
   void initState() {
@@ -43,27 +46,25 @@ class _ModelReelsScreenState extends State<ModelReelsScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('فشل جلب البيانات')));
+        final l10n = AppLocalizations.of(context)!;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.failedToFetchDataMsg)),
+        ); // ✅ مترجم
       }
     }
   }
 
-  Future<void> _deleteReel(int reelId) async {
-    // Show confirmation dialog
+  Future<void> _deleteReel(int reelId, AppLocalizations l10n) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder:
           (ctx) => AlertDialog(
-            title: const Text("حذف الفيديو؟"),
-            content: const Text(
-              "هل أنت متأكد من حذف هذا الفيديو؟ لا يمكن التراجع عن هذا الإجراء.",
-            ),
+            title: Text(l10n.deleteVideoTitle), // ✅ مترجم
+            content: Text(l10n.deleteVideoConfirmMsg), // ✅ مترجم
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text("إلغاء"),
+                child: Text(l10n.cancelBtn), // ✅ مترجم
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
@@ -71,7 +72,7 @@ class _ModelReelsScreenState extends State<ModelReelsScreen> {
                   foregroundColor: Colors.white,
                 ),
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text("حذف"),
+                child: Text(l10n.delete), // ✅ مترجم
               ),
             ],
           ),
@@ -86,8 +87,8 @@ class _ModelReelsScreenState extends State<ModelReelsScreen> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم الحذف بنجاح'),
+          SnackBar(
+            content: Text(l10n.deletedSuccessfullyMsg), // ✅ مترجم
             backgroundColor: Colors.green,
           ),
         );
@@ -95,8 +96,8 @@ class _ModelReelsScreenState extends State<ModelReelsScreen> {
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('حدث خطأ أثناء الحذف'),
+          SnackBar(
+            content: Text(l10n.errorDeletingMsg), // ✅ مترجم
             backgroundColor: Colors.red,
           ),
         );
@@ -115,6 +116,8 @@ class _ModelReelsScreenState extends State<ModelReelsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
     final activeCount = _reels.where((r) => r.isActive).length;
 
     return Scaffold(
@@ -129,10 +132,8 @@ class _ModelReelsScreenState extends State<ModelReelsScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              // --- Header ---
-              _buildHeader(),
+              _buildHeader(l10n), // ✅ تمرير l10n
 
-              // --- Stats & Action Bar ---
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16.0,
@@ -144,13 +145,13 @@ class _ModelReelsScreenState extends State<ModelReelsScreen> {
                     Row(
                       children: [
                         _buildBadge(
-                          "العدد الكلي: ${_reels.length}",
+                          "${l10n.totalCountLabel}${_reels.length}", // ✅ مترجم
                           Colors.pink.shade100,
                           Colors.pink.shade800,
                         ),
                         const SizedBox(width: 8),
                         _buildBadge(
-                          "نشط: $activeCount",
+                          "${l10n.activeCountLabel}$activeCount", // ✅ مترجم
                           Colors.green.shade100,
                           Colors.green.shade800,
                         ),
@@ -158,20 +159,18 @@ class _ModelReelsScreenState extends State<ModelReelsScreen> {
                     ),
                     ElevatedButton.icon(
                       onPressed: () async {
-                        // ✅ ننتظر نتيجة العودة من صفحة الرفع
                         await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (_) => const UploadReelScreen(),
                           ),
                         );
-                        // ✅ بمجرد العودة (سواء تم الرفع أم لا)، نقوم بتحديث القائمة
                         _fetchReels();
                       },
                       icon: const Icon(Icons.add, size: 18),
-                      label: const Text("رفع فيديو"),
+                      label: Text(l10n.uploadVideoBtn), // ✅ مترجم
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _purpleColor, // Your branding color
+                        backgroundColor: _purpleColor,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -183,20 +182,22 @@ class _ModelReelsScreenState extends State<ModelReelsScreen> {
                 ),
               ),
 
-              // --- Content ---
               Expanded(
                 child:
                     _isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : _reels.isEmpty
-                        ? _buildEmptyState()
+                        ? _buildEmptyState(l10n) // ✅ تمرير l10n
                         : ListView.separated(
                           padding: const EdgeInsets.all(16),
                           itemCount: _reels.length,
                           separatorBuilder:
                               (c, i) => const SizedBox(height: 12),
                           itemBuilder: (context, index) {
-                            return _buildReelCard(_reels[index]);
+                            return _buildReelCard(
+                              _reels[index],
+                              l10n,
+                            ); // ✅ تمرير l10n
                           },
                         ),
               ),
@@ -207,13 +208,13 @@ class _ModelReelsScreenState extends State<ModelReelsScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
           Text(
-            "إدارة الريلز",
+            l10n.reelsManagementTitle, // ✅ مترجم
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -226,7 +227,7 @@ class _ModelReelsScreenState extends State<ModelReelsScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            "اعرضي وتتبعي أداء مقاطع الفيديو الخاصة بك",
+            l10n.reelsManagementSubtitle, // ✅ مترجم
             style: TextStyle(color: Colors.grey[600], fontSize: 12),
           ),
         ],
@@ -253,7 +254,7 @@ class _ModelReelsScreenState extends State<ModelReelsScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(AppLocalizations l10n) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -274,13 +275,13 @@ class _ModelReelsScreenState extends State<ModelReelsScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
-            "لا توجد فيديوهات بعد",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          Text(
+            l10n.noVideosYetMsg, // ✅ مترجم
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
-            "ابدئي برفع مقاطع الفيديو لعرض منتجاتك",
+            l10n.startUploadingVideosMsg, // ✅ مترجم
             style: TextStyle(color: Colors.grey[500], fontSize: 12),
           ),
         ],
@@ -288,7 +289,7 @@ class _ModelReelsScreenState extends State<ModelReelsScreen> {
     );
   }
 
-  Widget _buildReelCard(ModelReel reel) {
+  Widget _buildReelCard(ModelReel reel, AppLocalizations l10n) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -306,7 +307,6 @@ class _ModelReelsScreenState extends State<ModelReelsScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Thumbnail
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Stack(
@@ -342,7 +342,6 @@ class _ModelReelsScreenState extends State<ModelReelsScreen> {
           ),
           const SizedBox(width: 12),
 
-          // Content
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -352,7 +351,9 @@ class _ModelReelsScreenState extends State<ModelReelsScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        reel.caption.isEmpty ? "بدون عنوان" : reel.caption,
+                        reel.caption.isEmpty
+                            ? l10n.noTitleMsg
+                            : reel.caption, // ✅ مترجم
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
@@ -361,7 +362,7 @@ class _ModelReelsScreenState extends State<ModelReelsScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    _buildStatusBadge(reel.isActive),
+                    _buildStatusBadge(reel.isActive, l10n), // ✅ تمرير l10n
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -381,63 +382,62 @@ class _ModelReelsScreenState extends State<ModelReelsScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Stats Row
                 Row(
                   children: [
                     _buildStatItem(
                       Icons.remove_red_eye,
                       "${reel.viewsCount}",
-                      "مشاهدة",
-                    ),
+                      l10n.viewsCountLabel,
+                    ), // ✅ مترجم
                     const SizedBox(width: 16),
                     _buildStatItem(
                       Icons.favorite,
                       "${reel.likesCount}",
-                      "إعجاب",
-                    ),
+                      l10n.likesCountLabel,
+                    ), // ✅ مترجم
                   ],
                 ),
               ],
             ),
           ),
 
-          // Actions Menu
           PopupMenuButton<String>(
             icon: Icon(Icons.more_vert, color: Colors.grey[600], size: 20),
             onSelected: (value) async {
               if (value == 'edit') {
-                // ✅ الانتقال لصفحة التعديل وانتظار النتيجة
                 final result = await Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => EditReelScreen(reel: reel)),
                 );
-                // ✅ إذا تم التعديل بنجاح (result == true)، نحدث القائمة
                 if (result == true) {
                   _fetchReels();
                 }
               } else if (value == 'delete') {
-                _deleteReel(reel.id);
+                _deleteReel(reel.id, l10n); // ✅ تمرير l10n
               }
             },
             itemBuilder:
                 (BuildContext context) => <PopupMenuEntry<String>>[
-                  const PopupMenuItem<String>(
+                  PopupMenuItem<String>(
                     value: 'edit',
                     child: Row(
                       children: [
-                        Icon(Icons.edit, size: 16),
-                        SizedBox(width: 8),
-                        Text('تعديل'),
+                        const Icon(Icons.edit, size: 16),
+                        const SizedBox(width: 8),
+                        Text(l10n.editBtn), // ✅ مترجم (ترجمناها سابقاً)
                       ],
                     ),
                   ),
-                  const PopupMenuItem<String>(
+                  PopupMenuItem<String>(
                     value: 'delete',
                     child: Row(
                       children: [
-                        Icon(Icons.delete, size: 16, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('حذف', style: TextStyle(color: Colors.red)),
+                        const Icon(Icons.delete, size: 16, color: Colors.red),
+                        const SizedBox(width: 8),
+                        Text(
+                          l10n.delete,
+                          style: const TextStyle(color: Colors.red),
+                        ), // ✅ مترجم
                       ],
                     ),
                   ),
@@ -448,7 +448,7 @@ class _ModelReelsScreenState extends State<ModelReelsScreen> {
     );
   }
 
-  Widget _buildStatusBadge(bool isActive) {
+  Widget _buildStatusBadge(bool isActive, AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
@@ -459,7 +459,7 @@ class _ModelReelsScreenState extends State<ModelReelsScreen> {
         ),
       ),
       child: Text(
-        isActive ? "نشط" : "غير نشط",
+        isActive ? l10n.activeStatus : l10n.inactiveStatus, // ✅ مترجم
         style: TextStyle(
           color: isActive ? Colors.green : Colors.orange,
           fontSize: 10,

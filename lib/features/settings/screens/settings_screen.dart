@@ -4,6 +4,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../models/merchant_settings_model.dart';
 import '../services/settings_service.dart';
 
@@ -27,16 +31,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool _isUploadingProfile = false;
   bool _isUploadingBanner = false;
 
-  // Tabs
   late TabController _tabController;
-  final List<String> _tabs = [
-    "عام",
-    "المتجر",
-    "اجتماعي",
-    "تنبيهات",
-    "خصوصية",
-    "الاشتراك",
-  ];
 
   // Colors
   final Color rose500 = const Color(0xFFF43F5E);
@@ -45,18 +40,17 @@ class _SettingsScreenState extends State<SettingsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: _tabs.length, vsync: this);
+    // تحديد عدد التابات هنا وهو 6
+    _tabController = TabController(length: 6, vsync: this);
     _fetchData();
   }
 
   String _formatDate(String dateString) {
     if (dateString.isEmpty) return "";
     try {
-      // تحويل النص إلى تاريخ ثم تنسيقه
       DateTime date = DateTime.parse(dateString);
-      return DateFormat('yyyy-MM-dd').format(date); // النتيجة ستكون: 2026-01-09
+      return DateFormat('yyyy-MM-dd').format(date);
     } catch (e) {
-      // في حالة الفشل، نرجع النص كما هو ولكن نأخذ أول 10 حروف فقط
       return dateString.length > 10 ? dateString.substring(0, 10) : dateString;
     }
   }
@@ -78,26 +72,25 @@ class _SettingsScreenState extends State<SettingsScreen>
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("فشل تحميل البيانات")));
+      // الترجمة هنا غير متاحة بسهولة في initState، لكن يمكن الاعتماد على الشاشة الفاضية
     }
   }
 
-  Future<void> _handleSave() async {
+  // ✅ تمرير l10n
+  Future<void> _handleSave(AppLocalizations l10n) async {
     setState(() => _isSaving = true);
     try {
       await _service.updateSettings(_settings!);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("تم حفظ التغييرات بنجاح"),
+        SnackBar(
+          content: Text(l10n.changesSavedSuccessfullyMsg), // ✅ مترجم
           backgroundColor: Colors.green,
         ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("حدث خطأ أثناء الحفظ"),
+        SnackBar(
+          content: Text(l10n.errorWhileSavingMsg), // ✅ مترجم (موجود مسبقاً)
           backgroundColor: Colors.red,
         ),
       );
@@ -106,7 +99,8 @@ class _SettingsScreenState extends State<SettingsScreen>
     }
   }
 
-  Future<void> _handleImageUpload(String type) async {
+  // ✅ تمرير l10n
+  Future<void> _handleImageUpload(String type, AppLocalizations l10n) async {
     final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (picked == null) return;
 
@@ -126,14 +120,16 @@ class _SettingsScreenState extends State<SettingsScreen>
           else
             _settings!.storeBannerUrl = url;
         });
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("تم رفع الصورة بنجاح")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.imageUploadedSuccessMsg),
+          ), // ✅ مترجم (موجود مسبقاً)
+        );
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("فشل رفع الصورة")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.uploadFailedMsg)), // ✅ مترجم (موجود مسبقاً)
+      );
     } finally {
       setState(() {
         if (type == 'profile')
@@ -144,25 +140,25 @@ class _SettingsScreenState extends State<SettingsScreen>
     }
   }
 
-  Future<void> _cancelSubscription() async {
-    // Show confirmation dialog first
+  // ✅ تمرير l10n
+  Future<void> _cancelSubscription(AppLocalizations l10n) async {
     bool confirm =
         await showDialog(
           context: context,
           builder:
               (c) => AlertDialog(
-                title: const Text("تأكيد الإلغاء"),
-                content: const Text("هل أنت متأكد من رغبتك في إلغاء الاشتراك؟"),
+                title: Text(l10n.confirmCancellationTitle), // ✅ مترجم
+                content: Text(l10n.confirmCancelSubscriptionMsg), // ✅ مترجم
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(c, false),
-                    child: const Text("تراجع"),
+                    child: Text(l10n.backBtn), // ✅ مترجم
                   ),
                   TextButton(
                     onPressed: () => Navigator.pop(c, true),
-                    child: const Text(
-                      "تأكيد",
-                      style: TextStyle(color: Colors.red),
+                    child: Text(
+                      l10n.confirmBtn, // ✅ مترجم
+                      style: const TextStyle(color: Colors.red),
                     ),
                   ),
                 ],
@@ -173,26 +169,48 @@ class _SettingsScreenState extends State<SettingsScreen>
     if (confirm) {
       try {
         await _service.cancelSubscription();
-        _fetchData(); // Refresh data
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("تم إلغاء الاشتراك")));
+        _fetchData();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.subscriptionCancelledMsg)), // ✅ مترجم
+        );
       } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("فشل إلغاء الاشتراك")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.failedToCancelSubscriptionMsg),
+          ), // ✅ مترجم
+        );
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
+    // ✅ تم نقل التابات هنا لدعم الترجمة
+    final List<String> localizedTabs = [
+      l10n.generalTab,
+      l10n.storeTab,
+      l10n.socialTab,
+      l10n.notificationsTab,
+      l10n.privacyTab,
+      l10n.subscriptionTab,
+    ];
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC), // Slate-50
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
+        title: Text(
+          l10n.settings,
+          style: const TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
+        ), // ✅ مترجم
         iconTheme: const IconThemeData(color: Colors.black),
         bottom:
             _isLoading
@@ -203,7 +221,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                   labelColor: rose500,
                   unselectedLabelColor: Colors.grey,
                   indicatorColor: rose500,
-                  tabs: _tabs.map((t) => Tab(text: t)).toList(),
+                  tabs: localizedTabs.map((t) => Tab(text: t)).toList(),
                 ),
       ),
       body:
@@ -215,22 +233,22 @@ class _SettingsScreenState extends State<SettingsScreen>
                     child: TabBarView(
                       controller: _tabController,
                       children: [
-                        _buildGeneralTab(),
-                        _buildStoreTab(),
-                        _buildSocialTab(),
-                        _buildNotificationsTab(),
-                        _buildPrivacyTab(),
-                        _buildSubscriptionTab(),
+                        _buildGeneralTab(l10n), // ✅ تمرير l10n
+                        _buildStoreTab(l10n),
+                        _buildSocialTab(l10n),
+                        _buildNotificationsTab(l10n),
+                        _buildPrivacyTab(l10n),
+                        _buildSubscriptionTab(l10n),
                       ],
                     ),
                   ),
-                  _buildSaveButton(),
+                  _buildSaveButton(l10n), // ✅ تمرير l10n
                 ],
               ),
     );
   }
 
-  Widget _buildSaveButton() {
+  Widget _buildSaveButton(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -247,7 +265,8 @@ class _SettingsScreenState extends State<SettingsScreen>
         child: SizedBox(
           width: double.infinity,
           child: ElevatedButton(
-            onPressed: _isSaving ? null : _handleSave,
+            onPressed:
+                _isSaving ? null : () => _handleSave(l10n), // ✅ تمرير l10n
             style: ElevatedButton.styleFrom(
               backgroundColor: rose500,
               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -265,10 +284,10 @@ class _SettingsScreenState extends State<SettingsScreen>
                         strokeWidth: 2,
                       ),
                     )
-                    : const Text(
-                      "حفظ التغييرات",
-                      style: TextStyle(
-                        color: Colors.black,
+                    : Text(
+                      l10n.saveChangesBtn, // ✅ مترجم
+                      style: const TextStyle(
+                        color: Colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -281,19 +300,25 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   // --- Tabs Content ---
 
-  Widget _buildGeneralTab() {
+  Widget _buildGeneralTab(AppLocalizations l10n) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
           _buildCard(
-            title: "الإعدادات العامة",
+            title: l10n.generalSettingsTitle, // ✅ مترجم
             icon: Icons.settings,
             child: Column(
               children: [
-                _buildDropdown("اللغة", "العربية", ["العربية", "English"]),
+                _buildDropdown(l10n.languageLabel, "العربية", [
+                  "العربية",
+                  "English",
+                ]), // ✅ مترجم
                 const SizedBox(height: 16),
-                _buildDropdown("العملة", "SAR", ["SAR", "USD"]),
+                _buildDropdown(l10n.currencyLabel, "SAR", [
+                  "SAR",
+                  "USD",
+                ]), // ✅ مترجم
               ],
             ),
           ),
@@ -302,24 +327,24 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  Widget _buildStoreTab() {
+  Widget _buildStoreTab(AppLocalizations l10n) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
           _buildCard(
-            title: "تفاصيل المتجر",
+            title: l10n.storeDetailsTitle, // ✅ مترجم
             icon: Icons.store,
             child: Column(
               children: [
                 _buildTextField(
-                  "اسم المتجر",
+                  l10n.storeNameLabel, // ✅ مترجم
                   _settings!.storeName,
                   (v) => _settings!.storeName = v,
                 ),
                 const SizedBox(height: 16),
                 _buildTextField(
-                  "وصف المتجر",
+                  l10n.storeDescriptionLabel, // ✅ مترجم
                   _settings!.storeDescription,
                   (v) => _settings!.storeDescription = v,
                   maxLines: 3,
@@ -359,7 +384,11 @@ class _SettingsScreenState extends State<SettingsScreen>
                           bottom: 0,
                           right: 0,
                           child: GestureDetector(
-                            onTap: () => _handleImageUpload('profile'),
+                            onTap:
+                                () => _handleImageUpload(
+                                  'profile',
+                                  l10n,
+                                ), // ✅ تمرير l10n
                             child: CircleAvatar(
                               radius: 14,
                               backgroundColor: rose500,
@@ -374,24 +403,23 @@ class _SettingsScreenState extends State<SettingsScreen>
                       ],
                     ),
                     const SizedBox(width: 16),
-                    const Expanded(
-                      child: Text("صورة المتجر (الشعار). يفضل أن تكون مربعة."),
-                    ),
+                    Expanded(child: Text(l10n.storeLogoHint)), // ✅ مترجم
                   ],
                 ),
                 const SizedBox(height: 20),
 
                 // Banner
-                const Align(
-                  alignment: Alignment.centerRight,
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
                   child: Text(
-                    "بنر المتجر",
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                    l10n.storeBannerLabel, // ✅ مترجم
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
                 const SizedBox(height: 8),
                 GestureDetector(
-                  onTap: () => _handleImageUpload('banner'),
+                  onTap:
+                      () => _handleImageUpload('banner', l10n), // ✅ تمرير l10n
                   child: Container(
                     height: 150,
                     width: double.infinity,
@@ -426,7 +454,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                                       color: rose500,
                                       size: 40,
                                     ),
-                                    const Text("اضغط لرفع البنر"),
+                                    Text(l10n.tapToUploadBannerMsg), // ✅ مترجم
                                   ],
                                 )
                                 : null),
@@ -440,11 +468,11 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  Widget _buildSocialTab() {
+  Widget _buildSocialTab(AppLocalizations l10n) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: _buildCard(
-        title: "روابط التواصل الاجتماعي",
+        title: l10n.socialMediaLinksTitle, // ✅ مترجم
         icon: Icons.share,
         child: Column(
           children: [
@@ -474,31 +502,31 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  Widget _buildNotificationsTab() {
+  Widget _buildNotificationsTab(AppLocalizations l10n) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: _buildCard(
-        title: "إعدادات التنبيهات",
+        title: l10n.notificationSettingsTitle, // ✅ مترجم
         icon: Icons.notifications,
         child: Column(
           children: [
             _buildSwitch(
-              "البريد الإلكتروني",
-              "استلام تحديثات عبر الإيميل",
+              l10n.emailLabel, // ✅ مترجم
+              l10n.receiveEmailUpdatesDesc, // ✅ مترجم
               _settings!.notifications.email,
               (v) => setState(() => _settings!.notifications.email = v),
             ),
             const Divider(),
             _buildSwitch(
-              "إشعارات التطبيق",
-              "استلام إشعارات فورية",
+              l10n.appNotificationsLabel, // ✅ مترجم
+              l10n.receivePushNotificationsDesc, // ✅ مترجم
               _settings!.notifications.push,
               (v) => setState(() => _settings!.notifications.push = v),
             ),
             const Divider(),
             _buildSwitch(
-              "رسائل SMS",
-              "استلام تحديثات عبر الرسائل النصية",
+              l10n.smsMessagesLabel, // ✅ مترجم
+              l10n.receiveSmsUpdatesDesc, // ✅ مترجم
               _settings!.notifications.sms,
               (v) => setState(() => _settings!.notifications.sms = v),
             ),
@@ -508,24 +536,24 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  Widget _buildPrivacyTab() {
+  Widget _buildPrivacyTab(AppLocalizations l10n) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: _buildCard(
-        title: "الخصوصية",
+        title: l10n.privacyTab, // ✅ مترجم
         icon: Icons.privacy_tip,
         child: Column(
           children: [
             _buildSwitch(
-              "إظهار البريد الإلكتروني",
-              "عرض الإيميل في صفحة المتجر العامة",
+              l10n.showEmailLabel, // ✅ مترجم
+              l10n.showEmailDesc, // ✅ مترجم
               _settings!.privacy.showEmail,
               (v) => setState(() => _settings!.privacy.showEmail = v),
             ),
             const Divider(),
             _buildSwitch(
-              "إظهار رقم الهاتف",
-              "عرض رقم الهاتف للعملاء",
+              l10n.showPhoneLabel, // ✅ مترجم
+              l10n.showPhoneDesc, // ✅ مترجم
               _settings!.privacy.showPhone,
               (v) => setState(() => _settings!.privacy.showPhone = v),
             ),
@@ -535,12 +563,11 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  Widget _buildSubscriptionTab() {
+  Widget _buildSubscriptionTab(AppLocalizations l10n) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          // Current Subscription
           if (_subscription != null)
             Container(
               padding: const EdgeInsets.all(20),
@@ -567,7 +594,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                             ),
                           ),
                           Text(
-                            "${_subscription!.price} SAR / شهر",
+                            "${_subscription!.price} ${l10n.currencySAR} ${l10n.perMonthLabel}", // ✅ مترجم
                             style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
@@ -576,7 +603,10 @@ class _SettingsScreenState extends State<SettingsScreen>
                           ),
                         ],
                       ),
-                      _buildStatusChip(_subscription!.status),
+                      _buildStatusChip(
+                        _subscription!.status,
+                        l10n,
+                      ), // ✅ تمرير l10n
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -593,9 +623,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                             ),
                             const SizedBox(width: 4),
                             Expanded(
-                              // يمنع النص من الخروج
                               child: Text(
-                                "البداية: ${_formatDate(_subscription!.startDate)}",
+                                "${l10n.startPrefix}${_formatDate(_subscription!.startDate)}", // ✅ مترجم
                                 style: const TextStyle(fontSize: 11),
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
@@ -605,12 +634,9 @@ class _SettingsScreenState extends State<SettingsScreen>
                         ),
                       ),
                       const SizedBox(width: 8),
-                      // تاريخ النهاية
                       Expanded(
                         child: Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment
-                                  .end, // محاذاة لليسار (أو اليمين حسب اللغة)
+                          mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             const Icon(
                               Icons.event_busy,
@@ -620,7 +646,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                "النهاية: ${_formatDate(_subscription!.endDate)}",
+                                "${l10n.endPrefix}${_formatDate(_subscription!.endDate)}", // ✅ مترجم
                                 style: const TextStyle(fontSize: 11),
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
@@ -636,9 +662,10 @@ class _SettingsScreenState extends State<SettingsScreen>
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        onPressed: _cancelSubscription,
+                        onPressed:
+                            () => _cancelSubscription(l10n), // ✅ تمرير l10n
                         icon: const Icon(Icons.cancel, size: 16),
-                        label: const Text("إلغاء الاشتراك"),
+                        label: Text(l10n.cancelSubscriptionBtn), // ✅ مترجم
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.red,
                           side: const BorderSide(color: Colors.red),
@@ -650,16 +677,18 @@ class _SettingsScreenState extends State<SettingsScreen>
               ),
             )
           else
-            _buildEmptyState("لا يوجد اشتراك نشط", Icons.diamond),
+            _buildEmptyState(
+              l10n.noActiveSubscriptionMsg,
+              Icons.diamond,
+            ), // ✅ مترجم
 
           const SizedBox(height: 20),
 
-          // History
-          const Align(
-            alignment: Alignment.centerRight,
+          Align(
+            alignment: AlignmentDirectional.centerStart,
             child: Text(
-              "سجل الاشتراكات",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              l10n.subscriptionHistoryTitle, // ✅ مترجم
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
           ),
           const SizedBox(height: 10),
@@ -671,7 +700,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
+                    boxShadow: const [
                       BoxShadow(color: Colors.black12, blurRadius: 5),
                     ],
                   ),
@@ -686,7 +715,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           Text(
-                            "${_formatDate(_subscription!.startDate)}",
+                            _formatDate(sub.startDate),
                             style: const TextStyle(
                               fontSize: 12,
                               color: Colors.grey,
@@ -697,9 +726,13 @@ class _SettingsScreenState extends State<SettingsScreen>
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          _buildStatusChip(sub.status, isSmall: true),
+                          _buildStatusChip(
+                            sub.status,
+                            l10n,
+                            isSmall: true,
+                          ), // ✅ تمرير l10n
                           Text(
-                            "${sub.price} SAR",
+                            "${sub.price} ${l10n.currencySAR}", // ✅ عملة
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ],
@@ -810,20 +843,24 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  Widget _buildStatusChip(String status, {bool isSmall = false}) {
+  Widget _buildStatusChip(
+    String status,
+    AppLocalizations l10n, {
+    bool isSmall = false,
+  }) {
     Color color = Colors.grey;
     String text = status;
     if (status == 'active') {
       color = Colors.green;
-      text = "نشط";
+      text = l10n.activeStatus; // ✅ مترجم (سابقاً)
     }
     if (status == 'cancelled') {
       color = Colors.orange;
-      text = "ملغى";
+      text = l10n.cancelledStatus; // ✅ مترجم (سابقاً)
     }
     if (status == 'inactive') {
       color = Colors.red;
-      text = "غير نشط";
+      text = l10n.inactiveStatus; // ✅ مترجم (سابقاً)
     }
 
     return Container(

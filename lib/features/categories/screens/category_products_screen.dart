@@ -4,6 +4,9 @@ import 'package:linyora_project/features/categories/screens/categories_screen.da
 import 'package:linyora_project/features/layout/main_layout_screen.dart';
 import 'package:provider/provider.dart';
 
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 // --- Providers ---
 import 'package:linyora_project/features/cart/providers/cart_provider.dart';
 import 'package:linyora_project/features/auth/providers/auth_provider.dart';
@@ -65,8 +68,8 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
     }
   }
 
-  // ✅ بناء الـ AppBar المطابق للرئيسية
-  Widget _buildSliverAppBar() {
+  // ✅ استقبال l10n للترجمة
+  Widget _buildSliverAppBar(AppLocalizations l10n) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final isRealAdmin =
         authProvider.user != null && authProvider.user!.roleId == 1;
@@ -78,12 +81,9 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
       backgroundColor: Colors.white,
       elevation: 0,
       surfaceTintColor: Colors.white,
-      // زر القائمة أو الرجوع حسب الصفحة
       leading:
           Navigator.canPop(context)
-              ? const BackButton(
-                color: Colors.black,
-              ) // زر رجوع إذا كان هناك صفحة سابقة
+              ? const BackButton(color: Colors.black)
               : IconButton(
                 icon: const Icon(Icons.grid_view_outlined, color: Colors.black),
                 onPressed:
@@ -92,16 +92,12 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                       MaterialPageRoute(builder: (c) => CategoriesScreen()),
                     ),
               ),
-
-      // ✅ التعديل هنا: جعل العنوان قابلاً للنقر
       title: GestureDetector(
         onTap: () {
-          // الانتقال للصفحة الرئيسية وحذف كل الصفحات السابقة من المكدس
           Navigator.pushAndRemoveUntil(
             context,
-            // ⚠️ تأكد من استيراد HomeScreen أو MainScreen (التي تحتوي على البار السفلي)
             MaterialPageRoute(builder: (context) => const MainLayoutScreen()),
-            (route) => false, // الشرط false يحذف كل شيء سابق
+            (route) => false,
           );
         },
         child: Row(
@@ -149,7 +145,6 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
       ),
       centerTitle: true,
       actions: [
-        // ... بقية الأزرار (إشعارات وسلة) كما هي ...
         Stack(
           alignment: Alignment.center,
           children: [
@@ -220,7 +215,6 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
         ),
         const SizedBox(width: 8),
       ],
-      // ... الجزء السفلي (bottom) كما هو ...
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(70.0),
         child: Container(
@@ -246,8 +240,7 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                   const Icon(Icons.search, color: Colors.grey),
                   const SizedBox(width: 10),
                   Text(
-                    // يمكنك استخدام متغير لاسم القسم هنا إذا كنت في صفحة الأقسام
-                    "عن ماذا تبحث اليوم؟",
+                    l10n.searchHint, // ✅ استخدام الترجمة التي أضفناها مسبقاً
                     style: TextStyle(color: Colors.grey[600], fontSize: 14),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -267,8 +260,8 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
     );
   }
 
-  // ✅ عنوان القسم الحالي (Breadcrumb)
-  Widget _buildCategoryHeader() {
+  // ✅ استقبال l10n للترجمة
+  Widget _buildCategoryHeader(AppLocalizations l10n) {
     return SliverToBoxAdapter(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
@@ -290,7 +283,7 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
             ),
             const Spacer(),
             Text(
-              "${_products.length} منتج",
+              "${_products.length} ${l10n.productsLabel}", // ✅ استخدام الترجمة التي أضفناها مسبقاً
               style: TextStyle(
                 color: Colors.grey[600],
                 fontWeight: FontWeight.w500,
@@ -304,9 +297,11 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      // ❌ تم حذف AppBar العادي
       body:
           _isLoading
               ? const Center(
@@ -321,11 +316,9 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                   return CustomScrollView(
                     slivers: [
                       // 1. الشريط العلوي الجديد
-                      _buildSliverAppBar(),
-
+                      _buildSliverAppBar(l10n), // ✅ تمرير l10n
                       // 2. عنوان القسم
-                      _buildCategoryHeader(),
-
+                      _buildCategoryHeader(l10n), // ✅ تمرير l10n
                       // 3. الأقسام الفرعية (Subcategories)
                       if (_subcategories.isNotEmpty)
                         SliverToBoxAdapter(
@@ -354,20 +347,20 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
 
                       // 4. شبكة المنتجات (Products Grid)
                       if (_products.isEmpty)
-                        const SliverFillRemaining(
+                        SliverFillRemaining(
                           child: Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(
+                                const Icon(
                                   Icons.search_off,
                                   size: 60,
                                   color: Colors.grey,
                                 ),
-                                SizedBox(height: 10),
+                                const SizedBox(height: 10),
                                 Text(
-                                  "لا توجد منتجات في هذا القسم حالياً",
-                                  style: TextStyle(color: Colors.grey),
+                                  l10n.noProductsInCategory, // ✅ نص مترجم
+                                  style: const TextStyle(color: Colors.grey),
                                 ),
                               ],
                             ),

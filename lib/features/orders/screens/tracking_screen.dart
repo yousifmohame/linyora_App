@@ -3,6 +3,9 @@ import 'package:intl/intl.dart';
 import 'package:linyora_project/models/order_model.dart';
 import 'package:linyora_project/features/orders/services/order_service.dart';
 
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 class OrderTrackingScreen extends StatefulWidget {
   final int orderId;
 
@@ -85,8 +88,29 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
     return 0; // الافتراضي
   }
 
-  // قائمة المراحل ثابتة، لكن حالتها تتغير بناءً على الـ Index
-  List<Map<String, String>> _getSteps() {
+  // ✅ ترجمة حالة الطلب المعروضة في الأعلى (استخدمنا نفس ترجمات الشاشة السابقة)
+  String _getTranslatedStatus(String status, AppLocalizations l10n) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return l10n.statusPending; // "قيد الانتظار"
+      case 'processing':
+        return l10n.statusProcessing; // "قيد التنفيذ"
+      case 'shipped':
+      case 'on_way':
+      case 'out_for_delivery':
+        return l10n.statusShipped; // "تم الشحن"
+      case 'completed':
+      case 'delivered':
+        return l10n.statusCompleted; // "مكتمل"
+      case 'cancelled':
+        return l10n.statusCancelled; // "ملغي"
+      default:
+        return status;
+    }
+  }
+
+  // ✅ تمرير l10n لترجمة المراحل
+  List<Map<String, String>> _getSteps(AppLocalizations l10n) {
     String dateStr =
         _order != null
             ? DateFormat('dd MMM, hh:mm a').format(DateTime.parse(_order!.date))
@@ -94,51 +118,68 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
 
     return [
       {
-        'title': 'تم استلام الطلب',
-        'subtitle': 'تلقينا طلبك ونحن بانتظار التأكيد',
-        'date': dateStr, // تاريخ الإنشاء
+        'title': l10n.step1Title, // ✅ مترجم
+        'subtitle': l10n.step1Subtitle, // ✅ مترجم
+        'date': dateStr,
       },
       {
-        'title': 'قيد التجهيز',
-        'subtitle': 'يتم تجهيز وتغليف المنتجات في المستودع',
-        'date': _currentStepIndex >= 1 ? 'مكتمل' : 'قريباً',
+        'title': l10n.step2Title, // ✅ مترجم
+        'subtitle': l10n.step2Subtitle, // ✅ مترجم
+        'date':
+            _currentStepIndex >= 1
+                ? l10n.completedLabel
+                : l10n.soonLabel, // ✅ مترجم
       },
       {
-        'title': 'خرج للشحن',
-        'subtitle': 'الشحنة مع مندوب التوصيل في الطريق إليك',
-        'date': _currentStepIndex >= 2 ? 'مكتمل' : 'قريباً',
+        'title': l10n.step3Title, // ✅ مترجم
+        'subtitle': l10n.step3Subtitle, // ✅ مترجم
+        'date':
+            _currentStepIndex >= 2
+                ? l10n.completedLabel
+                : l10n.soonLabel, // ✅ مترجم
       },
       {
-        'title': 'تم التوصيل',
-        'subtitle': 'نتمنى أن ينال المنتج إعجابك',
-        'date': _currentStepIndex >= 3 ? 'مكتمل' : 'قريباً',
+        'title': l10n.step4Title, // ✅ مترجم
+        'subtitle': l10n.step4Subtitle, // ✅ مترجم
+        'date':
+            _currentStepIndex >= 3
+                ? l10n.completedLabel
+                : l10n.soonLabel, // ✅ مترجم
       },
     ];
   }
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (_order == null) {
-      return const Scaffold(body: Center(child: Text("تعذر تحميل البيانات")));
+      return Scaffold(
+        body: Center(child: Text(l10n.failedToLoadData)),
+      ); // ✅ مترجم
     }
 
     // حالة خاصة إذا كان الطلب ملغياً
     if (_order!.status.toLowerCase() == 'cancelled') {
-      return _buildCancelledScreen();
+      return _buildCancelledScreen(l10n); // ✅ تمرير l10n
     }
 
-    final steps = _getSteps();
+    final steps = _getSteps(l10n); // ✅ تمرير l10n
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text(
-          "تتبع الشحنة",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+        title: Text(
+          l10n.trackingTitle, // ✅ مترجم
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
         ),
         centerTitle: true,
         backgroundColor: Colors.white,
@@ -169,7 +210,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    "رقم الشحنة: ${_order!.orderNumber}",
+                    "${l10n.shipmentNumberLabel}${_order!.orderNumber}", // ✅ مترجم
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -178,7 +219,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    "الحالة الحالية: ${_order!.status}", // يمكن ترجمتها هنا
+                    "${l10n.currentStatusLabel}${_getTranslatedStatus(_order!.status, l10n)}", // ✅ مترجم
                     style: TextStyle(
                       color: Colors.grey[600],
                       fontWeight: FontWeight.bold,
@@ -210,7 +251,11 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
                       children: List.generate(steps.length, (index) {
                         return SizedBox(
                           height: _stepHeight,
-                          child: _buildStepText(index, steps[index]),
+                          child: _buildStepText(
+                            index,
+                            steps[index],
+                            l10n,
+                          ), // ✅ تمرير l10n
                         );
                       }),
                     ),
@@ -225,21 +270,21 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
   }
 
   // شاشة خاصة للطلب الملغي
-  Widget _buildCancelledScreen() {
+  Widget _buildCancelledScreen(AppLocalizations l10n) {
     return Scaffold(
-      appBar: AppBar(title: const Text("حالة الطلب")),
+      appBar: AppBar(title: Text(l10n.orderStatusTitle)), // ✅ مترجم
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.cancel_outlined, size: 80, color: Colors.red[300]),
             const SizedBox(height: 20),
-            const Text(
-              "تم إلغاء هذا الطلب",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            Text(
+              l10n.orderCancelledMsg, // ✅ مترجم
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
-            Text("رقم الطلب: ${_order?.orderNumber}"),
+            Text("${l10n.orderNumberLabel}${_order?.orderNumber}"), // ✅ مترجم
           ],
         ),
       ),
@@ -253,15 +298,12 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
       height: (totalSteps - 1) * _stepHeight + 50,
       child: Stack(
         children: [
-          // 1. الخط الرمادي (المسار الكامل)
           Positioned(
             top: _topPadding,
             left: 19,
             bottom: 0,
             child: Container(width: 2, color: Colors.grey.shade300),
           ),
-
-          // 2. الخط الملون (المسار المكتمل)
           Positioned(
             top: _topPadding,
             left: 19,
@@ -270,15 +312,12 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
               builder: (context, child) {
                 return Container(
                   width: 2,
-                  // رسم الخط بناءً على نسبة التقدم
                   height: _animation.value * _stepHeight,
                   color: kPrimaryBlue,
                 );
               },
             ),
           ),
-
-          // 3. النقاط الثابتة
           ...List.generate(totalSteps, (index) {
             return Positioned(
               top: _topPadding + (index * _stepHeight) - 6,
@@ -286,8 +325,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
               child: _buildDot(index),
             );
           }),
-
-          // 4. الشاحنة المتحركة 🚚
           AnimatedBuilder(
             animation: _animation,
             builder: (context, child) {
@@ -326,7 +363,6 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
     return AnimatedBuilder(
       animation: _animation,
       builder: (context, child) {
-        // النقطة تضيء إذا تجاوزتها الشاحنة أو وصلت إليها
         bool isCompleted = _animation.value >= index;
 
         return Container(
@@ -352,7 +388,11 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
     );
   }
 
-  Widget _buildStepText(int index, Map<String, String> stepInfo) {
+  Widget _buildStepText(
+    int index,
+    Map<String, String> stepInfo,
+    AppLocalizations l10n,
+  ) {
     return AnimatedBuilder(
       animation: _animation,
       builder: (context, child) {
@@ -391,24 +431,26 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen>
                 style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
               ),
 
-              if (isCurrent &&
-                  _currentStepIndex != 3) // إظهار التنبيه إذا لم يكن مكتملاً
+              if (isCurrent && _currentStepIndex != 3)
                 Padding(
                   padding: const EdgeInsets.only(top: 8.0),
                   child: Row(
                     children: [
-                      SizedBox(
+                      const SizedBox(
                         width: 12,
                         height: 12,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: kPrimaryBlue,
+                          color: Colors.blue,
                         ),
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        "جاري العمل...",
-                        style: TextStyle(fontSize: 11, color: kPrimaryBlue),
+                        l10n.inProgressLabel, // ✅ مترجم
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.blue,
+                        ),
                       ),
                     ],
                   ),

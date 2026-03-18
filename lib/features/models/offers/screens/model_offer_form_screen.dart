@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import 'package:linyora_project/features/models/offers/models/offer_models.dart';
 import 'package:linyora_project/features/models/offers/services/offers_service.dart';
 
@@ -14,28 +18,18 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final OffersService _service = OffersService();
 
-  // Controllers
   late TextEditingController _titleController;
   late TextEditingController _descController;
   String? _selectedCategory;
 
-  // Data State
   List<PackageTier> _tiers = [];
   bool _isLoading = false;
 
-  // Colors
   final Color _roseColor = const Color(0xFFE11D48);
   final Color _purpleColor = const Color(0xFF9333EA);
 
-  // Categories Options (يمكن جلبها من API لاحقاً)
-  final List<String> _categories = [
-    'جلسة تصوير',
-    'فيديو ترويجي',
-    'مراجعة منتج',
-    'حضور فعالية',
-    'إعلان ستوري',
-    'أخرى',
-  ];
+  late List<String>
+  _categories; // سيتم تهيئتها لاحقاً داخل build للوصول للترجمة
 
   @override
   void initState() {
@@ -44,8 +38,8 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
   }
 
   void _initData() {
+    // 💡 تأجيل تعيين الباقة الافتراضية حتى يتم جلب l10n
     if (widget.packageToEdit != null) {
-      // وضع التعديل
       _titleController = TextEditingController(
         text: widget.packageToEdit!.title,
       );
@@ -53,8 +47,6 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
         text: widget.packageToEdit!.description,
       );
       _selectedCategory = widget.packageToEdit!.category;
-
-      // نسخ الباقات لتجنب التعديل على الكائن الأصلي قبل الحفظ
       _tiers =
           widget.packageToEdit!.tiers
               .map(
@@ -69,19 +61,8 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
               )
               .toList();
     } else {
-      // وضع الإنشاء
       _titleController = TextEditingController();
       _descController = TextEditingController();
-      // باقة افتراضية واحدة
-      _tiers = [
-        PackageTier(
-          tierName: 'باقة أساسية',
-          price: 100,
-          deliveryDays: 1,
-          revisions: 1,
-          features: [''], // ميزة فارغة للبدء
-        ),
-      ];
     }
   }
 
@@ -92,13 +73,11 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
     super.dispose();
   }
 
-  // --- Logic ---
-
-  void _addTier() {
+  void _addTier(AppLocalizations l10n) {
     setState(() {
       _tiers.add(
         PackageTier(
-          tierName: 'باقة جديدة',
+          tierName: l10n.newPackageName, // ✅ مترجم
           price: 0,
           deliveryDays: 1,
           revisions: 0,
@@ -108,14 +87,12 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
     });
   }
 
-  void _removeTier(int index) {
+  void _removeTier(int index, AppLocalizations l10n) {
     if (_tiers.length > 1) {
       setState(() => _tiers.removeAt(index));
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("يجب أن يحتوي العرض على باقة واحدة على الأقل"),
-        ),
+        SnackBar(content: Text(l10n.atLeastOnePackageMsg)), // ✅ مترجم
       );
     }
   }
@@ -132,19 +109,17 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
     });
   }
 
-  Future<void> _submit() async {
+  Future<void> _submit(AppLocalizations l10n) async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     try {
-      // تجهيز البيانات
       final Map<String, dynamic> offerData = {
         'title': _titleController.text,
         'description': _descController.text,
         'category': _selectedCategory,
         'status': widget.packageToEdit?.status ?? 'active',
-        // تحويل الباقات لـ JSON
         'tiers': _tiers.map((t) => t.toJson()).toList(),
       };
 
@@ -156,17 +131,20 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("تم الحفظ بنجاح ✅"),
+          SnackBar(
+            content: Text("${l10n.savedSuccessfullyMsg} ✅"), // ✅ مترجم
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context, true); // العودة مع نتيجة true لتحديث القائمة
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("حدث خطأ: $e"), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text("${l10n.errorOccurredMsg}$e"),
+            backgroundColor: Colors.red,
+          ), // ✅ مترجم
         );
       }
     } finally {
@@ -174,15 +152,40 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
     }
   }
 
-  // --- UI ---
-
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
+    // تهيئة التصنيفات المترجمة والباقة الافتراضية هنا لتكون معتمدة على اللغة
+    _categories = [
+      l10n.photoSessionCategory,
+      l10n.promoVideoCategory,
+      l10n.productReviewCategory,
+      l10n.eventAttendanceCategory,
+      l10n.storyAdCategory,
+      l10n.otherCategory,
+    ];
+
+    if (_tiers.isEmpty && widget.packageToEdit == null) {
+      _tiers = [
+        PackageTier(
+          tierName: l10n.basicPackageName,
+          price: 100,
+          deliveryDays: 1,
+          revisions: 1,
+          features: [''],
+        ),
+      ];
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
         title: Text(
-          widget.packageToEdit == null ? "إضافة عرض جديد" : "تعديل العرض",
+          widget.packageToEdit == null
+              ? l10n.addNewOfferBtn
+              : l10n.editOfferTitle, // ✅ مترجم
           style: const TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.bold,
@@ -194,7 +197,7 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
         leading: const BackButton(color: Colors.black),
         actions: [
           TextButton(
-            onPressed: _isLoading ? null : _submit,
+            onPressed: _isLoading ? null : () => _submit(l10n), // ✅ تمرير l10n
             child:
                 _isLoading
                     ? const SizedBox(
@@ -203,7 +206,7 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                     : Text(
-                      "حفظ",
+                      l10n.saveBtn, // ✅ مترجم
                       style: TextStyle(
                         color: _purpleColor,
                         fontWeight: FontWeight.bold,
@@ -220,38 +223,45 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. المعلومات الأساسية
-              _buildSectionTitle("تفاصيل العرض", Icons.info_outline),
+              _buildSectionTitle(
+                l10n.offerDetailsSection,
+                Icons.info_outline,
+              ), // ✅ مترجم
               const SizedBox(height: 16),
-              _buildBasicInfoCard(),
+              _buildBasicInfoCard(l10n), // ✅ تمرير l10n
 
               const SizedBox(height: 24),
 
-              // 2. الباقات
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildSectionTitle("الباقات والأسعار", Icons.layers_outlined),
+                  _buildSectionTitle(
+                    l10n.packagesAndPricesSection,
+                    Icons.layers_outlined,
+                  ), // ✅ مترجم
                   TextButton.icon(
-                    onPressed: _addTier,
+                    onPressed: () => _addTier(l10n), // ✅ تمرير l10n
                     icon: const Icon(Icons.add, size: 18),
-                    label: const Text("إضافة مستوى"),
+                    label: Text(l10n.addLevelBtn), // ✅ مترجم
                     style: TextButton.styleFrom(foregroundColor: _roseColor),
                   ),
                 ],
               ),
               const SizedBox(height: 8),
 
-              ...List.generate(_tiers.length, (index) => _buildTierCard(index)),
+              ...List.generate(
+                _tiers.length,
+                (index) => _buildTierCard(index, l10n),
+              ), // ✅ تمرير l10n
 
               const SizedBox(height: 40),
 
-              // زر الحفظ السفلي (إضافي)
               SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : _submit,
+                  onPressed:
+                      _isLoading ? null : () => _submit(l10n), // ✅ تمرير l10n
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
                     shadowColor: Colors.transparent,
@@ -274,9 +284,9 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
                               ? const CircularProgressIndicator(
                                 color: Colors.white,
                               )
-                              : const Text(
-                                "حفظ العرض",
-                                style: TextStyle(
+                              : Text(
+                                l10n.saveOfferBtn, // ✅ مترجم
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -310,7 +320,7 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
     );
   }
 
-  Widget _buildBasicInfoCard() {
+  Widget _buildBasicInfoCard(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -324,11 +334,15 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
         children: [
           TextFormField(
             controller: _titleController,
-            validator: (v) => v!.isEmpty ? "العنوان مطلوب" : null,
+            validator:
+                (v) =>
+                    v!.isEmpty
+                        ? l10n.requiredFieldMsg
+                        : null, // ✅ مترجم (سابقاً)
             decoration: _inputDecoration(
-              "عنوان العرض",
-              "مثال: جلسة تصوير منتجات احترافية",
-            ),
+              l10n.offerTitleLabel,
+              l10n.offerTitleHint,
+            ), // ✅ مترجم
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
@@ -338,24 +352,31 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
                     .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                     .toList(),
             onChanged: (v) => setState(() => _selectedCategory = v),
-            validator: (v) => v == null ? "يرجى اختيار فئة" : null,
-            decoration: _inputDecoration("الفئة", "اختر فئة العرض"),
+            validator:
+                (v) =>
+                    v == null
+                        ? l10n.requiredFieldMsg
+                        : null, // ✅ مترجم (سابقاً)
+            decoration: _inputDecoration(
+              l10n.categoryLabel,
+              l10n.chooseOfferCategoryHint,
+            ), // ✅ مترجم
           ),
           const SizedBox(height: 16),
           TextFormField(
             controller: _descController,
             maxLines: 3,
             decoration: _inputDecoration(
-              "الوصف",
-              "اشرح تفاصيل العرض وما سيحصل عليه العميل...",
-            ),
+              l10n.descriptionLabel,
+              l10n.descriptionHint,
+            ), // ✅ مترجم
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTierCard(int index) {
+  Widget _buildTierCard(int index, AppLocalizations l10n) {
     final tier = _tiers[index];
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -369,7 +390,6 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
       ),
       child: Column(
         children: [
-          // Header
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
@@ -383,7 +403,7 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  "المستوى ${index + 1}",
+                  "${l10n.levelLabel}${index + 1}", // ✅ مترجم
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     color: Colors.black54,
@@ -391,7 +411,8 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
                 ),
                 if (_tiers.length > 1)
                   InkWell(
-                    onTap: () => _removeTier(index),
+                    onTap:
+                        () => _removeTier(index, l10n), // ✅ تمرير الترجمة للخطأ
                     child: const Icon(
                       Icons.delete_outline,
                       color: Colors.red,
@@ -401,8 +422,6 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
               ],
             ),
           ),
-
-          // Inputs
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -410,8 +429,15 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
                 TextFormField(
                   initialValue: tier.tierName,
                   onChanged: (v) => tier.tierName = v,
-                  validator: (v) => v!.isEmpty ? "مطلوب" : null,
-                  decoration: _inputDecoration("اسم الباقة", "مثال: أساسية"),
+                  validator:
+                      (v) =>
+                          v!.isEmpty
+                              ? l10n.requiredFieldMsg
+                              : null, // ✅ مترجم (سابقاً)
+                  decoration: _inputDecoration(
+                    l10n.packageNameLabel,
+                    l10n.packageNameHint,
+                  ), // ✅ مترجم
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -421,7 +447,10 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
                         initialValue: tier.price.toString(),
                         onChanged: (v) => tier.price = double.tryParse(v) ?? 0,
                         keyboardType: TextInputType.number,
-                        decoration: _inputDecoration("السعر (ر.س)", "0"),
+                        decoration: _inputDecoration(
+                          l10n.priceSALLabel,
+                          "0",
+                        ), // ✅ مترجم
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -431,7 +460,10 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
                         onChanged:
                             (v) => tier.deliveryDays = int.tryParse(v) ?? 1,
                         keyboardType: TextInputType.number,
-                        decoration: _inputDecoration("مدة التسليم (أيام)", "1"),
+                        decoration: _inputDecoration(
+                          l10n.deliveryDurationDaysLabel,
+                          "1",
+                        ), // ✅ مترجم
                       ),
                     ),
                   ],
@@ -442,18 +474,19 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
                   onChanged: (v) => tier.revisions = int.tryParse(v) ?? 0,
                   keyboardType: TextInputType.number,
                   decoration: _inputDecoration(
-                    "عدد التعديلات",
-                    "(-1 للتعديلات اللانهائية)",
-                  ),
+                    l10n.revisionsNumberLabel,
+                    l10n.revisionsHint,
+                  ), // ✅ مترجم
                 ),
 
                 const Divider(height: 24),
 
-                // Features List
                 Align(
-                  alignment: Alignment.centerRight,
+                  alignment:
+                      Alignment
+                          .centerRight, // أو left حسب اللغة (سنتجاهلها هنا ونعتمد على Directionality للتطبيق)
                   child: Text(
-                    "المميزات:",
+                    l10n.featuresLabel, // ✅ مترجم
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
@@ -480,7 +513,7 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
                                 vertical: 8,
                                 horizontal: 8,
                               ),
-                              hintText: "ميزة (مثال: فيديو بجودة 4K)",
+                              hintText: l10n.featureHint, // ✅ مترجم
                               hintStyle: const TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey,
@@ -506,11 +539,10 @@ class _ModelOfferFormScreenState extends State<ModelOfferFormScreen> {
                     ),
                   ),
                 ),
-
                 TextButton.icon(
                   onPressed: () => _addFeatureToTier(index),
                   icon: const Icon(Icons.add, size: 16),
-                  label: const Text("إضافة ميزة"),
+                  label: Text(l10n.addFeatureBtn), // ✅ مترجم
                   style: TextButton.styleFrom(
                     visualDensity: VisualDensity.compact,
                   ),

@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:linyora_project/features/products/screens/product_details_screen.dart';
-import 'package:linyora_project/features/subscriptions/screens/payment_Services.dart'; // تأكد من المسار
+import 'package:linyora_project/features/subscriptions/screens/payment_Services.dart';
+
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../../../models/product_model.dart';
 import '../../products/services/product_service.dart';
 import 'add_edit_product_screen.dart';
@@ -16,22 +20,18 @@ class MerchantProductsScreen extends StatefulWidget {
 
 class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
   final ProductService _productService = ProductService();
-
   final PaymentService _paymentService = PaymentService();
 
   List<ProductModel> _products = [];
   bool _isLoading = true;
 
-  // الإحصائيات الحقيقية
   int get _totalProducts => _products.length;
   int get _activeProducts =>
       _products.where((p) => p.status == 'active').length;
 
-  // حساب المنتجات ذات المخزون المنخفض (أقل من 10 قطع في أي متغير)
   int get _lowStock {
     int count = 0;
     for (var p in _products) {
-      // نفترض أن لديك Variants في المودل، إذا لم يكن، يمكنك تعديل الشرط
       bool isLow = false;
       // if (p.variants != null) {
       //   isLow = p.variants!.any((v) => v.stockQuantity < 10);
@@ -60,27 +60,31 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('خطأ: $e')));
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${l10n.errorOccurredMsg}$e')),
+      ); // ✅ مترجم
     }
   }
 
-  Future<void> _deleteProduct(String id) async {
+  Future<void> _deleteProduct(String id, AppLocalizations l10n) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder:
           (ctx) => AlertDialog(
-            title: const Text('حذف المنتج'),
-            content: const Text('هل أنت متأكد من حذف هذا المنتج نهائياً؟'),
+            title: Text(l10n.deleteProductTitle), // ✅ مترجم
+            content: Text(l10n.deleteProductContent), // ✅ مترجم
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('إلغاء'),
+                child: Text(l10n.cancelBtn), // ✅ مترجم (ترجمناها سابقاً)
               ),
               TextButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('حذف', style: TextStyle(color: Colors.red)),
+                child: Text(
+                  l10n.delete,
+                  style: const TextStyle(color: Colors.red),
+                ), // ✅ مترجم (ترجمناها سابقاً)
               ),
             ],
           ),
@@ -91,22 +95,24 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
         await _productService.deleteProduct(id);
         _fetchProducts();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم الحذف بنجاح'),
+          SnackBar(
+            content: Text(l10n.deletedSuccessfullyMsg), // ✅ مترجم
             backgroundColor: Colors.green,
           ),
         );
       } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('فشل الحذف: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${l10n.deletionFailedMsg}$e')),
+        ); // ✅ مترجم
       }
     }
   }
 
   // --- منطق الترويج ---
-  Future<void> _handlePromote(ProductModel product) async {
-    // 1. جلب الباقات
+  Future<void> _handlePromote(
+    ProductModel product,
+    AppLocalizations l10n,
+  ) async {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -115,16 +121,15 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
 
     try {
       final tiers = await _productService.getPromotionTiers();
-      Navigator.pop(context); // إغلاق التحميل
+      Navigator.pop(context);
 
       if (tiers.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('لا توجد باقات ترويج متاحة حالياً')),
+          SnackBar(content: Text(l10n.noPromotionTiersAvailableMsg)), // ✅ مترجم
         );
         return;
       }
 
-      // 2. عرض نافذة اختيار الباقة
       if (!mounted) return;
       showModalBottomSheet(
         context: context,
@@ -134,46 +139,60 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
             (context) => _PromotionTiersSheet(
               product: product,
               tiers: tiers,
+              l10n: l10n, // ✅ تمرير l10n
               onSelect: (tier) async {
-                Navigator.pop(context); // إغلاق النافذة
-                await _processPromotionPayment(product.id, tier.id);
+                Navigator.pop(context);
+                await _processPromotionPayment(
+                  product.id,
+                  tier.id,
+                  l10n,
+                ); // ✅ تمرير l10n
               },
             ),
       );
     } catch (e) {
       Navigator.pop(context);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('حدث خطأ: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${l10n.errorOccurredMsg}$e')),
+      ); // ✅ مترجم
     }
   }
 
-  Future<void> _processPromotionPayment(int productId, int tierId) async {
+  Future<void> _processPromotionPayment(
+    int productId,
+    int tierId,
+    AppLocalizations l10n,
+  ) async {
     await _paymentService.promoteProduct(
       context: context,
       productId: productId,
       tierId: tierId,
       onSuccess: () {
-        // عند نجاح الدفع
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم ترويج المنتج بنجاح! 🚀'),
+          SnackBar(
+            content: Text(l10n.productPromotedSuccessMsg), // ✅ مترجم
             backgroundColor: Colors.green,
           ),
         );
-        _fetchProducts(); // تحديث القائمة لعرض الشارة الجديدة
+        _fetchProducts();
       },
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text(
-          'المنتجات',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        title: Text(
+          l10n.merchantProductsTitle, // ✅ مترجم
+          style: const TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
@@ -203,10 +222,10 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildStatsGrid(),
+                      _buildStatsGrid(l10n), // ✅ تمرير l10n
                       const SizedBox(height: 24),
                       if (_products.isEmpty)
-                        _buildEmptyState()
+                        _buildEmptyState(l10n) // ✅ تمرير l10n
                       else
                         ListView.separated(
                           shrinkWrap: true,
@@ -215,10 +234,12 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
                           separatorBuilder:
                               (ctx, i) => const SizedBox(height: 12),
                           itemBuilder:
-                              (ctx, index) =>
-                                  _buildProductAccordion(_products[index]),
+                              (ctx, index) => _buildProductAccordion(
+                                _products[index],
+                                l10n,
+                              ), // ✅ تمرير l10n
                         ),
-                      const SizedBox(height: 40), // مسافة في الأسفل
+                      const SizedBox(height: 40),
                     ],
                   ),
                 ),
@@ -226,7 +247,7 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
     );
   }
 
-  Widget _buildStatsGrid() {
+  Widget _buildStatsGrid(AppLocalizations l10n) {
     return GridView.count(
       crossAxisCount: 2,
       crossAxisSpacing: 12,
@@ -236,18 +257,17 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
       childAspectRatio: 1.5,
       children: [
         _buildStatCard(
-          "إجمالي المنتجات",
+          l10n.totalProductsLabel, // ✅ مترجم
           _totalProducts.toString(),
           Icons.inventory_2,
           Colors.blue,
         ),
         _buildStatCard(
-          "منتجات نشطة",
+          l10n.activeProductsLabel, // ✅ مترجم
           _activeProducts.toString(),
           Icons.visibility,
           Colors.green,
         ),
-        // _buildStatCard("مخزون منخفض", _lowStock.toString(), Icons.trending_down, Colors.amber),
       ],
     );
   }
@@ -302,7 +322,6 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
     );
   }
 
-  // أضف هذه الدالة لحل المشكلة
   Widget _buildBadge(String text, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -329,11 +348,7 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
     );
   }
 
-  // --- Product Accordion Item ---
-  Widget _buildProductAccordion(ProductModel product) {
-    // 1. منطق التحقق من الترويج
-    // نفترض أن المودل يحتوي على حقل promotionEndsAt
-    // إذا لم يكن موجوداً، يجب إضافته في ProductModel
+  Widget _buildProductAccordion(ProductModel product, AppLocalizations l10n) {
     bool isPromoted = false;
     String promotionText = "";
 
@@ -343,7 +358,9 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
         isPromoted = true;
         final daysLeft = endDate.difference(DateTime.now()).inDays;
         promotionText =
-            daysLeft > 0 ? "مروّج ($daysLeft يوم)" : "مروّج (ينتهي اليوم)";
+            daysLeft > 0
+                ? "${l10n.promotedLabel} ($daysLeft ${l10n.daysLabel})"
+                : "${l10n.promotedLabel} (${l10n.endsTodayLabel})"; // ✅ مترجم (ديناميكي)
       }
     }
 
@@ -355,7 +372,7 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
           color:
               isPromoted
                   ? const Color(0xFF9333EA).withOpacity(0.3)
-                  : Colors.grey.shade200, // حدود ملونة للمروج
+                  : Colors.grey.shade200,
           width: isPromoted ? 1.5 : 1,
         ),
         boxShadow: [
@@ -379,7 +396,6 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
             height: 50,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              // إذا كان مروجاً نعطيه إطاراً مميزاً
               border:
                   isPromoted
                       ? Border.all(color: const Color(0xFF9333EA), width: 2)
@@ -409,9 +425,8 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _buildStatusBadge(product.status),
+              _buildStatusBadge(product.status, l10n), // ✅ تمرير l10n
 
-              // 2. شارة الترويج (Promoted Badge)
               if (isPromoted)
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -473,38 +488,39 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
               child: Column(
                 children: [
                   Row(
-                    children: const [
-                      Icon(
+                    children: [
+                      const Icon(
                         Icons.auto_awesome,
                         size: 16,
                         color: Color(0xFFF43F5E),
                       ),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Text(
-                        "تفاصيل المنتج",
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                        l10n.productDetailsLabel, // ✅ مترجم
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  _buildDetailRow("السعر", "${product.price} ر.س"),
+                  _buildDetailRow(
+                    l10n.priceLabel,
+                    "${product.price} ${l10n.currencySAR}",
+                  ), // ✅ مترجم
                   if (product.brand != null)
-                    _buildDetailRow("العلامة التجارية", product.brand!),
+                    _buildDetailRow(l10n.brandLabel, product.brand!), // ✅ مترجم
                 ],
               ),
             ),
 
             const SizedBox(height: 16),
 
-            // --- أزرار التحكم ---
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  // 3. تفعيل زر المعاينة
                   _buildActionButton(
-                    "معاينة",
+                    l10n.previewBtn, // ✅ مترجم
                     Icons.visibility_outlined,
                     Colors.blue,
                     () {
@@ -520,13 +536,11 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
                     },
                   ),
                   const SizedBox(width: 8),
-                  // داخل دالة بناء زر التعديل
                   _buildActionButton(
-                    "تعديل",
+                    l10n.editBtn, // ✅ مترجم (ترجمناها سابقاً)
                     Icons.edit_outlined,
                     Colors.black87,
                     () async {
-                      // 1. إظهار التحميل
                       showDialog(
                         context: context,
                         barrierDismissible: false,
@@ -538,19 +552,11 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
                             ),
                       );
 
-                      // 2. جلب التفاصيل من السيرفر (للحصول على isDropshipping)
-                      // ملاحظة: هذا الكائن سيحتوي على فئة واحدة فقط بسبب مشكلة الباك إند
                       final fetchedProduct = await _productService
                           .getProductById(product.id);
-
-                      Navigator.pop(context); // إخفاء التحميل
+                      Navigator.pop(context);
 
                       if (fetchedProduct != null) {
-                        // 🔥🔥 الحل السحري هنا 🔥🔥
-                        // نقوم بإنشاء نسخة جديدة تدمج البيانات:
-                        // نأخذ كل شيء من (fetchedProduct) لأنه الأحدث
-                        // لكن نأخذ (categoryIds) من (product) الموجود في القائمة لأنه الصحيح والكامل
-
                         final mergedProduct = ProductModel(
                           id: fetchedProduct.id,
                           name: fetchedProduct.name,
@@ -567,38 +573,34 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
                           stock: fetchedProduct.stock,
                           variants: fetchedProduct.variants,
                           promotionEndsAt: fetchedProduct.promotionEndsAt,
-
-                          // ✅ هنا نأخذ الفئات من القائمة (product) وليس من السيرفر (fetchedProduct)
-                          // لأن القائمة تحتوي على [1, 2, 3] بينما السيرفر أعاد [3] فقط
                           categoryIds: product.categoryIds,
-
-                          // ✅ ونأخذ حالة الدروب شيبينج من السيرفر
                           isDropshipping: fetchedProduct.isDropshipping,
                           originalProductId: fetchedProduct.originalProductId,
                           merchantId: fetchedProduct.merchantId,
                         );
 
-                        // نرسل المنتج المدمج لصفحة التعديل
                         _navigateToAddEdit(product: mergedProduct);
                       } else {
-                        // في حال فشل الاتصال، نستخدم البيانات المحلية
                         _navigateToAddEdit(product: product);
                       }
                     },
                   ),
                   const SizedBox(width: 8),
                   _buildActionButton(
-                    "ترويج",
+                    l10n.promoteBtn, // ✅ مترجم
                     Icons.campaign,
                     const Color(0xFFF43F5E),
-                    () => _handlePromote(product),
+                    () => _handlePromote(product, l10n), // ✅ تمرير l10n
                   ),
                   const SizedBox(width: 8),
                   _buildActionButton(
-                    "حذف",
+                    l10n.delete, // ✅ مترجم (سابقاً)
                     Icons.delete_outline,
                     Colors.red,
-                    () => _deleteProduct(product.id.toString()),
+                    () => _deleteProduct(
+                      product.id.toString(),
+                      l10n,
+                    ), // ✅ تمرير l10n
                   ),
                 ],
               ),
@@ -640,7 +642,7 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
     );
   }
 
-  Widget _buildStatusBadge(String status) {
+  Widget _buildStatusBadge(String status, AppLocalizations l10n) {
     bool isActive = status == 'active';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -652,7 +654,7 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
         ),
       ),
       child: Text(
-        isActive ? "نشط" : "مسودة",
+        isActive ? l10n.activeStatusLabel : l10n.draftStatusLabel, // ✅ مترجم
         style: TextStyle(
           color: isActive ? Colors.green.shade700 : Colors.grey.shade700,
           fontSize: 10,
@@ -662,7 +664,7 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(AppLocalizations l10n) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 60),
@@ -684,14 +686,14 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
-              'لا توجد منتجات بعد',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            Text(
+              l10n.noProductsYetTitle, // ✅ مترجم
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'ابدأ بإضافة منتجك الأول وابدأ البيع!',
-              style: TextStyle(color: Colors.grey),
+            Text(
+              l10n.startAddingProductsMsg, // ✅ مترجم
+              style: const TextStyle(color: Colors.grey),
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
@@ -707,7 +709,7 @@ class _MerchantProductsScreenState extends State<MerchantProductsScreen> {
                 ),
               ),
               icon: const Icon(Icons.add),
-              label: const Text('إضافة منتج جديد'),
+              label: Text(l10n.addNewProductBtn), // ✅ مترجم
             ),
           ],
         ),
@@ -728,11 +730,13 @@ class _PromotionTiersSheet extends StatelessWidget {
   final ProductModel product;
   final List<PromotionTier> tiers;
   final Function(PromotionTier) onSelect;
+  final AppLocalizations l10n; // ✅ استقبال الترجمة
 
   const _PromotionTiersSheet({
     required this.product,
     required this.tiers,
     required this.onSelect,
+    required this.l10n,
   });
 
   @override
@@ -751,10 +755,13 @@ class _PromotionTiersSheet extends StatelessWidget {
             children: [
               const Icon(Icons.campaign, color: Color(0xFFF43F5E), size: 28),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  "ترويج المنتج",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  l10n.promoteProductTitle, // ✅ مترجم
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
               IconButton(
@@ -765,7 +772,7 @@ class _PromotionTiersSheet extends StatelessWidget {
           ),
           const SizedBox(height: 5),
           Text(
-            "اختر باقة للترويج لمنتج: ${product.name}",
+            "${l10n.choosePackageForProductMsg}${product.name}", // ✅ مترجم
             style: const TextStyle(color: Colors.grey),
           ),
           const SizedBox(height: 20),
@@ -804,7 +811,7 @@ class _PromotionTiersSheet extends StatelessWidget {
                                 ),
                               ),
                               Text(
-                                "${tier.durationDays} يوم",
+                                "${tier.durationDays} ${l10n.daysLabel}", // ✅ مترجم
                                 style: TextStyle(
                                   color: Colors.grey.shade600,
                                   fontSize: 12,
@@ -814,7 +821,7 @@ class _PromotionTiersSheet extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          "${tier.price.toInt()} ر.س",
+                          "${tier.price.toInt()} ${l10n.currencySAR}", // ✅ عملة مترجمة
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 18,

@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import 'package:linyora_project/features/dashboards/MyStore/models/merchant_profile_model.dart';
 import 'package:linyora_project/features/dashboards/MyStore/services/merchant_service.dart';
 import 'package:linyora_project/features/products/screens/add_edit_product_screen.dart';
@@ -43,7 +47,9 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = "فشل تحميل بيانات المتجر";
+          // ✅ الحصول على الترجمة هنا بشكل آمن إذا كانت الشاشة موجودة
+          final l10n = AppLocalizations.of(context)!;
+          _errorMessage = l10n.failedToLoadStoreDataMsg; // ✅ مترجم
           _isLoading = false;
         });
       }
@@ -52,6 +58,9 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     if (_isLoading) {
       return const Scaffold(
         body: Center(
@@ -72,11 +81,11 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
                 color: Colors.grey,
               ),
               const SizedBox(height: 16),
-              Text(_errorMessage ?? "لا توجد بيانات للمتجر"),
+              Text(_errorMessage ?? l10n.noStoreDataMsg), // ✅ مترجم
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: _loadStoreData,
-                child: const Text("إعادة المحاولة"),
+                child: Text(l10n.retryBtn), // ✅ مترجم (سابقاً)
               ),
             ],
           ),
@@ -84,7 +93,6 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
       );
     }
 
-    // --- حسابات التجاوب ---
     final double screenWidth = MediaQuery.of(context).size.width;
     int crossAxisCount = screenWidth > 900 ? 4 : (screenWidth > 600 ? 3 : 2);
     double childAspectRatio = 0.7;
@@ -92,29 +100,21 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
 
-      // زر إضافة منتج جديد
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          // ننتظر حتى يعود المستخدم من صفحة الإضافة
           await Navigator.push(
             context,
-            MaterialPageRoute(
-              builder:
-                  (_) =>
-                      const AddEditProductScreen(), // بدون تمرير منتج = وضع الإضافة
-            ),
+            MaterialPageRoute(builder: (_) => const AddEditProductScreen()),
           );
-          // عند العودة، نحدث البيانات لرؤية المنتج الجديد
           _loadStoreData();
         },
         backgroundColor: const Color(0xFFF105C6),
         icon: const Icon(Icons.add),
-        label: const Text("منتج جديد"),
+        label: Text(l10n.newProductBtn), // ✅ مترجم
       ),
 
       body: CustomScrollView(
         slivers: [
-          // 1. الغلاف (Cover)
           SliverAppBar(
             expandedHeight: 200.0,
             floating: false,
@@ -124,17 +124,10 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
               IconButton(
                 icon: const Icon(Icons.settings_outlined),
                 onPressed: () {
-                  // الانتقال لصفحة الإعدادات
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const SettingsScreen()),
                   );
-                  // أو عرض رسالة مؤقتة إذا لم تكن الصفحة جاهزة
-                  // ScaffoldMessenger.of(context).showSnackBar(
-                  //   const SnackBar(
-                  //     content: Text("صفحة الإعدادات قادمة قريباً"),
-                  //   ),
-                  // );
                 },
               ),
             ],
@@ -173,13 +166,11 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
             ),
           ),
 
-          // 2. محتوى البروفايل
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 children: [
-                  // الصورة الشخصية
                   Column(
                     children: [
                       Container(
@@ -226,13 +217,16 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
                       ),
                       const SizedBox(height: 15),
 
-                      // الشارات (Badges)
                       Wrap(
                         spacing: 8,
                         alignment: WrapAlignment.center,
                         children: [
                           if (_storeProfile!.isVerified)
-                            _buildBadge(Icons.verified, "موثوق", Colors.blue),
+                            _buildBadge(
+                              Icons.verified,
+                              l10n.trustedBadge,
+                              Colors.blue,
+                            ), // ✅ مترجم
                           _buildBadge(
                             Icons.star,
                             "${_storeProfile!.rating}",
@@ -241,15 +235,14 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
                           if (_storeProfile!.isDropshipper)
                             _buildBadge(
                               Icons.cloud_download,
-                              "Dropshipper",
+                              l10n.dropshipperBadge,
                               Colors.purple,
-                            ),
+                            ), // ✅ مترجم
                         ],
                       ),
                     ],
                   ),
 
-                  // أزرار التحكم
                   Padding(
                     padding: const EdgeInsets.all(8.0),
                     child: Row(
@@ -266,7 +259,7 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
                               );
                             },
                             icon: const Icon(Icons.edit, size: 18),
-                            label: const Text("تعديل المتجر"),
+                            label: Text(l10n.editStoreBtn), // ✅ مترجم
                             style: OutlinedButton.styleFrom(
                               foregroundColor: Colors.black,
                               side: const BorderSide(color: Colors.grey),
@@ -280,16 +273,12 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () {
-                              // ✅ التأكد من أن البيانات محملة قبل الانتقال
                               if (_storeProfile != null) {
-                                print(_storeProfile!.id);
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
                                     builder:
                                         (_) => MerchantProfileScreen(
-                                          // ✅ هنا نمرر الـ ID الخاص بالمتجر الحالي
-                                          // بما أن ID في المودل int والشاشة تطلب String، نستخدم toString()
                                           merchantId:
                                               _storeProfile!.id.toString(),
                                         ),
@@ -301,7 +290,7 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
                               Icons.visibility_outlined,
                               size: 18,
                             ),
-                            label: const Text("معاينة كزائر"),
+                            label: Text(l10n.previewAsVisitorBtn), // ✅ مترجم
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.black,
                               foregroundColor: Colors.white,
@@ -315,7 +304,6 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
                     ),
                   ),
 
-                  // الوصف (Bio)
                   if (_storeProfile!.bio != null)
                     Text(
                       _storeProfile!.bio!,
@@ -324,7 +312,6 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
                     ),
                   const SizedBox(height: 20),
 
-                  // لوحة الإحصائيات (Dashboard Stats)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       vertical: 20,
@@ -339,38 +326,41 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
                         _buildStatItem(
-                          "المبيعات",
+                          l10n.salesLabel,
                           "${_storeProfile!.totalSales}",
                           Icons.monetization_on,
                           Colors.green,
-                        ),
+                        ), // ✅ مترجم
                         _buildVerticalDivider(),
                         _buildStatItem(
-                          "المنتجات",
+                          l10n.productsLabel,
                           "${_storeProfile!.activeProductsCount}",
                           Icons.inventory_2,
                           Colors.orange,
-                        ),
+                        ), // ✅ مترجم
                         _buildVerticalDivider(),
                         _buildStatItem(
-                          "المتابعين",
+                          l10n.followersLabel,
                           "${_storeProfile!.followersCount}",
                           Icons.people,
                           Colors.blue,
-                        ),
+                        ), // ✅ مترجم
                       ],
                     ),
                   ),
 
                   const SizedBox(height: 25),
 
-                  const Row(
+                  Row(
                     children: [
-                      Icon(Icons.grid_view_rounded, color: Color(0xFFF105C6)),
-                      SizedBox(width: 8),
+                      const Icon(
+                        Icons.grid_view_rounded,
+                        color: Color(0xFFF105C6),
+                      ),
+                      const SizedBox(width: 8),
                       Text(
-                        "منتجاتي",
-                        style: TextStyle(
+                        l10n.myProductsTitle, // ✅ مترجم
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
@@ -383,18 +373,17 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
             ),
           ),
 
-          // 3. شبكة المنتجات الحقيقية
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             sliver:
                 _storeProfile!.products.isEmpty
-                    ? const SliverToBoxAdapter(
+                    ? SliverToBoxAdapter(
                       child: Center(
                         child: Padding(
-                          padding: EdgeInsets.all(40.0),
+                          padding: const EdgeInsets.all(40.0),
                           child: Text(
-                            "لا توجد منتجات حتى الآن",
-                            style: TextStyle(color: Colors.grey),
+                            l10n.noProductsYetMsg, // ✅ مترجم
+                            style: const TextStyle(color: Colors.grey),
                           ),
                         ),
                       ),
@@ -410,18 +399,16 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
                         final product = _storeProfile!.products[index];
                         return _MyProductCard(
                           product: product,
+                          l10n: l10n, // ✅ تمرير l10n للكرت
                           onEdit: () async {
-                            // ✅ هنا الربط الحقيقي لتعديل المنتج
                             await Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder:
-                                    (_) => AddEditProductScreen(
-                                      product: product,
-                                    ), // تمرير المنتج = وضع التعديل
+                                    (_) =>
+                                        AddEditProductScreen(product: product),
                               ),
                             );
-                            // تحديث الصفحة لرؤية التعديلات (مثل السعر الجديد)
                             _loadStoreData();
                           },
                         );
@@ -434,8 +421,6 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
       ),
     );
   }
-
-  // --- Widgets ---
 
   Widget _buildBadge(IconData icon, String text, Color color) {
     return Container(
@@ -473,9 +458,7 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
         Icon(icon, color: color),
         const SizedBox(height: 8),
         Text(
-          value == "0" && label == "المبيعات"
-              ? "-"
-              : value, // عرض شرطة إذا لم تتوفر المبيعات
+          value == "0" && label == "المبيعات" ? "-" : value,
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
         Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
@@ -488,12 +471,16 @@ class _MyStoreScreenState extends State<MyStoreScreen> {
   }
 }
 
-// كارت المنتج الحقيقي
 class _MyProductCard extends StatelessWidget {
   final ProductModel product;
   final VoidCallback onEdit;
+  final AppLocalizations l10n; // ✅ استقبال الترجمة
 
-  const _MyProductCard({required this.product, required this.onEdit});
+  const _MyProductCard({
+    required this.product,
+    required this.onEdit,
+    required this.l10n,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -525,7 +512,6 @@ class _MyProductCard extends StatelessWidget {
                             const Icon(Icons.broken_image, color: Colors.grey),
                   ),
                 ),
-                // زر التعديل
                 Positioned(
                   top: 8,
                   left: 8,
@@ -545,7 +531,6 @@ class _MyProductCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                // شارة دروب شيبينج إذا كان المنتج مستورداً
                 if (product.isDropshipping)
                   Positioned(
                     top: 8,
@@ -582,7 +567,7 @@ class _MyProductCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      "${product.price} ر.س",
+                      "${product.price} ${l10n.currencySAR}", // ✅ عملة مترجمة
                       style: const TextStyle(
                         color: Color(0xFFF105C6),
                         fontWeight: FontWeight.bold,
@@ -591,7 +576,7 @@ class _MyProductCard extends StatelessWidget {
                     ),
                     if (product.stock <= 5)
                       Text(
-                        "باقي ${product.stock}",
+                        "${l10n.remainingStockPrefix}${product.stock}", // ✅ مترجم ومدمج
                         style: const TextStyle(fontSize: 10, color: Colors.red),
                       ),
                   ],

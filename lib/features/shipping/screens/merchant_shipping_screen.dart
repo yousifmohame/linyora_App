@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; // تأكد من إضافتها في pubspec.yaml
+import 'package:intl/intl.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../models/shipping_company_model.dart';
 import '../services/shipping_service.dart';
 
@@ -19,7 +23,6 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
   bool _isLoading = true;
   String _searchTerm = '';
 
-  // Form Controllers
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _costController = TextEditingController();
@@ -31,7 +34,8 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
     _fetchCompanies();
   }
 
-  Future<void> _fetchCompanies() async {
+  // ✅ تمرير l10n
+  Future<void> _fetchCompanies({AppLocalizations? l10n}) async {
     setState(() => _isLoading = true);
     try {
       final companies = await _service.getCompanies();
@@ -44,7 +48,8 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
-      _showSnackBar('فشل تحميل البيانات', isError: true);
+      if (l10n != null)
+        _showSnackBar(l10n.failedToLoadDataMsg, isError: true); // ✅ مترجم
     }
   }
 
@@ -60,10 +65,11 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
     });
   }
 
-  Future<void> _handleSave({int? id}) async {
+  // ✅ تمرير l10n
+  Future<void> _handleSave(AppLocalizations l10n, {int? id}) async {
     if (!_formKey.currentState!.validate()) return;
 
-    Navigator.pop(context); // إغلاق الديالوج
+    Navigator.pop(context);
     setState(() => _isLoading = true);
 
     try {
@@ -72,54 +78,56 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
         'shipping_cost': double.parse(_costController.text),
         'delivery_time':
             _timeController.text.isEmpty ? '3-5 أيام' : _timeController.text,
-        'is_active': true, // افتراضياً مفعل عند الإنشاء
+        'is_active': true,
       };
 
       if (id != null) {
         await _service.updateCompany(id, data);
-        _showSnackBar('تم تحديث البيانات بنجاح');
+        _showSnackBar(l10n.dataUpdatedSuccessfullyMsg); // ✅ مترجم
       } else {
         await _service.createCompany(data);
-        _showSnackBar('تم إضافة الشركة بنجاح');
+        _showSnackBar(l10n.companyAddedSuccessfullyMsg); // ✅ مترجم
       }
       _fetchCompanies();
     } catch (e) {
       setState(() => _isLoading = false);
-      _showSnackBar('حدث خطأ أثناء الحفظ', isError: true);
+      _showSnackBar(l10n.errorWhileSavingMsg, isError: true); // ✅ مترجم
     }
   }
 
-  Future<void> _handleDelete(int id) async {
+  // ✅ تمرير l10n
+  Future<void> _handleDelete(int id, AppLocalizations l10n) async {
     try {
       await _service.deleteCompany(id);
-      _showSnackBar('تم الحذف بنجاح');
+      _showSnackBar(l10n.deletedSuccessfullyMsg); // ✅ مترجم
       _fetchCompanies();
     } catch (e) {
-      _showSnackBar('فشل الحذف', isError: true);
+      _showSnackBar(l10n.deletionFailedMsg, isError: true); // ✅ مترجم
     }
   }
 
-  Future<void> _handleStatusToggle(ShippingCompany company) async {
-    // تحديث تفاؤلي (Optimistic Update)
+  // ✅ تمرير l10n
+  Future<void> _handleStatusToggle(
+    ShippingCompany company,
+    AppLocalizations l10n,
+  ) async {
     setState(() {
       final index = _allCompanies.indexWhere((c) => c.id == company.id);
-      if (index != -1) {
-        // ننشئ نسخة معدلة
-        /* ملاحظة: لأن الحقول final، يجب إعادة جلب البيانات أو استخدام copyWith في المودل.
-           للتبسيط هنا سنجلب البيانات من السيرفر بعد التحديث */
-      }
+      if (index != -1) {}
     });
 
     try {
       await _service.toggleStatus(company.id, !company.isActive);
-      _showSnackBar(company.isActive ? 'تم تعطيل الشركة' : 'تم تفعيل الشركة');
+      _showSnackBar(
+        company.isActive ? l10n.companyDisabledMsg : l10n.companyEnabledMsg,
+      ); // ✅ مترجم
       _fetchCompanies();
     } catch (e) {
-      _showSnackBar('فشل تغيير الحالة', isError: true);
+      _showSnackBar(l10n.statusChangeFailedMsg, isError: true); // ✅ مترجم
     }
   }
 
-  void _showAddEditDialog({ShippingCompany? company}) {
+  void _showAddEditDialog(AppLocalizations l10n, {ShippingCompany? company}) {
     _nameController.text = company?.name ?? '';
     _costController.text = company?.shippingCost.toString() ?? '';
     _timeController.text = company?.deliveryTime ?? '';
@@ -132,7 +140,11 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
               children: [
                 const Icon(Icons.local_shipping, color: Color(0xFF9333EA)),
                 const SizedBox(width: 8),
-                Text(company == null ? 'إضافة شركة جديدة' : 'تعديل البيانات'),
+                Text(
+                  company == null
+                      ? l10n.addNewCompanyTitle
+                      : l10n.editDataTitle,
+                ), // ✅ مترجم
               ],
             ),
             content: Form(
@@ -142,26 +154,33 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
                 children: [
                   TextFormField(
                     controller: _nameController,
-                    decoration: _inputDecoration('اسم الشركة', Icons.business),
-                    validator: (v) => v!.isEmpty ? 'مطلوب' : null,
+                    decoration: _inputDecoration(
+                      l10n.companyNameLabel,
+                      Icons.business,
+                    ), // ✅ مترجم
+                    validator:
+                        (v) =>
+                            v!.isEmpty ? l10n.requiredField : null, // ✅ مترجم
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _costController,
                     decoration: _inputDecoration(
-                      'تلفة الشحن (ر.س)',
+                      '${l10n.shippingCostLabel} (${l10n.currencySAR})',
                       Icons.attach_money,
-                    ),
+                    ), // ✅ مترجم وعملة
                     keyboardType: TextInputType.number,
-                    validator: (v) => v!.isEmpty ? 'مطلوب' : null,
+                    validator:
+                        (v) =>
+                            v!.isEmpty ? l10n.requiredField : null, // ✅ مترجم
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _timeController,
                     decoration: _inputDecoration(
-                      'مدة التوصيل (مثال: 3-5 أيام)',
+                      l10n.deliveryTimeLabel,
                       Icons.timer,
-                    ),
+                    ), // ✅ مترجم
                   ),
                 ],
               ),
@@ -169,46 +188,50 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text(
-                  'إلغاء',
-                  style: TextStyle(color: Colors.grey),
-                ),
+                child: Text(
+                  l10n.cancelBtn,
+                  style: const TextStyle(color: Colors.grey),
+                ), // ✅ مترجم
               ),
               ElevatedButton(
-                onPressed: () => _handleSave(id: company?.id),
+                onPressed:
+                    () => _handleSave(l10n, id: company?.id), // ✅ تمرير l10n
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFF43F5E),
                   foregroundColor: Colors.white,
                 ),
-                child: Text(company == null ? 'إضافة' : 'حفظ التعديلات'),
+                child: Text(
+                  company == null ? l10n.addBtn : l10n.saveChangesBtn,
+                ), // ✅ مترجم
               ),
             ],
           ),
     );
   }
 
-  void _showDeleteConfirm(int id, String name) {
+  void _showDeleteConfirm(int id, String name, AppLocalizations l10n) {
     showDialog(
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('تأكيد الحذف'),
-            content: Text('هل أنت متأكد من حذف شركة "$name"؟'),
+            title: Text(l10n.confirmDeletionTitle), // ✅ مترجم
+            // ✅ صحيح
+            content: Text(l10n.confirmDeleteCompanyDesc(name)),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('تراجع'),
+                child: Text(l10n.backBtn), // ✅ مترجم
               ),
               ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  _handleDelete(id);
+                  _handleDelete(id, l10n); // ✅ تمرير l10n
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
                   foregroundColor: Colors.white,
                 ),
-                child: const Text('حذف'),
+                child: Text(l10n.delete), // ✅ مترجم
               ),
             ],
           ),
@@ -227,7 +250,9 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Stats Calculations
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     final int total = _allCompanies.length;
     final int active = _allCompanies.where((c) => c.isActive).length;
     final double totalCost = _allCompanies.fold(
@@ -243,50 +268,49 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFFFFF1F2),
-              Color(0xFFF3E8FF),
-            ], // Rose-50 to Purple-50
+            colors: [Color(0xFFFFF1F2), Color(0xFFF3E8FF)],
           ),
         ),
         child: SafeArea(
           child: Column(
             children: [
-              // Header & Stats
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
-                    _buildHeader(),
+                    _buildHeader(l10n), // ✅ تمرير l10n
                     const SizedBox(height: 20),
                     Row(
                       children: [
                         _buildStatCard(
                           total.toString(),
-                          "الإجمالي",
+                          l10n.totalStat,
                           Colors.pink,
-                        ),
+                        ), // ✅ مترجم
                         const SizedBox(width: 8),
-                        _buildStatCard(active.toString(), "نشطة", Colors.green),
+                        _buildStatCard(
+                          active.toString(),
+                          l10n.activeStat,
+                          Colors.green,
+                        ), // ✅ مترجم
                         const SizedBox(width: 8),
                         _buildStatCard(
                           avgCost.toStringAsFixed(0),
-                          "متوسط السعر",
+                          l10n.averagePriceStat,
                           Colors.blue,
-                        ),
+                        ), // ✅ مترجم
                         const SizedBox(width: 8),
                         _buildStatCard(
                           totalCost.toStringAsFixed(0),
-                          "إجمالي التكلفة",
+                          l10n.totalCostStat,
                           Colors.purple,
-                        ),
+                        ), // ✅ مترجم
                       ],
                     ),
                   ],
                 ),
               ),
 
-              // Controls (Search & Add)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Container(
@@ -305,7 +329,7 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
                             _filterCompanies();
                           },
                           decoration: InputDecoration(
-                            hintText: "بحث...",
+                            hintText: "${l10n.searchBtn}...", // ✅ مترجم
                             prefixIcon: const Icon(
                               Icons.search,
                               size: 20,
@@ -325,15 +349,16 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
                       ),
                       const SizedBox(width: 8),
                       IconButton(
-                        onPressed: _fetchCompanies,
+                        onPressed: () => _fetchCompanies(l10n: l10n),
                         icon: const Icon(Icons.refresh, color: Colors.grey),
-                        tooltip: "تحديث",
+                        tooltip: l10n.refreshTooltip, // ✅ مترجم
                       ),
                       const SizedBox(width: 8),
                       ElevatedButton.icon(
-                        onPressed: () => _showAddEditDialog(),
+                        onPressed:
+                            () => _showAddEditDialog(l10n), // ✅ تمرير l10n
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFF43F5E), // Rose-500
+                          backgroundColor: const Color(0xFFF43F5E),
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
@@ -344,7 +369,7 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
                           ),
                         ),
                         icon: const Icon(Icons.add, size: 18),
-                        label: const Text("إضافة"),
+                        label: Text(l10n.addBtn), // ✅ مترجم
                       ),
                     ],
                   ),
@@ -353,7 +378,6 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
 
               const SizedBox(height: 16),
 
-              // List
               Expanded(
                 child:
                     _isLoading
@@ -363,14 +387,17 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
                           ),
                         )
                         : _filteredCompanies.isEmpty
-                        ? _buildEmptyState()
+                        ? _buildEmptyState(l10n) // ✅ تمرير l10n
                         : ListView.separated(
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
                           itemCount: _filteredCompanies.length,
                           separatorBuilder:
                               (c, i) => const SizedBox(height: 10),
                           itemBuilder: (context, index) {
-                            return _buildCompanyCard(_filteredCompanies[index]);
+                            return _buildCompanyCard(
+                              _filteredCompanies[index],
+                              l10n,
+                            ); // ✅ تمرير l10n
                           },
                         ),
               ),
@@ -381,9 +408,7 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
     );
   }
 
-  // --- Widgets ---
-
-  Widget _buildHeader() {
+  Widget _buildHeader(AppLocalizations l10n) {
     return Column(
       children: [
         Row(
@@ -399,9 +424,9 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
               child: const Icon(Icons.local_shipping, color: Color(0xFFE11D48)),
             ),
             const SizedBox(width: 8),
-            const Text(
-              "إدارة الشحن",
-              style: TextStyle(
+            Text(
+              l10n.shippingManagementTitle, // ✅ مترجم
+              style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
                 color: Colors.black87,
@@ -411,7 +436,7 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          "إدارة شركات الشحن والتوصيل وتحديد الأسعار",
+          l10n.manageShippingCompaniesDesc, // ✅ مترجم
           style: TextStyle(color: Colors.grey[600], fontSize: 13),
         ),
       ],
@@ -450,7 +475,9 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
     );
   }
 
-  Widget _buildCompanyCard(ShippingCompany company) {
+  Widget _buildCompanyCard(ShippingCompany company, AppLocalizations l10n) {
+    String langCode = Localizations.localeOf(context).languageCode;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -465,7 +492,6 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
         children: [
           Row(
             children: [
-              // Icon
               Container(
                 width: 40,
                 height: 40,
@@ -483,7 +509,6 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
               ),
               const SizedBox(width: 12),
 
-              // Name & Cost
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -500,8 +525,8 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
                       children: [
                         _infoBadge(
                           Icons.attach_money,
-                          "${company.shippingCost} ر.س",
-                        ),
+                          "${company.shippingCost} ${l10n.currencySAR}",
+                        ), // ✅ عملة مترجمة
                         const SizedBox(width: 8),
                         _infoBadge(Icons.timer, company.deliveryTime),
                       ],
@@ -510,7 +535,6 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
                 ),
               ),
 
-              // Actions
               Column(
                 children: [
                   Row(
@@ -521,7 +545,11 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
                           size: 18,
                           color: Colors.grey,
                         ),
-                        onPressed: () => _showAddEditDialog(company: company),
+                        onPressed:
+                            () => _showAddEditDialog(
+                              l10n,
+                              company: company,
+                            ), // ✅ تمرير l10n
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),
@@ -533,7 +561,11 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
                           color: Colors.red,
                         ),
                         onPressed:
-                            () => _showDeleteConfirm(company.id, company.name),
+                            () => _showDeleteConfirm(
+                              company.id,
+                              company.name,
+                              l10n,
+                            ), // ✅ تمرير l10n
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),
@@ -546,12 +578,11 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
 
           const Divider(height: 20),
 
-          // Footer (Date & Status)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                "أضيف في: ${DateFormat('yyyy-MM-dd').format(DateTime.parse(company.createdAt))}",
+                "${l10n.addedOnPrefix}${DateFormat('yyyy-MM-dd', langCode).format(DateTime.parse(company.createdAt))}", // ✅ مترجم
                 style: TextStyle(fontSize: 11, color: Colors.grey[500]),
               ),
               Row(
@@ -559,7 +590,9 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
                   Switch(
                     value: company.isActive,
                     activeColor: Colors.green,
-                    onChanged: (val) => _handleStatusToggle(company),
+                    onChanged:
+                        (val) =>
+                            _handleStatusToggle(company, l10n), // ✅ تمرير l10n
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -580,7 +613,9 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
                       ),
                     ),
                     child: Text(
-                      company.isActive ? "نشط" : "غير نشط",
+                      company.isActive
+                          ? l10n.activeStatus
+                          : l10n.inactiveStatus, // ✅ مترجم
                       style: TextStyle(
                         fontSize: 10,
                         color:
@@ -617,7 +652,7 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(AppLocalizations l10n) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -628,12 +663,15 @@ class _MerchantShippingScreenState extends State<MerchantShippingScreen> {
             color: Colors.grey.shade300,
           ),
           const SizedBox(height: 10),
-          const Text("لا توجد شركات شحن", style: TextStyle(color: Colors.grey)),
+          Text(
+            l10n.noShippingCompaniesMsg,
+            style: const TextStyle(color: Colors.grey),
+          ), // ✅ مترجم
           if (_searchTerm.isNotEmpty)
-            const Text(
-              "حاول البحث بكلمة أخرى",
-              style: TextStyle(color: Colors.grey, fontSize: 12),
-            ),
+            Text(
+              l10n.trySearchingOtherWordMsg,
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
+            ), // ✅ مترجم
         ],
       ),
     );

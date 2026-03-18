@@ -4,20 +4,23 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 // المودلز والخدمات
 import 'package:linyora_project/models/product_model.dart';
 import 'package:linyora_project/models/product_details_model.dart';
 import 'package:linyora_project/features/products/widgets/related_products_section.dart';
 import 'package:linyora_project/features/wishlist/providers/wishlist_provider.dart';
 import 'package:linyora_project/features/cart/providers/cart_provider.dart';
-import 'package:linyora_project/features/auth/providers/auth_provider.dart'; // ✅ هام للتحقق من الأدمن
+import 'package:linyora_project/features/auth/providers/auth_provider.dart';
 
 // الشاشات
 import 'package:linyora_project/features/cart/screens/cart_screen.dart';
 import 'package:linyora_project/features/cart/screens/checkout_screen.dart';
 import 'package:linyora_project/features/public_profiles/screens/merchant_profile_screen.dart';
-import 'package:linyora_project/features/home/screens/notifications_screen.dart'; // ✅ للإشعارات
-import 'package:linyora_project/features/home/screens/home_screen.dart'; // ✅ للعودة للرئيسية
+import 'package:linyora_project/features/home/screens/notifications_screen.dart';
+import 'package:linyora_project/features/home/screens/home_screen.dart';
 
 import '../services/product_service.dart';
 
@@ -71,15 +74,16 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     return total / _product!.reviews.length;
   }
 
-  void _shareProduct() {
+  // ✅ تمرير الترجمة لمشاركة المنتج
+  void _shareProduct(AppLocalizations l10n) {
     if (_product == null) return;
     final String productUrl = 'https://linyora.com/products/${_product!.id}';
     final String shareText =
-        'شاهد هذا المنتج الرائع على Linyora: \n${_product!.name}\nبسعر: ${_selectedVariant?.price ?? 0} ﷼\n\n$productUrl';
+        '${l10n.shareProductIntro} \n${_product!.name}\n${l10n.priceLabel} ${_selectedVariant?.price ?? 0} ${l10n.currencySAR}\n\n$productUrl';
     Share.share(shareText, subject: _product!.name);
   }
 
-  void _addToCart({bool goToCheckout = false}) {
+  void _addToCart(AppLocalizations l10n, {bool goToCheckout = false}) {
     if (_product == null) return;
     final productModel = _product!.toProductModel();
     Provider.of<CartProvider>(
@@ -93,11 +97,12 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         MaterialPageRoute(builder: (_) => const CheckoutScreen()),
       );
     } else {
-      _showAddToCartSuccessSheet();
+      _showAddToCartSuccessSheet(l10n); // ✅ تمرير الترجمة
     }
   }
 
-  void _showAddToCartSuccessSheet() {
+  // ✅ تمرير الترجمة
+  void _showAddToCartSuccessSheet(AppLocalizations l10n) {
     final String image =
         (_selectedVariant != null && _selectedVariant!.images.isNotEmpty)
             ? _selectedVariant!.images.first
@@ -116,13 +121,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           height: 280,
           child: Column(
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.check_circle, color: Colors.green),
-                  SizedBox(width: 10),
+                  const Icon(Icons.check_circle, color: Colors.green),
+                  const SizedBox(width: 10),
                   Text(
-                    "تمت الإضافة إلى السلة",
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                    l10n.addedToCartSuccess, // ✅ مترجم
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -148,7 +153,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       children: [
                         Text(_product!.name, maxLines: 1),
                         Text(
-                          "${price.toStringAsFixed(0)} ر.س",
+                          "${price.toStringAsFixed(0)} ${l10n.currencySAR}", // ✅ عملة مترجمة
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ],
@@ -162,7 +167,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text("تابع التسوق"),
+                      child: Text(l10n.continueShopping), // ✅ مترجم
                     ),
                   ),
                   const SizedBox(width: 15),
@@ -175,7 +180,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                           MaterialPageRoute(builder: (_) => const CartScreen()),
                         );
                       },
-                      child: const Text("عرض السلة"),
+                      child: Text(l10n.viewCartBtn), // ✅ مترجم
                     ),
                   ),
                 ],
@@ -221,8 +226,8 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     return colorMap[normalizedColor] ?? const Color(0xFFEEEEEE);
   }
 
-  // ✅ 1. الـ SliverAppBar الجديد المطابق للرئيسية
-  Widget _buildSliverAppBar() {
+  // ✅ تمرير الترجمة
+  Widget _buildSliverAppBar(AppLocalizations l10n) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final isRealAdmin =
         authProvider.user != null && authProvider.user!.roleId == 1;
@@ -234,11 +239,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       backgroundColor: Colors.white,
       elevation: 0,
       surfaceTintColor: Colors.white,
-      // زر رجوع لأنه صفحة تفاصيل
       leading: const BackButton(color: Colors.black),
       title: GestureDetector(
         onTap: () {
-          // العودة للرئيسية
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (context) => const HomeScreen()),
@@ -290,12 +293,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       ),
       centerTitle: true,
       actions: [
-        // زر المشاركة (أضفناه هنا لأنه مهم في صفحة المنتج)
         IconButton(
           icon: const Icon(Icons.share, color: Colors.black),
-          onPressed: _shareProduct,
+          onPressed: () => _shareProduct(l10n), // ✅ تمرير l10n
         ),
-        // زر الإشعارات
         IconButton(
           icon: const Icon(
             Icons.notifications_outlined,
@@ -308,7 +309,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 MaterialPageRoute(builder: (c) => const NotificationsScreen()),
               ),
         ),
-        // زر السلة
         Consumer<CartProvider>(
           builder: (context, cart, child) {
             return Stack(
@@ -362,10 +362,15 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة هنا
+    final l10n = AppLocalizations.of(context)!;
+
     if (_isLoading)
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     if (_product == null)
-      return const Scaffold(body: Center(child: Text("المنتج غير متوفر")));
+      return Scaffold(
+        body: Center(child: Text(l10n.productNotAvailable)),
+      ); // ✅ مترجم
 
     bool hasDiscount = false;
     int discountPercent = 0;
@@ -392,13 +397,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       body: CustomScrollView(
         controller: _scrollController,
         slivers: [
-          // ✅ 1. البار العلوي
-          _buildSliverAppBar(),
+          _buildSliverAppBar(l10n), // ✅ تمرير الترجمة
 
-          // ✅ 2. معرض الصور (تم نقله إلى SliverToBoxAdapter)
           SliverToBoxAdapter(
             child: Container(
-              height: 450, // نفس الارتفاع السابق
+              height: 450,
               color: Colors.white,
               child: Stack(
                 alignment: Alignment.bottomCenter,
@@ -445,7 +448,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             ),
           ),
 
-          // ✅ 3. باقي تفاصيل المنتج (تم الحفاظ عليها)
           SliverList(
             delegate: SliverChildListDelegate([
               Container(
@@ -454,7 +456,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // السعر
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
@@ -466,9 +467,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                           ),
                         ),
                         const SizedBox(width: 4),
-                        const Text(
-                          'ر.س',
-                          style: TextStyle(
+                        Text(
+                          l10n.currencySAR, // ✅ عملة مترجمة
+                          style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                           ),
@@ -493,7 +494,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              '$discountPercent% خصم',
+                              '$discountPercent${l10n.discountOff}', // ✅ مترجم
                               style: const TextStyle(
                                 color: Colors.red,
                                 fontSize: 12,
@@ -506,7 +507,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // الاسم + زر المفضلة
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -560,15 +560,14 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
                     const SizedBox(height: 8),
 
-                    // التقييمات
                     Row(
                       children: [
                         const Icon(Icons.star, color: Colors.amber, size: 18),
                         const SizedBox(width: 4),
                         Text(
                           reviewCount > 0
-                              ? '${rating.toStringAsFixed(1)} ($reviewCount تقييم)'
-                              : 'لا توجد تقييمات',
+                              ? '${rating.toStringAsFixed(1)} ($reviewCount ${l10n.reviewCountLabel})' // ✅ مترجم
+                              : l10n.noReviewsYet, // ✅ مترجم
                           style: const TextStyle(
                             color: Colors.grey,
                             fontSize: 12,
@@ -582,7 +581,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
               const SizedBox(height: 8),
 
-              // الألوان
               if (_product!.variants.isNotEmpty)
                 Container(
                   color: Colors.white,
@@ -590,9 +588,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        "اختر المواصفات",
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                      Text(
+                        l10n.chooseSpecifications, // ✅ مترجم
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 12),
                       SingleChildScrollView(
@@ -673,7 +671,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
               const SizedBox(height: 8),
 
-              // التاجر
               Container(
                 color: Colors.white,
                 padding: const EdgeInsets.all(16),
@@ -688,12 +685,15 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "البائع: ${_product!.merchantName}",
+                          "${l10n.sellerPrefix}${_product!.merchantName}", // ✅ مترجم
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
-                        const Text(
-                          "موثوق به",
-                          style: TextStyle(fontSize: 12, color: Colors.green),
+                        Text(
+                          l10n.trustedSeller, // ✅ مترجم
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.green,
+                          ),
                         ),
                       ],
                     ),
@@ -710,9 +710,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                           ),
                         );
                       },
-                      child: const Text(
-                        "زيارة المتجر",
-                        style: TextStyle(color: Colors.pink),
+                      child: Text(
+                        l10n.visitStoreBtn, // ✅ مترجم
+                        style: const TextStyle(color: Colors.pink),
                       ),
                     ),
                   ],
@@ -721,16 +721,15 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
               const SizedBox(height: 8),
 
-              // الوصف
               Container(
                 color: Colors.white,
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      "وصف المنتج",
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                    Text(
+                      l10n.productDescriptionTitle, // ✅ مترجم
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -753,7 +752,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                         child: Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: Text(
-                            _isDescriptionExpanded ? "عرض أقل" : "اقرأ المزيد",
+                            _isDescriptionExpanded
+                                ? l10n.showLess
+                                : l10n.readMore, // ✅ مترجم
                             style: const TextStyle(color: Colors.pink),
                           ),
                         ),
@@ -764,12 +765,14 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
               const SizedBox(height: 8),
 
-              // منتجات مشابهة
               RelatedProductsSection(currentProductId: _product!.id),
 
               const SizedBox(height: 8),
 
-              ReviewsSection(reviews: _product!.reviews),
+              ReviewsSection(
+                reviews: _product!.reviews,
+                l10n: l10n,
+              ), // ✅ تمرير l10n
 
               const SizedBox(height: 20),
             ]),
@@ -825,15 +828,19 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () => _addToCart(goToCheckout: false),
+                  onPressed:
+                      () => _addToCart(
+                        l10n,
+                        goToCheckout: false,
+                      ), // ✅ تمرير الترجمة
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     side: const BorderSide(color: Colors.pink),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  child: const Text(
-                    "أضف للسلة",
-                    style: TextStyle(
+                  child: Text(
+                    l10n.addToCartBtn, // ✅ مترجم
+                    style: const TextStyle(
                       color: Colors.pink,
                       fontWeight: FontWeight.bold,
                     ),
@@ -843,14 +850,18 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () => _addToCart(goToCheckout: true),
+                  onPressed:
+                      () => _addToCart(
+                        l10n,
+                        goToCheckout: true,
+                      ), // ✅ تمرير الترجمة
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.pink,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  child: const Text(
-                    "شراء الآن",
-                    style: TextStyle(
+                  child: Text(
+                    l10n.buyNowBtn, // ✅ مترجم
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                     ),
@@ -867,10 +878,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
 class ReviewsSection extends StatelessWidget {
   final List<ProductReview> reviews;
+  final AppLocalizations l10n; // ✅ استقبال الترجمة
 
-  const ReviewsSection({Key? key, required this.reviews}) : super(key: key);
+  const ReviewsSection({Key? key, required this.reviews, required this.l10n})
+    : super(key: key);
 
-  // حساب توزيع النجوم (كم شخص أعطى 5 نجوم، 4 نجوم...)
   Map<int, int> _calculateStarDistribution() {
     Map<int, int> distribution = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0};
     for (var review in reviews) {
@@ -882,7 +894,6 @@ class ReviewsSection extends StatelessWidget {
     return distribution;
   }
 
-  // حساب متوسط التقييم
   double _calculateAverage() {
     if (reviews.isEmpty) return 0.0;
     double total = reviews.fold(0, (sum, item) => sum + item.rating);
@@ -901,7 +912,7 @@ class ReviewsSection extends StatelessWidget {
             Icon(Icons.rate_review_outlined, size: 60, color: Colors.grey[300]),
             const SizedBox(height: 16),
             Text(
-              "لا توجد تقييمات بعد",
+              l10n.noReviewsYetTitle, // ✅ نص مترجم
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -910,7 +921,7 @@ class ReviewsSection extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              "كن أول من يقيم هذا المنتج!",
+              l10n.beFirstToReview, // ✅ نص مترجم
               style: TextStyle(color: Colors.grey[500]),
             ),
           ],
@@ -927,17 +938,15 @@ class ReviewsSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "تقييمات العملاء",
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          Text(
+            l10n.customerReviewsTitle, // ✅ نص مترجم
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 24),
 
-          // 1. قسم الملخص (الرقم الكبير + الشرائط)
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // العمود الأيمن: الرقم الكبير
               Expanded(
                 flex: 2,
                 child: Column(
@@ -966,14 +975,13 @@ class ReviewsSection extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      "${reviews.length} تقييم",
+                      "${reviews.length} ${l10n.reviewCountLabel}", // ✅ نص مترجم
                       style: TextStyle(color: Colors.grey[500], fontSize: 12),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 20),
-              // العمود الأيسر: أشرطة التقدم
               Expanded(
                 flex: 3,
                 child: Column(
@@ -1034,27 +1042,23 @@ class ReviewsSection extends StatelessWidget {
             child: Divider(thickness: 1, height: 1),
           ),
 
-          // 2. قائمة التعليقات
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: reviews.length > 5 ? 5 : reviews.length, // عرض أول 5 فقط
+            itemCount: reviews.length > 5 ? 5 : reviews.length,
             separatorBuilder: (context, index) => const Divider(height: 30),
             itemBuilder: (context, index) {
-              return _buildReviewItem(reviews[index]);
+              return _buildReviewItem(reviews[index], l10n); // ✅ تمرير l10n
             },
           ),
 
-          // زر عرض المزيد
           if (reviews.length > 5)
             Padding(
               padding: const EdgeInsets.only(top: 16),
               child: SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
-                  onPressed: () {
-                    // هنا يمكنك فتح صفحة تحتوي على كل التقييمات
-                  },
+                  onPressed: () {},
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     side: BorderSide(color: Colors.grey.shade300),
@@ -1062,9 +1066,9 @@ class ReviewsSection extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: const Text(
-                    "عرض جميع التقييمات",
-                    style: TextStyle(color: Colors.black),
+                  child: Text(
+                    l10n.viewAllReviewsBtn, // ✅ نص مترجم
+                    style: const TextStyle(color: Colors.black),
                   ),
                 ),
               ),
@@ -1074,19 +1078,13 @@ class ReviewsSection extends StatelessWidget {
     );
   }
 
-  // ويدجت لبناء كارت التعليق الواحد
-  Widget _buildReviewItem(ProductReview review) {
-    // تنسيق التاريخ
+  Widget _buildReviewItem(ProductReview review, AppLocalizations l10n) {
     String formattedDate = review.createdAt;
     try {
       final date = DateTime.parse(review.createdAt);
-      formattedDate = DateFormat(
-        'dd MMM yyyy',
-        'en',
-      ).format(date); // استخدم 'ar' إذا كانت المكتبة تدعم العربية
+      formattedDate = DateFormat('dd MMM yyyy').format(date);
     } catch (_) {}
 
-    // استخراج الحرف الأول للاسم
     String firstLetter =
         review.userName.isNotEmpty ? review.userName[0].toUpperCase() : "U";
 
@@ -1095,7 +1093,6 @@ class ReviewsSection extends StatelessWidget {
       children: [
         Row(
           children: [
-            // صورة المستخدم (دائرة بالحرف الأول)
             CircleAvatar(
               radius: 18,
               backgroundColor: _getColorForName(review.userName),
@@ -1109,7 +1106,6 @@ class ReviewsSection extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            // الاسم والتاريخ
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1120,7 +1116,6 @@ class ReviewsSection extends StatelessWidget {
                     fontSize: 14,
                   ),
                 ),
-                // النجوم الصغيرة بجانب الاسم
                 Row(
                   children: List.generate(5, (index) {
                     return Icon(
@@ -1150,7 +1145,6 @@ class ReviewsSection extends StatelessWidget {
             ),
           ),
 
-        // أزرار تفاعلية وهمية (للمنظر الجمالي فقط)
         const SizedBox(height: 12),
         Row(
           children: [
@@ -1161,12 +1155,12 @@ class ReviewsSection extends StatelessWidget {
             ),
             const SizedBox(width: 4),
             Text(
-              "مفيد",
+              l10n.helpfulReviewBtn, // ✅ نص مترجم
               style: TextStyle(fontSize: 12, color: Colors.grey[500]),
             ),
             const SizedBox(width: 16),
             Text(
-              "إبلاغ",
+              l10n.reportReviewBtn, // ✅ نص مترجم
               style: TextStyle(fontSize: 12, color: Colors.grey[400]),
             ),
           ],
@@ -1175,7 +1169,6 @@ class ReviewsSection extends StatelessWidget {
     );
   }
 
-  // دالة لتوليد لون عشوائي ثابت بناءً على الاسم
   Color _getColorForName(String name) {
     final colors = [
       Colors.blue,

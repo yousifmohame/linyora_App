@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import 'package:linyora_project/features/supplier/products/models/supplier_models.dart';
 import 'package:linyora_project/features/supplier/products/services/supplier_products_service.dart';
 
@@ -17,7 +21,6 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
   List<SupplierProduct> _products = [];
   bool _isLoading = true;
 
-  // الإحصائيات
   int get totalProducts => _products.length;
   int get totalVariants =>
       _products.fold(0, (sum, p) => sum + p.variants.length);
@@ -35,37 +38,43 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
   Future<void> _loadProducts() async {
     try {
       final data = await _service.getProducts();
-      if (mounted)
+      if (mounted) {
         setState(() {
           _products = data;
           _isLoading = false;
         });
+      }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _deleteProduct(int id) async {
+  Future<void> _deleteProduct(int id, AppLocalizations l10n) async {
+    // ✅ تمرير l10n
     try {
       await _service.deleteProduct(id);
-      _loadProducts(); // تحديث
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("تم الحذف")));
+      _loadProducts();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.deletedSuccessfullyMsg),
+        ), // ✅ مترجم (سابقاً)
+      );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("فشل الحذف")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.deletionFailedMsg)), // ✅ مترجم (سابقاً)
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4F8),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          // فتح الفورم في صفحة جديدة، وإذا تم الحفظ نحدث القائمة
           bool? result = await Navigator.push(
             context,
             MaterialPageRoute(
@@ -76,7 +85,7 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
         },
         backgroundColor: const Color(0xFFF105C6),
         icon: const Icon(Icons.add),
-        label: const Text("منتج جديد"),
+        label: Text(l10n.newProductBtn), // ✅ مترجم (سابقاً)
       ),
       body: CustomScrollView(
         slivers: [
@@ -85,12 +94,11 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  // الإحصائيات
                   Row(
                     children: [
                       Expanded(
                         child: _buildStatCard(
-                          "إجمالي المنتجات",
+                          l10n.totalProducts, // ✅ مترجم (سابقاً)
                           "$totalProducts",
                           Colors.blue,
                         ),
@@ -98,7 +106,7 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: _buildStatCard(
-                          "الأصناف",
+                          l10n.totalVariantsLabel, // ✅ مترجم
                           "$totalVariants",
                           Colors.indigo,
                         ),
@@ -106,7 +114,7 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: _buildStatCard(
-                          "مخزون منخفض",
+                          l10n.lowStockLabel, // ✅ مترجم
                           "$lowStock",
                           Colors.orange,
                         ),
@@ -115,11 +123,12 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // قائمة المنتجات
                   if (_isLoading)
                     const Center(child: CircularProgressIndicator())
                   else if (_products.isEmpty)
-                    const Center(child: Text("لا توجد منتجات"))
+                    Center(
+                      child: Text(l10n.noProductsYetMsg),
+                    ) // ✅ مترجم (سابقاً)
                   else
                     ListView.builder(
                       shrinkWrap: true,
@@ -127,7 +136,7 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
                       itemCount: _products.length,
                       itemBuilder: (ctx, i) {
                         final product = _products[i];
-                        return _buildProductItem(product);
+                        return _buildProductItem(product, l10n); // ✅ تمرير l10n
                       },
                     ),
 
@@ -160,6 +169,7 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
               fontWeight: FontWeight.bold,
             ),
             maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           Text(
             value,
@@ -170,13 +180,13 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
     );
   }
 
-  Widget _buildProductItem(SupplierProduct product) {
+  Widget _buildProductItem(SupplierProduct product, AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
       ),
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -204,7 +214,9 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
             product.name,
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
-          subtitle: Text("${product.variants.length} ألوان"),
+          subtitle: Text(
+            "${product.variants.length}${l10n.colorsCountSuffix}",
+          ), // ✅ مترجم ومدمج
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -223,7 +235,8 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
               ),
               IconButton(
                 icon: const Icon(Icons.delete, color: Colors.red),
-                onPressed: () => _deleteProduct(product.id!),
+                onPressed:
+                    () => _deleteProduct(product.id!, l10n), // ✅ تمرير l10n
               ),
             ],
           ),
@@ -232,9 +245,9 @@ class _SupplierProductsScreenState extends State<SupplierProductsScreen> {
                   .map(
                     (v) => ListTile(
                       dense: true,
-                      title: Text("لون: ${v.color}"),
+                      title: Text("${l10n.colorLabel}${v.color}"), // ✅ مترجم
                       subtitle: Text(
-                        "المخزون: ${v.stockQuantity} | التكلفة: ${v.costPrice}",
+                        "${l10n.stockLabel}${v.stockQuantity} | ${l10n.costLabel}${v.costPrice}", // ✅ مترجم
                       ),
                       trailing:
                           v.images.isNotEmpty

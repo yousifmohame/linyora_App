@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:linyora_project/features/subscriptions/services/subscription_service.dart';
-import './payment_services.dart' hide PaymentService;
 import 'package:provider/provider.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import 'package:linyora_project/features/auth/providers/auth_provider.dart';
 import 'package:linyora_project/models/subscription_plan_model.dart';
-import 'package:linyora_project/features/subscriptions/screens/payment_Services.dart'; // تأكد من المسار
+import 'package:linyora_project/features/subscriptions/screens/payment_Services.dart';
 
 class SubscriptionPlansScreen extends StatefulWidget {
   const SubscriptionPlansScreen({Key? key}) : super(key: key);
@@ -15,15 +18,13 @@ class SubscriptionPlansScreen extends StatefulWidget {
 }
 
 class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
-  final SubscriptionService _dataService =
-      SubscriptionService(); // لجلب الباقات
-  final PaymentService _paymentService = PaymentService(); // ✅ للدفع
+  final SubscriptionService _dataService = SubscriptionService();
+  final PaymentService _paymentService = PaymentService();
 
   List<SubscriptionPlan> _plans = [];
   bool _isLoading = true;
-  int? _selectedPlanId; // لتحديد الزر الذي يتم تحميله
+  int? _selectedPlanId;
 
-  // الألوان
   final Color _activeColor = const Color(0xFF10B981);
   final Color _primaryColor = const Color(0xFFF43F5E);
   final Color _darkText = const Color(0xFF1E293B);
@@ -48,29 +49,24 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
     }
   }
 
-  // ✅ دالة الاشتراك الجديدة
-  // داخل الكلاس _SubscriptionPlansScreenState
-
-  Future<void> _handleSubscribe(int planId) async {
-    // 1. بدء حالة التحميل للزر المختار
+  // ✅ تمرير l10n لمعالجة رسائل الخطأ من الـ PaymentService
+  Future<void> _handleSubscribe(int planId, AppLocalizations l10n) async {
     setState(() => _selectedPlanId = planId);
 
     try {
       await _paymentService.subscribeToPlan(
         context: context,
         planId: planId,
-        paymentMethodId: null, // سيتم فتحه عبر Stripe Sheet
+        paymentMethodId: null,
+        l10n: l10n, // ✅ تمريرها
         onSuccess: () async {
-          // 2. إظهار رسالة انتظار بسيطة للمستخدم
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('⏳ جاري تأكيد الاشتراك مع البنك...'),
-              duration: Duration(seconds: 2),
+            SnackBar(
+              content: Text(l10n.confirmingSubscriptionMsg), // ✅ مترجم
+              duration: const Duration(seconds: 2),
             ),
           );
 
-          // 3. 🔥 أهم خطوة: انتظار بسيط ثم تحديث بيانات المستخدم
-          // ننتظر قليلاً لضمان وصول الـ Webhook من Stripe إلى السيرفر الخاص بك
           await Future.delayed(const Duration(seconds: 2));
 
           final authProvider = Provider.of<AuthProvider>(
@@ -80,16 +76,14 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
           await authProvider.refreshUser();
 
           if (mounted) {
-            // 4. إغلاق الشاشة والعودة لصفحة "اشتراكي" التي ستتحدث تلقائياً
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('✅ مبروك! تم تفعيل باقتك الجديدة بنجاح'),
+              SnackBar(
+                content: Text(l10n.subscriptionActivatedSuccessMsg), // ✅ مترجم
                 backgroundColor: Colors.green,
-                duration: Duration(seconds: 3),
+                duration: const Duration(seconds: 3),
               ),
             );
 
-            // العودة للصفحة السابقة
             Navigator.of(context).pop();
           }
         },
@@ -98,7 +92,7 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ فشلت العملية: $e'),
+            content: Text('${l10n.operationFailedMsg}$e'), // ✅ مترجم
             backgroundColor: Colors.red,
           ),
         );
@@ -112,7 +106,9 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // قراءة بيانات المستخدم لمعرفة الباقة الحالية
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     final user = Provider.of<AuthProvider>(context).user;
     final subscription = user?.subscription;
 
@@ -124,9 +120,12 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text(
-          "خطط الاشتراك",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        title: Text(
+          l10n.subscriptionPlansTitle, // ✅ مترجم
+          style: const TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
@@ -143,9 +142,9 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                    const Text(
-                      "اكتشفي الباقة المثالية لكِ",
-                      style: TextStyle(
+                    Text(
+                      l10n.discoverPerfectPackage, // ✅ مترجم
+                      style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                       ),
@@ -153,7 +152,7 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      "استمتعي بميزات حصرية وأدوات متقدمة لتنمية أعمالك",
+                      l10n.packageFeaturesSubtitle, // ✅ مترجم
                       style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                       textAlign: TextAlign.center,
                     ),
@@ -168,7 +167,11 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                         final plan = _plans[index];
                         final bool isMyPlan =
                             (currentPlanId != null && plan.id == currentPlanId);
-                        return _buildProfessionalCard(plan, isMyPlan);
+                        return _buildProfessionalCard(
+                          plan,
+                          isMyPlan,
+                          l10n,
+                        ); // ✅ تمرير l10n
                       },
                     ),
                     const SizedBox(height: 40),
@@ -178,8 +181,11 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
     );
   }
 
-  Widget _buildProfessionalCard(SubscriptionPlan plan, bool isMyPlan) {
-    // هل يتم معالجة هذا الزر حالياً؟
+  Widget _buildProfessionalCard(
+    SubscriptionPlan plan,
+    bool isMyPlan,
+    AppLocalizations l10n,
+  ) {
     final bool isProcessing = _selectedPlanId == plan.id;
 
     return Stack(
@@ -200,7 +206,6 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
           ),
           child: Column(
             children: [
-              // الهيدر
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
@@ -230,7 +235,7 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                           Padding(
                             padding: const EdgeInsets.only(top: 4.0),
                             child: Text(
-                              "✅ باقتك الحالية",
+                              l10n.yourCurrentPackage, // ✅ مترجم
                               style: TextStyle(
                                 fontSize: 12,
                                 color: _activeColor,
@@ -263,7 +268,7 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                             ),
                           ),
                           TextSpan(
-                            text: " ر.س",
+                            text: " ${l10n.currencySAR}", // ✅ عملة مترجمة
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
@@ -271,7 +276,7 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                             ),
                           ),
                           TextSpan(
-                            text: "\n/ شهرياً",
+                            text: l10n.perMonth, // ✅ مترجم
                             style: TextStyle(
                               fontSize: 11,
                               color: Colors.grey[500],
@@ -285,7 +290,6 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
               ),
               const Divider(height: 1),
 
-              // الميزات والزر
               Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(
@@ -323,7 +327,10 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                         onPressed:
                             (isMyPlan || _selectedPlanId != null)
                                 ? null
-                                : () => _handleSubscribe(plan.id),
+                                : () => _handleSubscribe(
+                                  plan.id,
+                                  l10n,
+                                ), // ✅ تمرير l10n
                         style: ElevatedButton.styleFrom(
                           backgroundColor:
                               isMyPlan ? Colors.grey[200] : _primaryColor,
@@ -351,7 +358,9 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                                   ),
                                 )
                                 : Text(
-                                  isMyPlan ? "مشترك حالياً ✅" : "اشتراك الآن",
+                                  isMyPlan
+                                      ? l10n.currentlySubscribedBtn
+                                      : l10n.subscribeNowBtn, // ✅ مترجم
                                   style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
@@ -387,9 +396,9 @@ class _SubscriptionPlansScreenState extends State<SubscriptionPlansScreen> {
                     ),
                   ],
                 ),
-                child: const Text(
-                  "الأكثر طلباً 🔥",
-                  style: TextStyle(
+                child: Text(
+                  l10n.mostRequestedBadge, // ✅ مترجم
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,

@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../models/wallet_model.dart';
 import '../services/wallet_service.dart';
 
@@ -13,8 +17,7 @@ class WalletScreen extends StatefulWidget {
 class _WalletScreenState extends State<WalletScreen>
     with SingleTickerProviderStateMixin {
   final WalletService _service = WalletService();
-  late TabController
-  _tabController; // للتحكم في الفلترة (الكل، إيداع، خصم، سحب)
+  late TabController _tabController;
 
   WalletData? _wallet;
   List<WalletTransaction> _transactions = [];
@@ -23,21 +26,18 @@ class _WalletScreenState extends State<WalletScreen>
   bool _isSubmitting = false;
   final TextEditingController _amountController = TextEditingController();
 
-  // متغيرات العرض المحسوبة
   double get _displayAvailableBalance =>
       (_wallet?.balance ?? 0) > 0 ? (_wallet?.balance ?? 0) : 0.0;
 
   double get _displayTotalDebt {
     double rawBalance = _wallet?.balance ?? 0;
     double outstanding = _wallet?.outstandingDebt ?? 0;
-    // الدين = المديونية المسجلة + العجز في الرصيد الرئيسي (إذا كان بالسالب)
     return outstanding + (rawBalance < 0 ? rawBalance.abs() : 0);
   }
 
   @override
   void initState() {
     super.initState();
-    // 4 تابات: الكل، إيداعات، خصومات، سحوبات
     _tabController = TabController(length: 4, vsync: this);
     _fetchData();
   }
@@ -64,23 +64,26 @@ class _WalletScreenState extends State<WalletScreen>
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
-      // يمكن إضافة SnackBar للخطأ هنا
     }
   }
 
-  Future<void> _handlePayoutRequest() async {
+  // ✅ تمرير l10n لمعالجة رسائل الخطأ
+  Future<void> _handlePayoutRequest(AppLocalizations l10n) async {
     final amount = double.tryParse(_amountController.text) ?? 0.0;
 
     if (amount <= 0) {
-      _showSnackBar('يرجى إدخال مبلغ صحيح', isError: true);
+      _showSnackBar(l10n.enterValidAmountMsg, isError: true); // ✅ مترجم
       return;
     }
     if (amount > _displayAvailableBalance) {
-      _showSnackBar('رصيدك المتاح غير كافٍ', isError: true);
+      _showSnackBar(l10n.insufficientBalanceMsg, isError: true); // ✅ مترجم
       return;
     }
     if (amount < 50) {
-      _showSnackBar('الحد الأدنى للسحب هو 50 ر.س', isError: true);
+      _showSnackBar(
+        "${l10n.minPayoutMsg}${l10n.currencySAR}",
+        isError: true,
+      ); // ✅ مترجم ومدمج
       return;
     }
 
@@ -89,8 +92,8 @@ class _WalletScreenState extends State<WalletScreen>
       final message = await _service.requestPayout(amount);
       _showSnackBar(message, isError: false);
       _amountController.clear();
-      Navigator.pop(context); // إغلاق الـ BottomSheet
-      _fetchData(); // تحديث البيانات
+      Navigator.pop(context);
+      _fetchData();
     } catch (e) {
       _showSnackBar(e.toString().replaceAll('Exception: ', ''), isError: true);
     } finally {
@@ -108,23 +111,23 @@ class _WalletScreenState extends State<WalletScreen>
     );
   }
 
-  // ترجمة أنواع المعاملات للعربية
-  String _translateType(String type) {
+  // ✅ تمرير l10n للترجمة الديناميكية للأنواع
+  String _translateType(String type, AppLocalizations l10n) {
     switch (type) {
       case 'sale_earning':
-        return 'أرباح مبيعات';
+        return l10n.saleEarningType; // ✅
       case 'shipping_earning':
-        return 'عائد شحن';
+        return l10n.shippingEarningType; // ✅
       case 'cod_commission_deduction':
-        return 'عمولة (COD)';
+        return l10n.codCommissionDeductionType; // ✅
       case 'commission_deduction':
-        return 'خصم عمولة';
+        return l10n.commissionDeductionType; // ✅
       case 'payout':
-        return 'سحب رصيد';
+        return l10n.payoutType; // ✅
       case 'agreement_income':
-        return 'أرباح تسويق';
+        return l10n.agreementIncomeType; // ✅
       case 'adjustment':
-        return 'تسوية إدارية';
+        return l10n.adjustmentType; // ✅
       default:
         return type;
     }
@@ -132,14 +135,20 @@ class _WalletScreenState extends State<WalletScreen>
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          "المحفظة المالية",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        title: Text(
+          l10n.walletTitle, // ✅ مترجم
+          style: const TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
         actions: [
@@ -158,11 +167,10 @@ class _WalletScreenState extends State<WalletScreen>
                   physics: const AlwaysScrollableScrollPhysics(),
                   child: Column(
                     children: [
-                      _buildStatsGrid(),
+                      _buildStatsGrid(l10n), // ✅ تمرير l10n
 
                       const SizedBox(height: 16),
 
-                      // زر السحب
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: SizedBox(
@@ -170,10 +178,11 @@ class _WalletScreenState extends State<WalletScreen>
                           child: ElevatedButton.icon(
                             onPressed:
                                 _displayAvailableBalance >= 50
-                                    ? () => _showPayoutSheet()
+                                    ? () =>
+                                        _showPayoutSheet(l10n) // ✅ تمرير l10n
                                     : null,
                             icon: const Icon(Icons.account_balance_wallet),
-                            label: const Text("طلب سحب رصيد"),
+                            label: Text(l10n.requestPayoutBtn), // ✅ مترجم
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF9333EA),
                               foregroundColor: Colors.white,
@@ -189,8 +198,7 @@ class _WalletScreenState extends State<WalletScreen>
 
                       const SizedBox(height: 24),
 
-                      // قسم المعاملات مع التابات
-                      _buildTransactionsSection(),
+                      _buildTransactionsSection(l10n), // ✅ تمرير l10n
                     ],
                   ),
                 ),
@@ -198,37 +206,36 @@ class _WalletScreenState extends State<WalletScreen>
     );
   }
 
-  // --- 1. شبكة البطاقات (4 Cards Grid) ---
-  Widget _buildStatsGrid() {
+  Widget _buildStatsGrid(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
           Row(
             children: [
-              // البطاقة الخضراء: الرصيد المتاح
               Expanded(
                 child: _buildStatCard(
-                  title: "المتاح للسحب",
+                  title: l10n.availableToWithdrawLabel, // ✅ مترجم
                   value: _displayAvailableBalance,
                   icon: Icons.check_circle_outline,
                   color: Colors.green,
-                  subtext: "جاهز للتحويل",
+                  subtext: l10n.readyToTransferLabel, // ✅ مترجم
+                  l10n: l10n,
                 ),
               ),
               const SizedBox(width: 12),
-              // البطاقة الحمراء: المديونيات (تظهر حتى لو 0 ولكن بتصميم مختلف)
               Expanded(
                 child: _buildStatCard(
-                  title: "المديونيات",
+                  title: l10n.debtsLabel, // ✅ مترجم
                   value: _displayTotalDebt,
                   icon: Icons.warning_amber_rounded,
                   color: _displayTotalDebt > 0 ? Colors.red : Colors.grey,
                   subtext:
                       _displayTotalDebt > 0
-                          ? "يتم خصمها تلقائياً"
-                          : "لا توجد مديونيات",
+                          ? l10n.autoDeductedLabel
+                          : l10n.noDebtsLabel, // ✅ مترجم
                   isDebt: true,
+                  l10n: l10n,
                 ),
               ),
             ],
@@ -236,25 +243,26 @@ class _WalletScreenState extends State<WalletScreen>
           const SizedBox(height: 12),
           Row(
             children: [
-              // البطاقة البرتقالية: المعلق
               Expanded(
                 child: _buildStatCard(
-                  title: "قيد التسوية",
+                  title: l10n.pendingSettlementLabel, // ✅ مترجم
                   value: _wallet?.pendingBalance ?? 0,
                   icon: Icons.access_time,
                   color: Colors.orange,
-                  subtext: "${_wallet?.pendingTransactionsCount ?? 0} عمليات",
+                  subtext:
+                      "${_wallet?.pendingTransactionsCount ?? 0} ${l10n.operationsLabel}", // ✅ مترجم
+                  l10n: l10n,
                 ),
               ),
               const SizedBox(width: 12),
-              // البطاقة الزرقاء: الإجمالي
               Expanded(
                 child: _buildStatCard(
-                  title: "إجمالي الأرباح",
+                  title: l10n.totalProfitsLabel, // ✅ مترجم
                   value: _wallet?.totalEarnings ?? 0,
                   icon: Icons.trending_up,
                   color: Colors.blue,
-                  subtext: "التاريخي",
+                  subtext: l10n.historicalLabel, // ✅ مترجم
+                  l10n: l10n,
                 ),
               ),
             ],
@@ -271,7 +279,11 @@ class _WalletScreenState extends State<WalletScreen>
     required Color color,
     required String subtext,
     bool isDebt = false,
+    required AppLocalizations l10n, // ✅ إضافة l10n
   }) {
+    // اختيار اللغة للتنسيق بناءً على اختيار المستخدم لتنسيق الأرقام
+    String langCode = Localizations.localeOf(context).languageCode;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -292,12 +304,15 @@ class _WalletScreenState extends State<WalletScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title,
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               Icon(icon, color: color, size: 18),
@@ -305,9 +320,9 @@ class _WalletScreenState extends State<WalletScreen>
           ),
           const SizedBox(height: 12),
           Text(
-            "${NumberFormat('#,##0.00').format(value)} ر.س",
+            "${NumberFormat('#,##0.00', langCode).format(value)} ${l10n.currencySAR}", // ✅ تنسيق وعملة
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: isDebt && value > 0 ? Colors.red : Colors.black87,
             ),
@@ -316,14 +331,14 @@ class _WalletScreenState extends State<WalletScreen>
           Text(
             subtext,
             style: TextStyle(color: Colors.grey[400], fontSize: 10),
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
     );
   }
 
-  // --- 2. قسم المعاملات مع التصفية ---
-  Widget _buildTransactionsSection() {
+  Widget _buildTransactionsSection(AppLocalizations l10n) {
     return Container(
       color: Colors.white,
       child: Column(
@@ -337,22 +352,22 @@ class _WalletScreenState extends State<WalletScreen>
               fontWeight: FontWeight.bold,
               fontSize: 13,
             ),
-            tabs: const [
-              Tab(text: "الكل"),
-              Tab(text: "إيداع"),
-              Tab(text: "خصم"),
-              Tab(text: "سحب"),
+            tabs: [
+              Tab(text: l10n.allTab), // ✅ مترجم
+              Tab(text: l10n.depositTab), // ✅ مترجم
+              Tab(text: l10n.deductionTab), // ✅ مترجم
+              Tab(text: l10n.withdrawTab), // ✅ مترجم
             ],
           ),
           SizedBox(
-            height: 500, // ارتفاع ثابت للقائمة
+            height: 500,
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildTransactionList('all'),
-                _buildTransactionList('earnings'),
-                _buildTransactionList('deductions'),
-                _buildTransactionList('payouts'),
+                _buildTransactionList('all', l10n), // ✅ تمرير l10n
+                _buildTransactionList('earnings', l10n),
+                _buildTransactionList('deductions', l10n),
+                _buildTransactionList('payouts', l10n),
               ],
             ),
           ),
@@ -361,8 +376,7 @@ class _WalletScreenState extends State<WalletScreen>
     );
   }
 
-  Widget _buildTransactionList(String filterType) {
-    // تصفية القائمة
+  Widget _buildTransactionList(String filterType, AppLocalizations l10n) {
     final filteredList =
         _transactions.where((t) {
           if (filterType == 'all') return true;
@@ -380,11 +394,16 @@ class _WalletScreenState extends State<WalletScreen>
           children: [
             Icon(Icons.receipt_long, size: 48, color: Colors.grey.shade300),
             const SizedBox(height: 10),
-            const Text("لا توجد عمليات", style: TextStyle(color: Colors.grey)),
+            Text(
+              l10n.noOperationsMsg,
+              style: const TextStyle(color: Colors.grey),
+            ), // ✅ مترجم
           ],
         ),
       );
     }
+
+    String langCode = Localizations.localeOf(context).languageCode;
 
     return ListView.separated(
       padding: const EdgeInsets.all(16),
@@ -400,7 +419,6 @@ class _WalletScreenState extends State<WalletScreen>
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // الأيقونة
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
@@ -425,13 +443,12 @@ class _WalletScreenState extends State<WalletScreen>
               ),
               const SizedBox(width: 12),
 
-              // التفاصيل
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _translateType(trans.type),
+                      _translateType(trans.type, l10n), // ✅ تمرير l10n
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
@@ -450,6 +467,7 @@ class _WalletScreenState extends State<WalletScreen>
                         Text(
                           DateFormat(
                             'yyyy-MM-dd',
+                            langCode,
                           ).format(DateTime.parse(trans.createdAt)),
                           style: TextStyle(
                             color: Colors.grey.shade400,
@@ -482,12 +500,11 @@ class _WalletScreenState extends State<WalletScreen>
                 ),
               ),
 
-              // المبلغ والحالة
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    "${isPositive ? '+' : ''}${trans.amount} ر.س",
+                    "${isPositive ? '+' : ''}${trans.amount} ${l10n.currencySAR}", // ✅ عملة مترجمة
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 15,
@@ -498,7 +515,7 @@ class _WalletScreenState extends State<WalletScreen>
                     ),
                   ),
                   const SizedBox(height: 4),
-                  _buildStatusChip(trans.status),
+                  _buildStatusChip(trans.status, l10n), // ✅ تمرير l10n
                 ],
               ),
             ],
@@ -508,25 +525,25 @@ class _WalletScreenState extends State<WalletScreen>
     );
   }
 
-  Widget _buildStatusChip(String status) {
+  Widget _buildStatusChip(String status, AppLocalizations l10n) {
     Color color;
     String text;
     switch (status) {
       case 'cleared':
         color = Colors.green;
-        text = "مكتمل";
+        text = l10n.completedStatus; // ✅ مترجم
         break;
       case 'pending':
         color = Colors.orange;
-        text = "معلق";
+        text = l10n.pendingStatus; // ✅ مترجم
         break;
       case 'processing':
         color = Colors.blue;
-        text = "قيد المعالجة";
+        text = l10n.processingStatus; // ✅ مترجم
         break;
       case 'cancelled':
         color = Colors.red;
-        text = "ملغي";
+        text = l10n.cancelledStatus; // ✅ مترجم
         break;
       default:
         color = Colors.grey;
@@ -550,8 +567,7 @@ class _WalletScreenState extends State<WalletScreen>
     );
   }
 
-  // --- Bottom Sheet للسحب ---
-  void _showPayoutSheet() {
+  void _showPayoutSheet(AppLocalizations l10n) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -569,13 +585,16 @@ class _WalletScreenState extends State<WalletScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  "طلب سحب أرباح",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                Text(
+                  l10n.payoutRequestTitle, // ✅ مترجم
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  "الرصيد المتاح: ${_displayAvailableBalance} ر.س",
+                  "${l10n.availableBalanceLabel}$_displayAvailableBalance ${l10n.currencySAR}", // ✅ ديناميكي ومترجم
                   style: const TextStyle(color: Colors.grey),
                 ),
                 const SizedBox(height: 20),
@@ -583,17 +602,20 @@ class _WalletScreenState extends State<WalletScreen>
                   controller: _amountController,
                   keyboardType: TextInputType.number,
                   autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: "المبلغ المطلوب",
-                    suffixText: "ر.س",
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: l10n.requestedAmountLabel, // ✅ مترجم
+                    suffixText: l10n.currencySAR, // ✅ مترجم
+                    border: const OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _isSubmitting ? null : _handlePayoutRequest,
+                    onPressed:
+                        _isSubmitting
+                            ? null
+                            : () => _handlePayoutRequest(l10n), // ✅ تمرير l10n
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF9333EA),
                       foregroundColor: Colors.white,
@@ -608,7 +630,7 @@ class _WalletScreenState extends State<WalletScreen>
                                 color: Colors.white,
                               ),
                             )
-                            : const Text("تأكيد السحب"),
+                            : Text(l10n.confirmWithdrawalBtn), // ✅ مترجم
                   ),
                 ),
                 const SizedBox(height: 20),

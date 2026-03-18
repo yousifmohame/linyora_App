@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart'; // تأكد من إضافتها أو استبدلها بأيقونات عادية
 import 'package:url_launcher/url_launcher.dart';
 
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 class AboutLinyoraScreen extends StatelessWidget {
   const AboutLinyoraScreen({Key? key}) : super(key: key);
 
@@ -15,6 +18,9 @@ class AboutLinyoraScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف ملف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: Colors.black, // خلفية داكنة
       extendBodyBehindAppBar: true,
@@ -33,9 +39,7 @@ class AboutLinyoraScreen extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              const Color(
-                0xFFF105C6,
-              ).withOpacity(0.15), // لون البراند في الأعلى
+              const Color(0xFFF105C6).withOpacity(0.15), // لون البراند في الأعلى
               Colors.black,
               Colors.black,
             ],
@@ -54,10 +58,10 @@ class AboutLinyoraScreen extends StatelessWidget {
               const SizedBox(height: 30),
 
               // 2. نبذة عن التطبيق
-              const Text(
-                "Linyora ليس مجرد تطبيق، إنه مجتمع!",
+              Text(
+                l10n.aboutTitle, // ✅ نص مترجم
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Color(0xFFF105C6),
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -65,7 +69,7 @@ class AboutLinyoraScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                "نجمع بين متعة مشاهدة الفيديوهات القصيرة وسهولة التسوق الإلكتروني. اكتشف أحدث الصيحات، تابع مشاهيرك المفضلين، واطلب المنتجات التي تحبها بضغطة زر.",
+                l10n.aboutDescription, // ✅ نص مترجم
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.grey[400],
@@ -79,31 +83,31 @@ class AboutLinyoraScreen extends StatelessWidget {
               // 3. قائمة الروابط والمعلومات
               _buildInfoTile(
                 icon: Icons.language,
-                title: "زيارة موقعنا الإلكتروني",
+                title: l10n.visitWebsite, // ✅ نص مترجم
                 onTap: () => _launchUrl('https://linyora.com'),
               ),
               _buildInfoTile(
                 icon: Icons.privacy_tip_outlined,
-                title: "سياسة الإسترجاع",
+                title: l10n.returnPolicy, // ✅ نص مترجم
                 onTap: () => _launchUrl('https://linyora.com/policy'),
               ),
               _buildInfoTile(
                 icon: Icons.description_outlined,
-                title: "شروط الاستخدام",
+                title: l10n.termsOfUse, // ✅ نص مترجم
                 onTap: () => _launchUrl('https://linyora.com/terms'),
               ),
               _buildInfoTile(
                 icon: Icons.support_agent,
-                title: "مركز المساعدة",
+                title: l10n.helpCenter, // ✅ نص مترجم
                 onTap: () => _launchUrl('https://linyora.com/help'),
               ),
 
               const SizedBox(height: 40),
 
               // 4. التواصل الاجتماعي
-              const Text(
-                "تابعنا على",
-                style: TextStyle(
+              Text(
+                l10n.followUs, // ✅ نص مترجم
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                 ),
@@ -138,12 +142,12 @@ class AboutLinyoraScreen extends StatelessWidget {
 
               // 5. الحقوق والإصدار
               Text(
-                "Version 1.0.0",
+                "${l10n.version} 1.0.0", // ✅ استخدام متغير Version الموجود مسبقاً
                 style: TextStyle(color: Colors.grey[600], fontSize: 12),
               ),
               const SizedBox(height: 8),
               Text(
-                "© 2024 Linyora Inc. All rights reserved.",
+                l10n.copyright, // ✅ نص مترجم
                 style: TextStyle(color: Colors.grey[600], fontSize: 12),
               ),
             ],
@@ -175,7 +179,6 @@ class AboutLinyoraScreen extends StatelessWidget {
             backgroundColor: Colors.white,
             // ضع مسار اللوجو الخاص بك هنا
             backgroundImage: AssetImage('assets/images/logo.png'),
-            // child: Icon(Icons.shopping_bag, size: 50, color: Colors.black), // مؤقت
           ),
         ),
         const SizedBox(height: 16),

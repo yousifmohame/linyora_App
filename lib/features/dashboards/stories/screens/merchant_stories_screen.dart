@@ -2,11 +2,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../models/merchant_story_model.dart';
 import '../services/merchant_stories_service.dart';
-import 'create_story_modal.dart'; // تأكد من وجود هذا الملف
+import 'create_story_modal.dart';
 
-// الألوان المتاحة للخلفية
 const List<Map<String, dynamic>> kStoryColors = [
   {'value': '#000000', 'color': Colors.black, 'label': 'أسود'},
   {'value': '#3B82F6', 'color': Color(0xFF3B82F6), 'label': 'أزرق'},
@@ -58,8 +61,8 @@ class _MerchantStoriesScreenState extends State<MerchantStoriesScreen> {
     });
   }
 
-  // ✅ دالة الحذف مع نافذة تأكيد
-  Future<void> _confirmDelete(int id) async {
+  // ✅ تمرير l10n
+  Future<void> _confirmDelete(int id, AppLocalizations l10n) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder:
@@ -67,27 +70,27 @@ class _MerchantStoriesScreenState extends State<MerchantStoriesScreen> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            title: const Row(
+            title: Row(
               children: [
-                Icon(Icons.warning_amber_rounded, color: Colors.red),
-                SizedBox(width: 8),
+                const Icon(Icons.warning_amber_rounded, color: Colors.red),
+                const SizedBox(width: 8),
                 Text(
-                  'حذف القصة',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  l10n.deleteStoryTitle, // ✅ مترجم (سابقاً)
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ],
             ),
-            content: const Text(
-              'هل أنت متأكد من حذف هذه القصة؟\nسيتم إزالتها نهائياً ولن يتمكن العملاء من رؤيتها.',
-              style: TextStyle(fontSize: 13, height: 1.5),
+            content: Text(
+              l10n.deleteStoryConfirmDesc, // ✅ مترجم
+              style: const TextStyle(fontSize: 13, height: 1.5),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text(
-                  'إلغاء',
-                  style: TextStyle(color: Colors.grey),
-                ),
+                child: Text(
+                  l10n.cancelBtn,
+                  style: const TextStyle(color: Colors.grey),
+                ), // ✅ مترجم
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(ctx, true),
@@ -98,7 +101,7 @@ class _MerchantStoriesScreenState extends State<MerchantStoriesScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                child: const Text('حذف'),
+                child: Text(l10n.delete), // ✅ مترجم
               ),
             ],
           ),
@@ -106,7 +109,6 @@ class _MerchantStoriesScreenState extends State<MerchantStoriesScreen> {
 
     if (confirm != true) return;
 
-    // الحذف الفعلي (Optimistic UI Update)
     final previousStories = List<MerchantStory>.from(_stories);
     setState(() {
       _stories.removeWhere((s) => s.id == id);
@@ -116,19 +118,18 @@ class _MerchantStoriesScreenState extends State<MerchantStoriesScreen> {
       await _service.deleteStory(id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم حذف القصة'),
+          SnackBar(
+            content: Text(l10n.storyDeletedSuccessfullyMsg), // ✅ مترجم
             backgroundColor: Colors.grey,
           ),
         );
       }
     } catch (e) {
-      // التراجع في حال الفشل
       setState(() => _stories = previousStories);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('فشل حذف القصة'),
+          SnackBar(
+            content: Text(l10n.failedToDeleteStoryMsg), // ✅ مترجم
             backgroundColor: Colors.red,
           ),
         );
@@ -138,12 +139,15 @@ class _MerchantStoriesScreenState extends State<MerchantStoriesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text(
-          'قصص المتجر',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        title: Text(
+          l10n.storeStories, // ✅ مترجم (سابقاً)
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
         centerTitle: true,
         backgroundColor: Colors.white,
@@ -153,7 +157,7 @@ class _MerchantStoriesScreenState extends State<MerchantStoriesScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _fetchStories,
-            tooltip: 'تحديث',
+            tooltip: l10n.refreshTooltip, // ✅ مترجم
           ),
         ],
       ),
@@ -161,29 +165,31 @@ class _MerchantStoriesScreenState extends State<MerchantStoriesScreen> {
           _isLoading
               ? _buildShimmerGrid()
               : _stories.isEmpty
-              ? _buildEmptyState()
+              ? _buildEmptyState(l10n) // ✅ تمرير l10n
               : Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: GridView.builder(
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3, // 3 أعمدة
-                    childAspectRatio: 0.6, // نسبة الطول للعرض (شكل ستوري)
+                    crossAxisCount: 3,
+                    childAspectRatio: 0.6,
                     crossAxisSpacing: 10,
                     mainAxisSpacing: 10,
                   ),
-                  // +1 من أجل زر الإضافة
                   itemCount: _stories.length + 1,
                   itemBuilder: (context, index) {
-                    if (index == 0) return _buildAddButton();
-                    return _buildStoryCard(_stories[index - 1]);
+                    if (index == 0)
+                      return _buildAddButton(l10n); // ✅ تمرير l10n
+                    return _buildStoryCard(
+                      _stories[index - 1],
+                      l10n,
+                    ); // ✅ تمرير l10n
                   },
                 ),
               ),
     );
   }
 
-  // ✅ زر الإضافة بتصميم أنيق
-  Widget _buildAddButton() {
+  Widget _buildAddButton(AppLocalizations l10n) {
     return GestureDetector(
       onTap: _showCreateStoryModal,
       child: Container(
@@ -225,9 +231,9 @@ class _MerchantStoriesScreenState extends State<MerchantStoriesScreen> {
               child: const Icon(Icons.add, color: Colors.white, size: 28),
             ),
             const SizedBox(height: 12),
-            const Text(
-              'قصة جديدة',
-              style: TextStyle(
+            Text(
+              l10n.newStoryBtn, // ✅ مترجم
+              style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 12,
                 color: Color(0xFF1E293B),
@@ -239,11 +245,9 @@ class _MerchantStoriesScreenState extends State<MerchantStoriesScreen> {
     );
   }
 
-  // ✅ بطاقة القصة (الاحترافية)
-  Widget _buildStoryCard(MerchantStory story) {
+  Widget _buildStoryCard(MerchantStory story, AppLocalizations l10n) {
     return Stack(
       children: [
-        // 1. الخلفية (صورة أو لون)
         Positioned.fill(
           child: Container(
             decoration: BoxDecoration(
@@ -264,7 +268,6 @@ class _MerchantStoriesScreenState extends State<MerchantStoriesScreen> {
           ),
         ),
 
-        // 2. تدرج لوني في الأسفل للنص
         Positioned(
           bottom: 0,
           left: 0,
@@ -284,7 +287,6 @@ class _MerchantStoriesScreenState extends State<MerchantStoriesScreen> {
           ),
         ),
 
-        // 3. عداد المشاهدات (أسفل اليسار)
         Positioned(
           bottom: 8,
           left: 8,
@@ -304,7 +306,6 @@ class _MerchantStoriesScreenState extends State<MerchantStoriesScreen> {
           ),
         ),
 
-        // 4. أيقونة نوع الوسائط (أسفل اليمين)
         if (story.mediaType != 'text')
           Positioned(
             bottom: 8,
@@ -316,12 +317,11 @@ class _MerchantStoriesScreenState extends State<MerchantStoriesScreen> {
             ),
           ),
 
-        // 5. زر الحذف (أعلى اليسار) - ✅ هذا هو الزر المطلوب
         Positioned(
           top: 6,
           left: 6,
           child: GestureDetector(
-            onTap: () => _confirmDelete(story.id),
+            onTap: () => _confirmDelete(story.id, l10n), // ✅ تمرير l10n
             child: Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
@@ -341,7 +341,6 @@ class _MerchantStoriesScreenState extends State<MerchantStoriesScreen> {
     );
   }
 
-  // محتوى القصة الداخلي
   Widget _buildStoryContent(MerchantStory story) {
     if (story.mediaType == 'text') {
       Color bgColor =
@@ -367,7 +366,6 @@ class _MerchantStoriesScreenState extends State<MerchantStoriesScreen> {
         ),
       );
     } else {
-      // صورة أو فيديو (صورة مصغرة)
       return CachedNetworkImage(
         imageUrl: story.mediaUrl ?? '',
         fit: BoxFit.cover,
@@ -379,7 +377,6 @@ class _MerchantStoriesScreenState extends State<MerchantStoriesScreen> {
     }
   }
 
-  // حالة التحميل
   Widget _buildShimmerGrid() {
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -407,19 +404,17 @@ class _MerchantStoriesScreenState extends State<MerchantStoriesScreen> {
     );
   }
 
-  // حالة الفراغ (لا توجد قصص)
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(AppLocalizations l10n) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // زر الإضافة الكبير
-          _buildAddButton(),
+          _buildAddButton(l10n), // ✅ تمرير l10n
           const SizedBox(height: 24),
           Icon(Icons.auto_stories, size: 60, color: Colors.grey[300]),
           const SizedBox(height: 16),
           Text(
-            'لا توجد قصص نشطة',
+            l10n.noActiveStoriesMsg, // ✅ مترجم (سابقاً)
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -428,7 +423,7 @@ class _MerchantStoriesScreenState extends State<MerchantStoriesScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'شارك منتجاتك ولحظاتك مع عملائك الآن',
+            l10n.shareMomentsWithClientsMsg, // ✅ مترجم
             style: TextStyle(fontSize: 12, color: Colors.grey[500]),
           ),
         ],

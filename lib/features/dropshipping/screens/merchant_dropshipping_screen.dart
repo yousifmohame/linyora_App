@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import 'package:linyora_project/features/auth/providers/auth_provider.dart';
 import 'package:linyora_project/features/subscriptions/screens/subscription_plans_screen.dart';
 import '../models/supplier_product_model.dart';
@@ -18,14 +22,12 @@ class _MerchantDropshippingScreenState
     extends State<MerchantDropshippingScreen> {
   final DropshippingService _service = DropshippingService();
 
-  // State
   List<SupplierProduct> _allProducts = [];
   List<SupplierProduct> _filteredProducts = [];
   bool _isLoading = true;
   bool _isRefreshing = false;
-  final Set<int> _importingIds = {}; // لتتبع المنتجات التي يتم استيرادها حالياً
+  final Set<int> _importingIds = {};
 
-  // Filters
   String _searchTerm = '';
   String _selectedCategory = 'all';
   List<String> _categories = ['all'];
@@ -40,17 +42,16 @@ class _MerchantDropshippingScreenState
 
   void _checkAccessAndFetch() {
     final user = Provider.of<AuthProvider>(context, listen: false).user;
-
-    // التحقق من الصلاحية (نفس منطق Gate)
     bool hasAccess = user?.subscription?.hasDropshippingAccess ?? false;
 
     if (hasAccess) {
       _fetchProducts();
     } else {
-      setState(() => _isLoading = false); // إيقاف التحميل لعرض البوابة
+      setState(() => _isLoading = false);
     }
   }
 
+  // ✅ تم تمرير l10n لمعالجة رسالة الفشل
   Future<void> _fetchProducts() async {
     setState(() {
       if (_allProducts.isEmpty) _isLoading = true;
@@ -60,7 +61,6 @@ class _MerchantDropshippingScreenState
     try {
       final products = await _service.getSupplierProducts();
 
-      // استخراج التصنيفات الفريدة
       final categorySet = <String>{'all'};
       for (var p in products) {
         if (p.categories.isNotEmpty) {
@@ -72,20 +72,22 @@ class _MerchantDropshippingScreenState
         setState(() {
           _allProducts = products;
           _categories = categorySet.toList();
-          _applyFilters(); // تطبيق الفلتر المبدئي
+          _applyFilters();
           _isLoading = false;
           _isRefreshing = false;
         });
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _isLoading = false;
           _isRefreshing = false;
         });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('فشل تحميل المنتجات')));
+        final l10n = AppLocalizations.of(context)!;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.failedToLoadProductsMsg)),
+        ); // ✅ مترجم
+      }
     }
   }
 
@@ -104,39 +106,37 @@ class _MerchantDropshippingScreenState
     });
   }
 
-  Future<void> _handleImport(int id, double price) async {
+  // ✅ تمرير l10n لترجمة رسائل الاستيراد
+  Future<void> _handleImport(
+    int id,
+    double price,
+    AppLocalizations l10n,
+  ) async {
     setState(() => _importingIds.add(id));
     try {
       await _service.importProduct(id, price);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ تم إضافة المنتج لمتجرك بنجاح!'),
+          SnackBar(
+            content: Text(l10n.productAddedSuccessfullyMsg), // ✅ مترجم
             backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating, // تحسين مظهر التنبيه
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        String errorMessage = '❌ فشل الاستيراد';
+        String errorMessage = l10n.importFailedMsg; // ✅ مترجم
         Color snackBarColor = Colors.red;
 
-        // تحويل الخطأ لنص للتحقق من محتواه
         final errorString = e.toString().toLowerCase();
 
-        // 1. التحقق مما إذا كان الخطأ بسبب التكرار
-        // (قم بتعديل الكلمات المفتاحية هنا بناءً على ما يرسله الباك إند لديك)
         if (errorString.contains('exist') ||
             errorString.contains('duplicate') ||
-            errorString.contains('already')) {
-          errorMessage = '⚠️ هذا المنتج موجود بالفعل في متجرك!';
-          snackBarColor = Colors.orange; // لون تحذيري بدلاً من الأحمر
-        }
-        // تحقق إضافي إذا كانت الرسالة تأتي مباشرة بالعربية
-        else if (errorString.contains('موجود مسبقا')) {
-          errorMessage = '⚠️ هذا المنتج موجود بالفعل في متجرك!';
+            errorString.contains('already') ||
+            errorString.contains('موجود مسبقا')) {
+          errorMessage = l10n.productAlreadyExistsMsg; // ✅ مترجم
           snackBarColor = Colors.orange;
         }
 
@@ -144,7 +144,6 @@ class _MerchantDropshippingScreenState
           SnackBar(
             content: Row(
               children: [
-                // تغيير الأيقونة حسب نوع الخطأ
                 Icon(
                   snackBarColor == Colors.orange
                       ? Icons.warning_amber
@@ -170,23 +169,21 @@ class _MerchantDropshippingScreenState
     final user = Provider.of<AuthProvider>(context).user;
     final bool hasAccess = user?.subscription?.hasDropshippingAccess ?? false;
 
-    // 1. عرض البوابة (Gate) إذا لم يكن لديه صلاحية
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     if (!hasAccess && !_isLoading) {
-      return _buildSubscriptionGate();
+      return _buildSubscriptionGate(l10n); // ✅ تمرير l10n
     }
 
-    // 2. المحتوى الرئيسي
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB), // خلفية فاتحة جداً
+      backgroundColor: const Color(0xFFF9FAFB),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFFFFF1F2),
-              Color(0xFFF3E8FF),
-            ], // Rose-50 to Purple-50
+            colors: [Color(0xFFFFF1F2), Color(0xFFF3E8FF)],
           ),
         ),
         child: SafeArea(
@@ -197,25 +194,25 @@ class _MerchantDropshippingScreenState
                   )
                   : CustomScrollView(
                     slivers: [
-                      // Header & Stats & Filters
                       SliverToBoxAdapter(
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
                           child: Column(
                             children: [
-                              _buildHeader(),
+                              _buildHeader(l10n), // ✅ تمرير l10n
                               const SizedBox(height: 20),
-                              _buildStatsCards(),
+                              _buildStatsCards(l10n), // ✅ تمرير l10n
                               const SizedBox(height: 20),
-                              _buildFilters(),
+                              _buildFilters(l10n), // ✅ تمرير l10n
                             ],
                           ),
                         ),
                       ),
 
-                      // Products Grid
                       _filteredProducts.isEmpty
-                          ? SliverToBoxAdapter(child: _buildEmptyState())
+                          ? SliverToBoxAdapter(
+                            child: _buildEmptyState(l10n),
+                          ) // ✅ تمرير l10n
                           : SliverPadding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 16,
@@ -224,21 +221,21 @@ class _MerchantDropshippingScreenState
                             sliver: SliverGrid(
                               gridDelegate:
                                   const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 2, // عمودين
-                                    childAspectRatio:
-                                        0.65, // نسبة الطول للعرض (لجعل الكارت طويلاً)
+                                    crossAxisCount: 2,
+                                    childAspectRatio: 0.65,
                                     crossAxisSpacing: 10,
                                     mainAxisSpacing: 10,
                                   ),
                               delegate: SliverChildBuilderDelegate(
-                                (context, index) =>
-                                    _buildProductCard(_filteredProducts[index]),
+                                (context, index) => _buildProductCard(
+                                  _filteredProducts[index],
+                                  l10n,
+                                ), // ✅ تمرير l10n
                                 childCount: _filteredProducts.length,
                               ),
                             ),
                           ),
 
-                      // Bottom Padding
                       const SliverToBoxAdapter(child: SizedBox(height: 30)),
                     ],
                   ),
@@ -247,9 +244,7 @@ class _MerchantDropshippingScreenState
     );
   }
 
-  // --- Components ---
-
-  Widget _buildSubscriptionGate() {
+  Widget _buildSubscriptionGate(AppLocalizations l10n) {
     return Scaffold(
       body: Container(
         padding: const EdgeInsets.all(24),
@@ -284,15 +279,18 @@ class _MerchantDropshippingScreenState
                     ),
                   ),
                   const SizedBox(height: 20),
-                  const Text(
-                    "محتوى حصري",
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  Text(
+                    l10n.exclusiveContentTitle, // ✅ مترجم
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 10),
-                  const Text(
-                    "هذه الميزة متاحة فقط للمشتركين في باقة الدروب شيبينج. قم بالترقية للوصول إلى آلاف المنتجات الجاهزة للبيع.",
+                  Text(
+                    l10n.exclusiveDropshippingDesc, // ✅ مترجم
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey),
+                    style: const TextStyle(color: Colors.grey),
                   ),
                   const SizedBox(height: 24),
                   SizedBox(
@@ -308,7 +306,7 @@ class _MerchantDropshippingScreenState
                         );
                       },
                       icon: const Icon(Icons.auto_awesome),
-                      label: const Text("ترقية الباقة الآن"),
+                      label: Text(l10n.upgradePackageBtn), // ✅ مترجم
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFF43F5E),
                         foregroundColor: Colors.white,
@@ -327,15 +325,15 @@ class _MerchantDropshippingScreenState
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(AppLocalizations l10n) {
     return Column(
       children: [
-        const Text(
-          "سوق الدروب شيبينج",
-          style: TextStyle(
+        Text(
+          l10n.dropshippingMarketTitle, // ✅ مترجم
+          style: const TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.bold,
-            color: Colors.transparent, // Gradient Text Trick
+            color: Colors.transparent,
             shadows: [Shadow(offset: Offset(0, -5), color: Colors.black)],
             decoration: TextDecoration.underline,
             decorationColor: Color(0xFFF43F5E),
@@ -343,7 +341,7 @@ class _MerchantDropshippingScreenState
         ),
         const SizedBox(height: 8),
         Text(
-          "استكشف آلاف المنتجات وأضفها لمتجرك بنقرة زر واحدة",
+          l10n.exploreThousandsProductsDesc, // ✅ مترجم
           style: TextStyle(color: Colors.grey[600], fontSize: 14),
           textAlign: TextAlign.center,
         ),
@@ -351,19 +349,22 @@ class _MerchantDropshippingScreenState
     );
   }
 
-  Widget _buildStatsCards() {
-    // حساب الإحصائيات
+  Widget _buildStatsCards(AppLocalizations l10n) {
     int total = _allProducts.length;
     int featured = _allProducts.where((p) => p.isFeatured).length;
     int suppliers = _allProducts.map((p) => p.supplierName).toSet().length;
 
     return Row(
       children: [
-        _buildStatItem(total, "إجمالي المنتجات", Colors.pink),
+        _buildStatItem(total, l10n.totalProducts, Colors.pink), // ✅ مترجم
         const SizedBox(width: 8),
-        _buildStatItem(featured, "منتجات مميزة", Colors.purple),
+        _buildStatItem(
+          featured,
+          l10n.featuredProducts,
+          Colors.purple,
+        ), // ✅ مترجم
         const SizedBox(width: 8),
-        _buildStatItem(suppliers, "الموردين", Colors.blue),
+        _buildStatItem(suppliers, l10n.suppliers, Colors.blue), // ✅ مترجم
       ],
     );
   }
@@ -392,6 +393,7 @@ class _MerchantDropshippingScreenState
             Text(
               label,
               style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -399,7 +401,7 @@ class _MerchantDropshippingScreenState
     );
   }
 
-  Widget _buildFilters() {
+  Widget _buildFilters(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -409,14 +411,13 @@ class _MerchantDropshippingScreenState
       ),
       child: Column(
         children: [
-          // Search
           TextField(
             onChanged: (val) {
               _searchTerm = val;
               _applyFilters();
             },
             decoration: InputDecoration(
-              hintText: "بحث عن منتج...",
+              hintText: l10n.searchProductHint, // ✅ مترجم
               prefixIcon: const Icon(Icons.search, color: Colors.grey),
               filled: true,
               fillColor: Colors.grey.shade50,
@@ -427,8 +428,6 @@ class _MerchantDropshippingScreenState
               ),
             ),
           ),
-
-          // Row: Category & Refresh
           Row(
             children: [
               Expanded(
@@ -448,9 +447,9 @@ class _MerchantDropshippingScreenState
                                 (c) => DropdownMenuItem(
                                   value: c,
                                   child: Text(
-                                    c == 'all' ? 'جميع التصنيفات' : c,
+                                    c == 'all' ? l10n.allCategories : c,
                                     style: const TextStyle(fontSize: 13),
-                                  ),
+                                  ), // ✅ مترجم
                                 ),
                               )
                               .toList(),
@@ -489,13 +488,13 @@ class _MerchantDropshippingScreenState
     );
   }
 
-  Widget _buildProductCard(SupplierProduct product) {
+  Widget _buildProductCard(SupplierProduct product, AppLocalizations l10n) {
     final firstVariant =
         product.variants.isNotEmpty ? product.variants.first : null;
     final String imageUrl =
         (firstVariant != null && firstVariant.images.isNotEmpty)
             ? firstVariant.images.first
-            : ''; // Placeholder logic handle later
+            : '';
     final double price = firstVariant?.costPrice ?? 0.0;
     final bool isImporting = _importingIds.contains(product.id);
 
@@ -515,7 +514,6 @@ class _MerchantDropshippingScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image Area
           Expanded(
             flex: 5,
             child: Stack(
@@ -542,7 +540,6 @@ class _MerchantDropshippingScreenState
                     ),
                   ),
 
-                // Featured Badge
                 if (product.isFeatured)
                   Positioned(
                     top: 8,
@@ -556,24 +553,23 @@ class _MerchantDropshippingScreenState
                         color: Colors.white.withOpacity(0.9),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
-                          Icon(Icons.star, size: 10, color: Colors.amber),
-                          SizedBox(width: 2),
+                          const Icon(Icons.star, size: 10, color: Colors.amber),
+                          const SizedBox(width: 2),
                           Text(
-                            "مميز",
-                            style: TextStyle(
+                            l10n.featuredBadgeText,
+                            style: const TextStyle(
                               fontSize: 9,
                               color: Color(0xFFE11D48),
                               fontWeight: FontWeight.bold,
                             ),
-                          ),
+                          ), // ✅ مترجم
                         ],
                       ),
                     ),
                   ),
 
-                // Brand Badge
                 if (product.brand.isNotEmpty)
                   Positioned(
                     bottom: 8,
@@ -600,8 +596,6 @@ class _MerchantDropshippingScreenState
               ],
             ),
           ),
-
-          // Details Area
           Expanded(
             flex: 4,
             child: Padding(
@@ -625,7 +619,7 @@ class _MerchantDropshippingScreenState
                       ),
                       if (product.supplierName != null)
                         Text(
-                          "المورد: ${product.supplierName}",
+                          "${l10n.supplierPrefix}${product.supplierName}", // ✅ مترجم ومدمج
                           style: const TextStyle(
                             fontSize: 9,
                             color: Colors.grey,
@@ -633,12 +627,11 @@ class _MerchantDropshippingScreenState
                         ),
                     ],
                   ),
-
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "${price.toStringAsFixed(2)} ر.س",
+                        "${price.toStringAsFixed(2)} ${l10n.currencySAR}", // ✅ عملة مترجمة
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
@@ -653,7 +646,11 @@ class _MerchantDropshippingScreenState
                           onPressed:
                               isImporting
                                   ? null
-                                  : () => _handleImport(product.id, price),
+                                  : () => _handleImport(
+                                    product.id,
+                                    price,
+                                    l10n,
+                                  ), // ✅ تمرير l10n
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.transparent,
                             padding: EdgeInsets.zero,
@@ -667,7 +664,7 @@ class _MerchantDropshippingScreenState
                             ) {
                               if (states.contains(MaterialState.disabled))
                                 return Colors.grey.shade300;
-                              return null; // Use gradient logic via Container if needed, or simple color
+                              return null;
                             }),
                           ),
                           child: Ink(
@@ -689,24 +686,24 @@ class _MerchantDropshippingScreenState
                                           strokeWidth: 2,
                                         ),
                                       )
-                                      : const Row(
+                                      : Row(
                                         mainAxisAlignment:
                                             MainAxisAlignment.center,
                                         children: [
-                                          Icon(
+                                          const Icon(
                                             Icons.rocket_launch,
                                             size: 12,
                                             color: Colors.white,
                                           ),
-                                          SizedBox(width: 4),
+                                          const SizedBox(width: 4),
                                           Text(
-                                            "إضافة للمتجر",
-                                            style: TextStyle(
+                                            l10n.addToStoreBtn,
+                                            style: const TextStyle(
                                               color: Colors.white,
                                               fontSize: 10,
                                               fontWeight: FontWeight.bold,
                                             ),
-                                          ),
+                                          ), // ✅ مترجم
                                         ],
                                       ),
                             ),
@@ -724,7 +721,7 @@ class _MerchantDropshippingScreenState
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(40),
       alignment: Alignment.center,
@@ -732,9 +729,9 @@ class _MerchantDropshippingScreenState
         children: [
           Icon(Icons.search_off, size: 60, color: Colors.grey.shade300),
           const SizedBox(height: 10),
-          const Text(
-            "لا توجد منتجات مطابقة",
-            style: TextStyle(
+          Text(
+            l10n.noResultsFoundMsg, // ✅ مترجم (مستخدم سابقاً)
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
               color: Colors.grey,
@@ -746,7 +743,6 @@ class _MerchantDropshippingScreenState
   }
 }
 
-// Extension Helper for Filter
 extension IterableModifier<E> on Iterable<E> {
   Iterable<E> filter(bool Function(E) test) => where(test);
 }

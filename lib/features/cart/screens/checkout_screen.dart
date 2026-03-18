@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 // Services & Screens
 import 'package:linyora_project/features/auth/services/auth_service.dart';
 import 'package:linyora_project/features/auth/screens/login_screen.dart';
@@ -76,14 +79,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
 
     try {
-      // Fetch addresses, cards, and payment settings in parallel
       final results = await Future.wait([
         _checkoutService.getAddresses(),
         paymentProvider.fetchCards(),
-        _checkoutService.getPaymentSettings(), // Fetch settings from backend
+        _checkoutService.getPaymentSettings(),
       ]);
 
-      // Handle Addresses
       final addresses = results[0] as List<AddressModel>;
       if (mounted) {
         setState(() {
@@ -98,19 +99,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         });
       }
 
-      // Handle Payment Settings (COD Fee)
       final settings = results[2] as Map<String, dynamic>;
       if (mounted) {
         setState(() {
-          // Adjust key based on your backend response (e.g., 'cod_fee', 'codFee')
           _codFee = double.tryParse(settings['cod_fee'].toString()) ?? 0.0;
         });
       }
 
-      // Group Cart Items & Fetch Shipping Options
       await _prepareMerchantGroups(cart);
 
-      // Set Default Card
       if (paymentProvider.cards.isNotEmpty) {
         final defaultCard = paymentProvider.cards.firstWhere(
           (c) => c.isDefault,
@@ -121,9 +118,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     } catch (e) {
       print("Checkout Init Error: $e");
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("حدث خطأ أثناء تحميل البيانات")),
-        );
+        final l10n =
+            AppLocalizations.of(context)!; // ✅ الحصول على الترجمة للخطأ
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.dataLoadError)));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -134,9 +133,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _prepareMerchantGroups(CartProvider cart) async {
     final Map<String, MerchantGroup> groupsMap = {};
 
-    // A. Local Grouping
     for (var item in cart.items) {
-      // Identify Owner (Merchant or Supplier)
       final bool isDropshipping = item.product.isDropshipping ?? false;
       final String ownerId =
           isDropshipping
@@ -145,9 +142,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       final String prefix = isDropshipping ? 'sup-' : 'mer-';
       final String groupId = "$prefix$ownerId";
+
+      // ✅ نترجم كلمة مورد في حالة لم يكن هناك اسم
+      final l10n = mounted ? AppLocalizations.of(context)! : null;
+      final String fallbackName = l10n?.supplierLabel ?? "مورد";
+
       final String ownerName =
           isDropshipping
-              ? (item.product.merchantName ?? "مورد")
+              ? (item.product.merchantName ?? fallbackName)
               : item.product.merchantName;
 
       if (!groupsMap.containsKey(groupId)) {
@@ -162,16 +164,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     final List<MerchantGroup> tempGroups = groupsMap.values.toList();
 
-    // B. Fetch Shipping Options for each group from Server
     await Future.wait(
       tempGroups.map((group) async {
         try {
           final productIds = group.items.map((e) => e.product.id).toList();
           final options = await _checkoutService.getShippingOptions(productIds);
-
           group.shippingOptions = options;
-
-          // Select first option by default
           if (options.isNotEmpty) {
             group.selectedShipping = options.first;
           }
@@ -193,7 +191,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (mounted) {
       setState(() {
         _addresses = addresses;
-        // Logic to re-select address if current selection is invalid or null
         if (_selectedAddressId == null && addresses.isNotEmpty) {
           final defaultAddr = addresses.firstWhere(
             (a) => a.isDefault,
@@ -238,10 +235,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   // 4️⃣ Execute Payment
-  Future<void> _handlePayment() async {
-    // Validations
+  Future<void> _handlePayment(AppLocalizations l10n) async {
     if (_selectedAddressId == null) {
-      _showError('الرجاء اختيار عنوان شحن');
+      _showError(l10n.selectShippingAddressMsg); // ✅ مترجم
       return;
     }
 
@@ -249,12 +245,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       (g) => g.shippingOptions.isNotEmpty && g.selectedShipping == null,
     );
     if (missingShipping) {
-      _showError('الرجاء اختيار طريقة شحن لكل تاجر');
+      _showError(l10n.selectShippingMethodMsg); // ✅ مترجم
       return;
     }
 
     if (_paymentMethodType == 'card' && _selectedCardId == null) {
-      _showError('الرجاء اختيار بطاقة للدفع');
+      _showError(l10n.selectPaymentCardMsg); // ✅ مترجم
       return;
     }
 
@@ -262,11 +258,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     try {
       final cart = Provider.of<CartProvider>(context, listen: false);
-      // Calculate Total Amount (Backend usually recalculates for security, but good for UI/Preliminary check)
       final currentCodFee = _paymentMethodType == 'cod' ? _codFee : 0.0;
       final totalAmount = cart.totalAmount + _totalShippingCost + currentCodFee;
 
-      // Prepare Shipping Selections
       final shippingSelections =
           _merchantGroups.map((g) {
             return {
@@ -281,8 +275,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           addressId: _selectedAddressId!,
           shippingSelections: shippingSelections,
           shippingCost: _totalShippingCost,
-
-          codFee: _codFee, // 🔥 Sending COD Fee to backend
+          codFee: _codFee,
         );
       } else {
         await _checkoutService.placeCardOrder(
@@ -290,25 +283,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           addressId: _selectedAddressId!,
           shippingSelections: shippingSelections,
           shippingCost: _totalShippingCost,
-          // totalAmount is often calculated on backend for card payments to ensure integrity
           paymentMethodId: _selectedCardId!,
           totalAmount: totalAmount,
         );
       }
 
-      // Success
       cart.clearCart();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم الطلب بنجاح!'),
+          SnackBar(
+            content: Text(l10n.orderSuccessMsg), // ✅ مترجم
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context); // Navigate to Success Screen or Home
+        Navigator.pop(context);
       }
     } catch (e) {
-      _showError('حدث خطأ: ${e.toString().replaceAll('Exception:', '')}');
+      _showError(
+        '${l10n.errorOccurredMsg}${e.toString().replaceAll('Exception:', '')}',
+      ); // ✅ مترجم
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
@@ -324,42 +317,46 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // State 1: Not Logged In (Soft Auth Wall)
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     if (!_isLoggedIn) {
       return Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
-          title: const Text(
-            "إتمام الطلب",
-            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          title: Text(
+            l10n.checkoutTitle, // ✅ مترجم
+            style: const TextStyle(
+              color: Colors.black,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           backgroundColor: Colors.white,
           elevation: 0,
           leading: const BackButton(color: Colors.black),
         ),
-        body: _buildAuthRequiredView(),
+        body: _buildAuthRequiredView(l10n), // ✅ تمرير l10n
       );
     }
 
-    // State 2: Loading
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    // State 3: Checkout Form
     final cart = Provider.of<CartProvider>(context);
     final subTotal = cart.totalAmount;
-
-    // 🔥 Calculate Total Including COD Fee if selected
     final currentCodFee = _paymentMethodType == 'cod' ? _codFee : 0.0;
     final total = subTotal + _totalShippingCost + currentCodFee;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
-        title: const Text(
-          "إتمام الطلب",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        title: Text(
+          l10n.checkoutTitle, // ✅ مترجم
+          style: const TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
@@ -369,29 +366,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _buildAddressSection(),
+            _buildAddressSection(l10n), // ✅ تمرير l10n
             const SizedBox(height: 20),
 
             if (_merchantGroups.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(20),
-                child: Text("جاري معالجة المنتجات..."),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text(l10n.processingProducts), // ✅ مترجم
               )
             else
               ..._merchantGroups
-                  .map((group) => _buildMerchantGroupCard(group))
+                  .map(
+                    (group) => _buildMerchantGroupCard(group, l10n),
+                  ) // ✅ تمرير l10n
                   .toList(),
 
             const SizedBox(height: 20),
-            _buildPaymentMethodSection(),
+            _buildPaymentMethodSection(l10n), // ✅ تمرير l10n
             const SizedBox(height: 20),
-            _buildSummarySection(subTotal, total),
+            _buildSummarySection(subTotal, total, l10n), // ✅ تمرير l10n
             const SizedBox(height: 30),
 
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _isProcessing ? null : _handlePayment,
+                onPressed:
+                    _isProcessing
+                        ? null
+                        : () => _handlePayment(l10n), // ✅ تمرير l10n
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _primaryColor,
                   foregroundColor: Colors.white,
@@ -412,7 +414,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           ),
                         )
                         : Text(
-                          "ادفع ${total.toStringAsFixed(2)} ر.س",
+                          "${l10n.payBtn} ${total.toStringAsFixed(2)} ${l10n.currencySAR}", // ✅ ديناميكي ومترجم
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -429,7 +431,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   // --- Widgets ---
 
-  Widget _buildAuthRequiredView() {
+  Widget _buildAuthRequiredView(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.all(24.0),
       child: Column(
@@ -448,14 +450,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
           ),
           const SizedBox(height: 32),
-          const Text(
-            "تسجيل الدخول لإكمال الطلب",
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+          Text(
+            l10n.loginToCompleteOrder, // ✅ مترجم
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
           Text(
-            "لإتمام عملية الشراء وحفظ عنوانك وتتبع طلبك، يرجى تسجيل الدخول إلى حسابك.",
+            l10n.loginToCompleteOrderDesc, // ✅ مترجم
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey[600],
@@ -464,11 +466,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 32),
-          _buildFeatureRow(Icons.check_circle, "حفظ عناوين الشحن لتسريع الطلب"),
+          _buildFeatureRow(
+            Icons.check_circle,
+            l10n.saveAddressesFeature,
+          ), // ✅ مترجم
           const SizedBox(height: 12),
-          _buildFeatureRow(Icons.check_circle, "تتبع حالة الطلب خطوة بخطوة"),
+          _buildFeatureRow(
+            Icons.check_circle,
+            l10n.trackOrderFeature,
+          ), // ✅ مترجم
           const SizedBox(height: 12),
-          _buildFeatureRow(Icons.check_circle, "إدارة المرتجعات بسهولة"),
+          _buildFeatureRow(
+            Icons.check_circle,
+            l10n.easyReturnsFeature,
+          ), // ✅ مترجم
           const SizedBox(height: 40),
           SizedBox(
             width: double.infinity,
@@ -481,9 +492,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Text(
-                "تسجيل الدخول",
-                style: TextStyle(
+              child: Text(
+                l10n.loginBtn, // ✅ مترجم
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -504,9 +515,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Text(
-                "إنشاء حساب جديد",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              child: Text(
+                l10n.createAccountBtn, // ✅ مترجم
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
@@ -528,7 +542,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _buildAddressSection() {
+  Widget _buildAddressSection(AppLocalizations l10n) {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -540,7 +554,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header & Add Button
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -548,9 +561,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   children: [
                     Icon(Icons.location_on, color: _primaryColor),
                     const SizedBox(width: 8),
-                    const Text(
-                      "عنوان الشحن",
-                      style: TextStyle(
+                    Text(
+                      l10n.shippingAddressTitle, // ✅ مترجم
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -561,7 +574,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   TextButton(
                     onPressed: _navigateToAddAddress,
                     child: Text(
-                      "إضافة",
+                      l10n.addBtn, // ✅ مترجم
                       style: TextStyle(color: _primaryColor),
                     ),
                   ),
@@ -574,7 +587,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 child: TextButton.icon(
                   onPressed: _navigateToAddAddress,
                   icon: const Icon(Icons.add),
-                  label: const Text("إضافة عنوان جديد"),
+                  label: Text(l10n.addNewAddressBtn), // ✅ مترجم
                   style: TextButton.styleFrom(foregroundColor: _primaryColor),
                 ),
               )
@@ -624,6 +637,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                               Container(
                                                 margin: const EdgeInsets.only(
                                                   right: 8,
+                                                  left: 8,
                                                 ),
                                                 padding:
                                                     const EdgeInsets.symmetric(
@@ -635,9 +649,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                                   borderRadius:
                                                       BorderRadius.circular(4),
                                                 ),
-                                                child: const Text(
-                                                  "افتراضي",
-                                                  style: TextStyle(
+                                                child: Text(
+                                                  l10n.defaultAddressLabel, // ✅ مترجم
+                                                  style: const TextStyle(
                                                     fontSize: 10,
                                                   ),
                                                 ),
@@ -680,7 +694,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _buildMerchantGroupCard(MerchantGroup group) {
+  Widget _buildMerchantGroupCard(MerchantGroup group, AppLocalizations l10n) {
     return Card(
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 16),
@@ -693,7 +707,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Merchant Header
             Row(
               children: [
                 const Icon(Icons.store, color: Colors.blue),
@@ -709,7 +722,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
             const Divider(height: 24),
 
-            // Item List
             ...group.items.map((item) {
               final variant = item.selectedVariant;
               final String image =
@@ -756,7 +768,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               ),
                             ),
                           Text(
-                            "${item.quantity} x ${price.toStringAsFixed(0)} ر.س",
+                            "${item.quantity} x ${price.toStringAsFixed(0)} ${l10n.currencySAR}", // ✅ عملة مترجمة
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey[600],
@@ -766,7 +778,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ),
                     ),
                     Text(
-                      "${(item.quantity * price).toStringAsFixed(0)} ر.س",
+                      "${(item.quantity * price).toStringAsFixed(0)} ${l10n.currencySAR}", // ✅ عملة مترجمة
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ],
@@ -776,7 +788,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
             const SizedBox(height: 12),
 
-            // Shipping Options
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -786,17 +797,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.local_shipping_outlined,
                         size: 18,
                         color: Colors.grey,
                       ),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Text(
-                        "طريقة الشحن",
-                        style: TextStyle(
+                        l10n.shippingMethodTitle, // ✅ مترجم
+                        style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
@@ -806,11 +817,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   const SizedBox(height: 8),
 
                   if (group.shippingOptions.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(8.0),
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
                       child: Text(
-                        "لا توجد خيارات شحن متاحة لهذا العنوان",
-                        style: TextStyle(color: Colors.orange, fontSize: 13),
+                        l10n.noShippingOptions, // ✅ مترجم
+                        style: const TextStyle(
+                          color: Colors.orange,
+                          fontSize: 13,
+                        ),
                       ),
                     )
                   else
@@ -829,7 +843,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               subtitle:
                                   opt.estimatedDays != null
                                       ? Text(
-                                        "يصل خلال ${opt.estimatedDays} أيام",
+                                        "${l10n.arrivesIn} ${opt.estimatedDays} ${l10n.daysLabel}", // ✅ مترجم (ديناميكي)
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: Colors.grey[600],
@@ -837,7 +851,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                       )
                                       : null,
                               secondary: Text(
-                                "${opt.cost} ر.س",
+                                "${opt.cost} ${l10n.currencySAR}", // ✅ عملة مترجمة
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                   color: Colors.blue,
@@ -860,7 +874,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _buildPaymentMethodSection() {
+  Widget _buildPaymentMethodSection(AppLocalizations l10n) {
     return Consumer<PaymentProvider>(
       builder: (context, paymentProvider, child) {
         return Card(
@@ -874,13 +888,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.payment, color: Colors.green),
-                    SizedBox(width: 8),
+                    const Icon(Icons.payment, color: Colors.green),
+                    const SizedBox(width: 8),
                     Text(
-                      "طريقة الدفع",
-                      style: TextStyle(
+                      l10n.paymentMethodTitle, // ✅ مترجم
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -889,7 +903,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Credit Card Option
                 InkWell(
                   onTap: () => setState(() => _paymentMethodType = 'card'),
                   child: Row(
@@ -901,9 +914,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         onChanged:
                             (val) => setState(() => _paymentMethodType = val!),
                       ),
-                      const Text(
-                        "بطاقة ائتمان / مدى",
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                      Text(
+                        l10n.creditCardMada, // ✅ مترجم
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
@@ -914,7 +927,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     Padding(
                       padding: const EdgeInsets.only(right: 32, top: 8),
                       child: Text(
-                        "لا توجد بطاقات محفوظة",
+                        l10n.noSavedCards, // ✅ مترجم
                         style: TextStyle(color: Colors.grey[600], fontSize: 13),
                       ),
                     )
@@ -939,7 +952,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         });
                       },
                       icon: const Icon(Icons.add_circle_outline, size: 20),
-                      label: const Text("إضافة بطاقة جديدة"),
+                      label: Text(l10n.addNewCardBtn), // ✅ مترجم
                       style: TextButton.styleFrom(
                         foregroundColor: _primaryColor,
                       ),
@@ -949,7 +962,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
                 const Divider(height: 24),
 
-                // COD Option
                 InkWell(
                   onTap:
                       () => setState(() {
@@ -968,12 +980,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               _selectedCardId = null;
                             }),
                       ),
-                      const Text("الدفع عند الاستلام"),
+                      Text(l10n.cashOnDelivery), // ✅ مترجم
                       if (_codFee > 0)
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8.0),
                           child: Text(
-                            "(+${_codFee.toStringAsFixed(0)} ر.س رسوم)",
+                            "(+${_codFee.toStringAsFixed(0)} ${l10n.currencySAR} ${l10n.feeLabel})", // ✅ ديناميكي ومترجم
                             style: TextStyle(
                               color: Colors.orange.shade800,
                               fontSize: 12,
@@ -1035,7 +1047,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _buildSummarySection(double subTotal, double total) {
+  Widget _buildSummarySection(
+    double subTotal,
+    double total,
+    AppLocalizations l10n,
+  ) {
     return Card(
       elevation: 0,
       color: Colors.white,
@@ -1047,26 +1063,37 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _summaryRow("المجموع الفرعي", subTotal),
+            _summaryRow(l10n.subtotalLabel, subTotal, l10n), // ✅ مترجم
             const SizedBox(height: 8),
-            _summaryRow("الشحن", _totalShippingCost),
+            _summaryRow(
+              l10n.shippingCostLabel,
+              _totalShippingCost,
+              l10n,
+            ), // ✅ مترجم
 
-            // 🔥 Show COD fee if active
             if (_paymentMethodType == 'cod' && _codFee > 0) ...[
               const SizedBox(height: 8),
-              _summaryRow("رسوم الدفع عند الاستلام", _codFee, isFee: true),
+              _summaryRow(
+                l10n.codFeeDisplay,
+                _codFee,
+                l10n,
+                isFee: true,
+              ), // ✅ مترجم
             ],
 
             const Divider(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  "الإجمالي",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                Text(
+                  l10n.grandTotalLabel, // ✅ مترجم
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 Text(
-                  "${total.toStringAsFixed(2)} ر.س",
+                  "${total.toStringAsFixed(2)} ${l10n.currencySAR}", // ✅ عملة مترجمة
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -1082,14 +1109,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 color: Colors.blue[50],
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.verified_user, size: 16, color: Colors.blue),
-                  SizedBox(width: 8),
+                  const Icon(Icons.verified_user, size: 16, color: Colors.blue),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      "جميع المعاملات آمنة ومشفرة 100%",
-                      style: TextStyle(fontSize: 11, color: Colors.blue),
+                      l10n.secureTransactions, // ✅ مترجم
+                      style: const TextStyle(fontSize: 11, color: Colors.blue),
                     ),
                   ),
                 ],
@@ -1101,7 +1128,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _summaryRow(String label, double amount, {bool isFee = false}) {
+  Widget _summaryRow(
+    String label,
+    double amount,
+    AppLocalizations l10n, {
+    bool isFee = false,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -1112,7 +1144,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
         ),
         Text(
-          "${amount.toStringAsFixed(2)} ر.س",
+          "${amount.toStringAsFixed(2)} ${l10n.currencySAR}", // ✅ عملة مترجمة
           style: TextStyle(
             fontWeight: FontWeight.w600,
             color: isFee ? Colors.orange.shade800 : Colors.black,

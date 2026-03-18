@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import 'package:linyora_project/features/models/stories/models/story_model.dart';
 import 'package:linyora_project/features/models/stories/screens/create_story_sheet.dart';
 import 'package:linyora_project/features/models/stories/services/stories_service.dart';
@@ -36,47 +40,50 @@ class _StoriesScreenState extends State<InfluencerStoriesScreen> {
     }
   }
 
-  Future<void> _deleteStory(int id) async {
+  Future<void> _deleteStory(int id, AppLocalizations l10n) async {
     try {
       await _service.deleteStory(id);
-      _fetchStories(); // تحديث
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("تم الحذف")));
+      _fetchStories();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.deletedSuccessfullyMsg),
+        ), // ✅ مترجم (سابقاً)
+      );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("فشل الحذف")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.deletionFailedMsg)), // ✅ مترجم (سابقاً)
+      );
     }
   }
 
   void _showCreateSheet() async {
-    // نفتح BottomSheet وننتظر النتيجة
     final result = await showModalBottomSheet(
       context: context,
-      isScrollControlled: true, // للسماح بارتفاع كامل
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => const CreateStorySheet(),
     );
 
     if (result == true) {
-      _fetchStories(); // تحديث القائمة إذا تم النشر
+      _fetchStories();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4F8),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showCreateSheet,
         backgroundColor: const Color(0xFFF105C6),
         icon: const Icon(Icons.add_circle_outline),
-        label: const Text("قصة جديدة"),
+        label: Text(l10n.newStoryBtn), // ✅ مترجم
       ),
       body: Stack(
         children: [
-          // الخلفية
           Positioned(
             top: -50,
             right: -50,
@@ -91,9 +98,9 @@ class _StoriesScreenState extends State<InfluencerStoriesScreen> {
           CustomScrollView(
             slivers: [
               SliverAppBar(
-                title: const Text(
-                  "القصص النشطة",
-                  style: TextStyle(
+                title: Text(
+                  l10n.activeStoriesTitle, // ✅ مترجم
+                  style: const TextStyle(
                     color: Colors.black,
                     fontWeight: FontWeight.bold,
                   ),
@@ -110,20 +117,20 @@ class _StoriesScreenState extends State<InfluencerStoriesScreen> {
                   child: Center(child: CircularProgressIndicator()),
                 )
               else if (_stories.isEmpty)
-                const SliverFillRemaining(
+                SliverFillRemaining(
                   child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.history_toggle_off,
                           size: 60,
                           color: Colors.grey,
                         ),
-                        SizedBox(height: 10),
+                        const SizedBox(height: 10),
                         Text(
-                          "لا توجد قصص نشطة حالياً",
-                          style: TextStyle(color: Colors.grey),
+                          l10n.noActiveStoriesMsg, // ✅ مترجم
+                          style: const TextStyle(color: Colors.grey),
                         ),
                       ],
                     ),
@@ -132,7 +139,8 @@ class _StoriesScreenState extends State<InfluencerStoriesScreen> {
               else
                 SliverList(
                   delegate: SliverChildBuilderDelegate(
-                    (context, index) => _buildStoryCard(_stories[index]),
+                    (context, index) =>
+                        _buildStoryCard(_stories[index], l10n), // ✅ تمرير l10n
                     childCount: _stories.length,
                   ),
                 ),
@@ -145,7 +153,7 @@ class _StoriesScreenState extends State<InfluencerStoriesScreen> {
     );
   }
 
-  Widget _buildStoryCard(StoryModel story) {
+  Widget _buildStoryCard(StoryModel story, AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -159,7 +167,6 @@ class _StoriesScreenState extends State<InfluencerStoriesScreen> {
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            // Preview
             Container(
               width: 60,
               height: 60,
@@ -204,12 +211,11 @@ class _StoriesScreenState extends State<InfluencerStoriesScreen> {
             ),
             const SizedBox(width: 12),
 
-            // Info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildTypeBadge(story.type),
+                  _buildTypeBadge(story.type, l10n), // ✅ تمرير l10n
                   const SizedBox(height: 4),
                   Row(
                     children: [
@@ -242,9 +248,8 @@ class _StoriesScreenState extends State<InfluencerStoriesScreen> {
               ),
             ),
 
-            // Delete
             IconButton(
-              onPressed: () => _confirmDelete(story.id),
+              onPressed: () => _confirmDelete(story.id, l10n), // ✅ تمرير l10n
               icon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -264,7 +269,7 @@ class _StoriesScreenState extends State<InfluencerStoriesScreen> {
     );
   }
 
-  Widget _buildTypeBadge(String type) {
+  Widget _buildTypeBadge(String type, AppLocalizations l10n) {
     Color color =
         type == 'image'
             ? Colors.blue
@@ -273,8 +278,22 @@ class _StoriesScreenState extends State<InfluencerStoriesScreen> {
         type == 'image'
             ? Icons.image
             : (type == 'video' ? Icons.videocam : Icons.text_fields);
-    String label =
-        type == 'image' ? 'صورة' : (type == 'video' ? 'فيديو' : 'نص');
+
+    // ✅ ترجمة نوع القصة
+    String label;
+    switch (type) {
+      case 'image':
+        label = l10n.imageType;
+        break;
+      case 'video':
+        label = l10n.videoType;
+        break;
+      case 'text':
+        label = l10n.textType;
+        break;
+      default:
+        label = l10n.productType;
+    }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -300,25 +319,25 @@ class _StoriesScreenState extends State<InfluencerStoriesScreen> {
     );
   }
 
-  void _confirmDelete(int id) {
+  void _confirmDelete(int id, AppLocalizations l10n) {
     showDialog(
       context: context,
       builder:
           (ctx) => AlertDialog(
-            title: const Text("حذف القصة"),
-            content: const Text("هل أنت متأكد؟ سيتم حذف القصة نهائياً."),
+            title: Text(l10n.deleteStoryTitle), // ✅ مترجم
+            content: Text(l10n.deleteStoryConfirmMsg), // ✅ مترجم
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text("إلغاء"),
+                child: Text(l10n.cancelBtn), // ✅ مترجم
               ),
               ElevatedButton(
                 onPressed: () {
                   Navigator.pop(ctx);
-                  _deleteStory(id);
+                  _deleteStory(id, l10n); // ✅ تمرير l10n
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text("حذف"),
+                child: Text(l10n.delete), // ✅ مترجم
               ),
             ],
           ),

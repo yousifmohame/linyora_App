@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:linyora_project/features/products/screens/main_prodects.dart';
+
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../providers/cart_provider.dart';
 import '../../../models/cart_item_model.dart';
 import 'checkout_screen.dart';
@@ -11,14 +15,17 @@ class CartScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف ملف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Consumer<CartProvider>(
       builder: (context, cart, child) {
         return Scaffold(
           backgroundColor: Colors.grey[50],
           appBar: AppBar(
-            title: const Text(
-              "سلة التسوق",
-              style: TextStyle(
+            title: Text(
+              l10n.cartTitle, // ✅ نص مترجم
+              style: const TextStyle(
                 color: Colors.black,
                 fontWeight: FontWeight.bold,
               ),
@@ -37,23 +44,25 @@ class CartScreen extends StatelessWidget {
                       context: context,
                       builder:
                           (ctx) => AlertDialog(
-                            title: const Text("تفريغ السلة"),
-                            content: const Text(
-                              "هل أنت متأكد من حذف جميع المنتجات؟",
-                            ),
+                            title: Text(
+                              l10n.emptyCartDialogTitle,
+                            ), // ✅ نص مترجم
+                            content: Text(
+                              l10n.emptyCartDialogContent,
+                            ), // ✅ نص مترجم
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.pop(ctx),
-                                child: const Text("إلغاء"),
+                                child: Text(l10n.cancel), // ✅ نص مترجم
                               ),
                               TextButton(
                                 onPressed: () {
                                   cart.clearCart();
                                   Navigator.pop(ctx);
                                 },
-                                child: const Text(
-                                  "حذف",
-                                  style: TextStyle(color: Colors.red),
+                                child: Text(
+                                  l10n.delete, // ✅ نص مترجم
+                                  style: const TextStyle(color: Colors.red),
                                 ),
                               ),
                             ],
@@ -65,7 +74,7 @@ class CartScreen extends StatelessWidget {
           ),
           body:
               cart.items.isEmpty
-                  ? _buildEmptyCart(context)
+                  ? _buildEmptyCart(context, l10n) // ✅ تمرير الترجمة
                   : Column(
                     children: [
                       Expanded(
@@ -79,11 +88,16 @@ class CartScreen extends StatelessWidget {
                               context,
                               cart.items[index],
                               cart,
+                              l10n, // ✅ تمرير الترجمة
                             );
                           },
                         ),
                       ),
-                      _buildCheckoutSection(context, cart),
+                      _buildCheckoutSection(
+                        context,
+                        cart,
+                        l10n,
+                      ), // ✅ تمرير الترجمة
                     ],
                   ),
         );
@@ -91,7 +105,8 @@ class CartScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildEmptyCart(BuildContext context) {
+  // ✅ استقبال الترجمة هنا
+  Widget _buildEmptyCart(BuildContext context, AppLocalizations l10n) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -109,9 +124,9 @@ class CartScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          const Text(
-            "سلتك فارغة حالياً",
-            style: TextStyle(
+          Text(
+            l10n.cartEmptyMessage, // ✅ نص مترجم
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: Colors.grey,
@@ -133,17 +148,19 @@ class CartScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
               ),
             ),
-            child: const Text("ابدأ التسوق"),
+            child: Text(l10n.startShoppingBtn), // ✅ نص مترجم
           ),
         ],
       ),
     );
   }
 
+  // ✅ استقبال الترجمة هنا
   Widget _buildCartItem(
     BuildContext context,
     CartItemModel item,
     CartProvider cart,
+    AppLocalizations l10n,
   ) {
     final product = item.product;
     final variant = item.selectedVariant;
@@ -160,9 +177,9 @@ class CartScreen extends StatelessWidget {
       onDismissed: (_) {
         cart.removeFromCart(item.id);
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("تم حذف المنتج من السلة")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.productRemovedFromCart)),
+        ); // ✅ نص مترجم
       },
       background: Container(
         alignment: Alignment.centerLeft,
@@ -210,7 +227,6 @@ class CartScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ✨ التعديل هنا: صف يجمع الاسم وأيقونة الحذف
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -219,7 +235,7 @@ class CartScreen extends StatelessWidget {
                       Expanded(
                         child: Text(
                           product.name,
-                          maxLines: 2, // السماح بسطرين في حال الاسم الطويل
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
@@ -233,9 +249,9 @@ class CartScreen extends StatelessWidget {
                           cart.removeFromCart(item.id);
                           ScaffoldMessenger.of(context).hideCurrentSnackBar();
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("تم حذف المنتج"),
-                              duration: Duration(seconds: 1),
+                            SnackBar(
+                              content: Text(l10n.productDeleted), // ✅ نص مترجم
+                              duration: const Duration(seconds: 1),
                             ),
                           );
                         },
@@ -246,7 +262,7 @@ class CartScreen extends StatelessWidget {
                             bottom: 4.0,
                           ),
                           child: Icon(
-                            Icons.close, // أو Icons.delete_outline
+                            Icons.close,
                             size: 18,
                             color: Colors.grey,
                           ),
@@ -259,7 +275,7 @@ class CartScreen extends StatelessWidget {
 
                   if (variant != null)
                     Text(
-                      "المواصفات: ${variant.name}",
+                      "${l10n.specifications}${variant.name}", // ✅ نص مترجم
                       style: const TextStyle(color: Colors.grey, fontSize: 12),
                     ),
 
@@ -268,9 +284,9 @@ class CartScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // السعر
+                      // السعر مع العملة
                       Text(
-                        "${price.toStringAsFixed(0)} ر.س",
+                        "${price.toStringAsFixed(0)} ${l10n.currencySAR}", // ✅ عملة مترجمة (ديناميكية)
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Color(0xFFF105C6),
@@ -322,11 +338,11 @@ class CartScreen extends StatelessWidget {
                                     context,
                                   ).hideCurrentSnackBar();
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
+                                    SnackBar(
                                       content: Text(
-                                        "عذراً، هذه أقصى كمية متوفرة",
+                                        l10n.maxQuantityReached, // ✅ نص مترجم
                                       ),
-                                      duration: Duration(seconds: 1),
+                                      duration: const Duration(seconds: 1),
                                     ),
                                   );
                                 }
@@ -346,7 +362,12 @@ class CartScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCheckoutSection(BuildContext context, CartProvider cart) {
+  // ✅ استقبال الترجمة هنا
+  Widget _buildCheckoutSection(
+    BuildContext context,
+    CartProvider cart,
+    AppLocalizations l10n,
+  ) {
     double subtotal = cart.totalAmount;
 
     return Container(
@@ -367,8 +388,8 @@ class CartScreen extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildSummaryRow(
-              "المجموع",
-              "${subtotal.toStringAsFixed(2)} ر.س",
+              l10n.total, // ✅ نص مترجم
+              "${subtotal.toStringAsFixed(2)} ${l10n.currencySAR}", // ✅ عملة مترجمة
               isBold: true,
               color: const Color(0xFFF105C6),
             ),
@@ -394,9 +415,12 @@ class CartScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  "إتمام الشراء",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                child: Text(
+                  l10n.checkoutBtn, // ✅ نص مترجم
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),

@@ -1,6 +1,10 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../services/analytics_service.dart';
 import '../models/analytics_models.dart';
 
@@ -51,11 +55,16 @@ class _ModelAnalyticsScreenState extends State<ModelAnalyticsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (_data == null) {
-      return const Scaffold(body: Center(child: Text("خطأ في جلب البيانات")));
+      return Scaffold(
+        body: Center(child: Text(l10n.errorLoadingData)),
+      ); // ✅ مترجم (ترجمناها مسبقاً)
     }
 
     return Scaffold(
@@ -90,7 +99,7 @@ class _ModelAnalyticsScreenState extends State<ModelAnalyticsScreen> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  _buildHeader(),
+                  _buildHeader(l10n), // ✅ تمرير l10n
                   const SizedBox(height: 20),
 
                   // Time Range Selector
@@ -103,11 +112,11 @@ class _ModelAnalyticsScreenState extends State<ModelAnalyticsScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children:
-                          [
-                            'month',
-                            'quarter',
-                            'year',
-                          ].map((range) => _buildTimeButton(range)).toList(),
+                          ['month', 'quarter', 'year']
+                              .map(
+                                (range) => _buildTimeButton(range, l10n),
+                              ) // ✅ تمرير l10n
+                              .toList(),
                     ),
                   ),
 
@@ -123,25 +132,25 @@ class _ModelAnalyticsScreenState extends State<ModelAnalyticsScreen> {
                     childAspectRatio: 1.5,
                     children: [
                       _buildStatCard(
-                        "إجمالي الأرباح",
-                        "${_data!.totalEarnings} ر.س",
+                        l10n.totalEarningsLabel, // ✅ مترجم
+                        "${_data!.totalEarnings} ${l10n.currencySAR}", // ✅ عملة مترجمة
                         Icons.attach_money,
                         Colors.green,
                       ),
                       _buildStatCard(
-                        "اتفاقيات مكتملة",
+                        l10n.completedAgreementsLabel, // ✅ مترجم
                         "${_data!.completedAgreements}",
                         Icons.check_circle_outline,
                         Colors.blue,
                       ),
                       _buildStatCard(
-                        "متوسط الصفقة",
-                        "${_data!.averageDealPrice} ر.س",
+                        l10n.averageDealPriceLabel, // ✅ مترجم
+                        "${_data!.averageDealPrice} ${l10n.currencySAR}", // ✅ عملة مترجمة
                         Icons.handshake,
                         Colors.purple,
                       ),
                       _buildStatCard(
-                        "التفاعل",
+                        l10n.engagementRateLabel, // ✅ مترجم
                         "${_data!.performanceMetrics['engagementRate']}%",
                         Icons.trending_up,
                         _roseColor,
@@ -165,9 +174,11 @@ class _ModelAnalyticsScreenState extends State<ModelAnalyticsScreen> {
                           children: [
                             Icon(Icons.bar_chart, color: _purpleColor),
                             const SizedBox(width: 8),
-                            const Text(
-                              "الطلبات بمرور الوقت",
-                              style: TextStyle(fontWeight: FontWeight.bold),
+                            Text(
+                              l10n.requestsOverTimeTitle, // ✅ مترجم
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         ),
@@ -180,9 +191,9 @@ class _ModelAnalyticsScreenState extends State<ModelAnalyticsScreen> {
                   const SizedBox(height: 20),
 
                   // Top Offers & Insights
-                  _buildTopOffersCard(),
+                  _buildTopOffersCard(l10n), // ✅ تمرير l10n
                   const SizedBox(height: 20),
-                  _buildInsightsCard(),
+                  _buildInsightsCard(l10n), // ✅ تمرير l10n
                 ],
               ),
             ),
@@ -194,7 +205,7 @@ class _ModelAnalyticsScreenState extends State<ModelAnalyticsScreen> {
 
   // --- Widgets ---
 
-  Widget _buildHeader() {
+  Widget _buildHeader(AppLocalizations l10n) {
     return Column(
       children: [
         Row(
@@ -209,9 +220,9 @@ class _ModelAnalyticsScreenState extends State<ModelAnalyticsScreen> {
               child: Icon(Icons.analytics, color: _roseColor, size: 28),
             ),
             const SizedBox(width: 12),
-            const Text(
-              "التحليلات",
-              style: TextStyle(
+            Text(
+              l10n.analyticsTitle, // ✅ مترجم
+              style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
                 color: Colors.black87,
@@ -220,22 +231,22 @@ class _ModelAnalyticsScreenState extends State<ModelAnalyticsScreen> {
           ],
         ),
         const SizedBox(height: 8),
-        const Text(
-          "تتبع أداء حسابك والأرباح",
-          style: TextStyle(color: Colors.grey),
+        Text(
+          l10n.analyticsSubtitle, // ✅ مترجم
+          style: const TextStyle(color: Colors.grey),
         ),
       ],
     );
   }
 
-  Widget _buildTimeButton(String range) {
+  Widget _buildTimeButton(String range, AppLocalizations l10n) {
     bool isSelected = _timeRange == range;
     String label =
         range == 'month'
-            ? 'شهري'
+            ? l10n.monthlyRange
             : range == 'quarter'
-            ? 'ربع سنوي'
-            : 'سنوي';
+            ? l10n.quarterlyRange
+            : l10n.yearlyRange; // ✅ مترجم
     return GestureDetector(
       onTap: () => setState(() => _timeRange = range),
       child: Container(
@@ -277,12 +288,15 @@ class _ModelAnalyticsScreenState extends State<ModelAnalyticsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               Icon(icon, size: 16, color: color),
@@ -376,14 +390,10 @@ class _ModelAnalyticsScreenState extends State<ModelAnalyticsScreen> {
                 barRods: [
                   BarChartRodData(
                     toY: (entry.value['count'] as int).toDouble(),
-                    // ✅✅✅ تم التصحيح هنا: إضافة الألوان للتدرج
                     gradient: LinearGradient(
                       begin: Alignment.bottomCenter,
                       end: Alignment.topCenter,
-                      colors: [
-                        _purpleColor,
-                        _roseColor,
-                      ], // تم إصلاح المصفوفة الفارغة
+                      colors: [_purpleColor, _roseColor],
                     ),
                     width: 14,
                     borderRadius: const BorderRadius.vertical(
@@ -402,7 +412,7 @@ class _ModelAnalyticsScreenState extends State<ModelAnalyticsScreen> {
     );
   }
 
-  Widget _buildTopOffersCard() {
+  Widget _buildTopOffersCard(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -414,11 +424,11 @@ class _ModelAnalyticsScreenState extends State<ModelAnalyticsScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.emoji_events, color: Colors.amber),
+              const Icon(Icons.emoji_events, color: Colors.amber),
               const SizedBox(width: 8),
-              const Text(
-                "أفضل العروض",
-                style: TextStyle(fontWeight: FontWeight.bold),
+              Text(
+                l10n.topOffersTitle, // ✅ مترجم
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -444,7 +454,7 @@ class _ModelAnalyticsScreenState extends State<ModelAnalyticsScreen> {
                     ),
                   ),
                   Text(
-                    "${entry.value.price} ر.س",
+                    "${entry.value.price} ${l10n.currencySAR}", // ✅ عملة مترجمة
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                   const SizedBox(width: 12),
@@ -466,7 +476,7 @@ class _ModelAnalyticsScreenState extends State<ModelAnalyticsScreen> {
     );
   }
 
-  Widget _buildInsightsCard() {
+  Widget _buildInsightsCard(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -478,24 +488,29 @@ class _ModelAnalyticsScreenState extends State<ModelAnalyticsScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.insights, color: Colors.blue),
+              const Icon(Icons.insights, color: Colors.blue),
               const SizedBox(width: 8),
-              const Text(
-                "رؤى الأداء",
-                style: TextStyle(fontWeight: FontWeight.bold),
+              Text(
+                l10n.performanceInsightsTitle, // ✅ مترجم
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
           ),
           const SizedBox(height: 16),
           _buildInsightRow(
-            "مشاهدات الملف",
+            l10n.profileViewsLabel, // ✅ مترجم
             "${_data!.performanceMetrics['profileViews']}",
             Icons.visibility,
             Colors.pink,
           ),
-          _buildInsightRow("التقييم", "4.8/5", Icons.star, Colors.amber),
           _buildInsightRow(
-            "معدل الإكمال",
+            l10n.ratingLabel,
+            "4.8/5",
+            Icons.star,
+            Colors.amber,
+          ), // ✅ مترجم
+          _buildInsightRow(
+            l10n.completionRateLabel, // ✅ مترجم
             "94%",
             Icons.check_circle,
             Colors.green,

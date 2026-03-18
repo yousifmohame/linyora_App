@@ -1,6 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../models/notification_model.dart';
 import '../services/notifications_service.dart';
 
@@ -8,7 +12,8 @@ class ModelNotificationsScreen extends StatefulWidget {
   const ModelNotificationsScreen({Key? key}) : super(key: key);
 
   @override
-  State<ModelNotificationsScreen> createState() => _ModelNotificationsScreenState();
+  State<ModelNotificationsScreen> createState() =>
+      _ModelNotificationsScreenState();
 }
 
 class _ModelNotificationsScreenState extends State<ModelNotificationsScreen> {
@@ -25,7 +30,7 @@ class _ModelNotificationsScreenState extends State<ModelNotificationsScreen> {
     super.initState();
     _fetchNotifications();
 
-    // ✅ التحديث التلقائي كل 30 ثانية
+    // التحديث التلقائي كل 30 ثانية
     _pollingTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       if (mounted) _fetchNotifications(isBackground: true);
     });
@@ -53,7 +58,8 @@ class _ModelNotificationsScreenState extends State<ModelNotificationsScreen> {
     }
   }
 
-  Future<void> _markAllAsRead() async {
+  // ✅ تمرير l10n للسناك بار
+  Future<void> _markAllAsRead(AppLocalizations l10n) async {
     // Optimistic UI Update
     setState(() {
       for (var n in _notifications) {
@@ -67,7 +73,7 @@ class _ModelNotificationsScreenState extends State<ModelNotificationsScreen> {
       _fetchNotifications(isBackground: true); // Revert on failure
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("فشل تحديث الحالة")),
+          SnackBar(content: Text(l10n.failedToUpdateStatus)), // ✅ مترجم
         );
       }
     }
@@ -75,57 +81,78 @@ class _ModelNotificationsScreenState extends State<ModelNotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
-          "الإشعارات",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        title: Text(
+          l10n.notificationsTitle, // ✅ مترجم
+          style: const TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
-          onPressed: () => Navigator.pop(context, true), // نرجع true لتحديث الصفحة السابقة
+          onPressed: () => Navigator.pop(context, true),
         ),
         actions: [
           if (_notifications.isNotEmpty && _notifications.any((n) => !n.isRead))
             TextButton(
-              onPressed: _markAllAsRead,
-              child: Text("قراءة الكل", style: TextStyle(color: _roseColor)),
+              onPressed: () => _markAllAsRead(l10n), // ✅ تمرير l10n
+              child: Text(
+                l10n.markAllAsReadBtn,
+                style: TextStyle(color: _roseColor),
+              ), // ✅ مترجم
             ),
         ],
       ),
       body: RefreshIndicator(
         color: _roseColor,
         onRefresh: () async => await _fetchNotifications(isBackground: true),
-        child: _isLoading
-            ? Center(child: CircularProgressIndicator(color: _roseColor))
-            : _notifications.isEmpty
-                ? _buildEmptyState()
+        child:
+            _isLoading
+                ? Center(child: CircularProgressIndicator(color: _roseColor))
+                : _notifications.isEmpty
+                ? _buildEmptyState(l10n) // ✅ تمرير l10n
                 : ListView.separated(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    itemCount: _notifications.length,
-                    separatorBuilder: (context, index) => const Divider(height: 1),
-                    itemBuilder: (context, index) => _buildNotificationItem(_notifications[index]),
-                  ),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  itemCount: _notifications.length,
+                  separatorBuilder:
+                      (context, index) => const Divider(height: 1),
+                  itemBuilder:
+                      (context, index) =>
+                          _buildNotificationItem(_notifications[index]),
+                ),
       ),
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(AppLocalizations l10n) {
     return Center(
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.notifications_off_outlined, size: 80, color: Colors.grey[300]),
+            Icon(
+              Icons.notifications_off_outlined,
+              size: 80,
+              color: Colors.grey[300],
+            ),
             const SizedBox(height: 16),
-            const Text(
-              "لا توجد إشعارات جديدة",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey),
+            Text(
+              l10n.noNewNotificationsMsg, // ✅ مترجم
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+              ),
             ),
             const SizedBox(height: 100),
           ],
@@ -138,17 +165,16 @@ class _ModelNotificationsScreenState extends State<ModelNotificationsScreen> {
     IconData icon;
     Color color;
 
-    // ✅ تخصيص الأيقونات للمودل
     switch (notification.type) {
-      case 'request': // طلب تعاون جديد
+      case 'request':
         icon = Icons.handshake_outlined;
         color = Colors.blue;
         break;
-      case 'payment': // دفعة مالية
+      case 'payment':
         icon = Icons.account_balance_wallet_outlined;
         color = Colors.green;
         break;
-      case 'alert': // تنبيه
+      case 'alert':
         icon = Icons.warning_amber_rounded;
         color = Colors.orange;
         break;
@@ -157,10 +183,16 @@ class _ModelNotificationsScreenState extends State<ModelNotificationsScreen> {
         color = _roseColor;
     }
 
+    // ✅ جلب كود اللغة الحالي لضبط تنسيق التاريخ والوقت AM/PM لتصبح ص/م في العربية
+    String langCode = Localizations.localeOf(context).languageCode;
+
     return Container(
       color: notification.isRead ? Colors.white : _roseColor.withOpacity(0.05),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
@@ -172,7 +204,8 @@ class _ModelNotificationsScreenState extends State<ModelNotificationsScreen> {
         title: Text(
           notification.title,
           style: TextStyle(
-            fontWeight: notification.isRead ? FontWeight.normal : FontWeight.bold,
+            fontWeight:
+                notification.isRead ? FontWeight.normal : FontWeight.bold,
             fontSize: 16,
           ),
         ),
@@ -180,21 +213,31 @@ class _ModelNotificationsScreenState extends State<ModelNotificationsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 6),
-            Text(notification.message, style: TextStyle(color: Colors.grey[700], height: 1.3)),
+            Text(
+              notification.message,
+              style: TextStyle(color: Colors.grey[700], height: 1.3),
+            ),
             const SizedBox(height: 8),
             Text(
-              DateFormat('yyyy-MM-dd – hh:mm a').format(notification.createdAt),
+              DateFormat(
+                'yyyy-MM-dd – hh:mm a',
+                langCode,
+              ).format(notification.createdAt), // ✅ وقت ديناميكي
               style: TextStyle(color: Colors.grey[400], fontSize: 11),
             ),
           ],
         ),
-        trailing: !notification.isRead
-            ? Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(color: _roseColor, shape: BoxShape.circle),
-              )
-            : null,
+        trailing:
+            !notification.isRead
+                ? Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: _roseColor,
+                    shape: BoxShape.circle,
+                  ),
+                )
+                : null,
       ),
     );
   }

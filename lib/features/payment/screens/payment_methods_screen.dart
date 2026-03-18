@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+// ✅ استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../providers/payment_provider.dart';
 import '../../../models/payment_card_model.dart';
 import 'add_card_screen.dart';
@@ -15,19 +19,25 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => 
-      Provider.of<PaymentProvider>(context, listen: false).fetchCards()
+    Future.microtask(
+      () => Provider.of<PaymentProvider>(context, listen: false).fetchCards(),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    // ✅ تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text(
-          "طرق الدفع",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        title: Text(
+          l10n.paymentMethods, // ✅ نص مترجم (استخدمناه مسبقاً في الشاشة الرئيسية)
+          style: const TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
@@ -40,7 +50,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
           }
 
           if (provider.cards.isEmpty) {
-            return _buildEmptyState();
+            return _buildEmptyState(l10n); // ✅ تمرير الترجمة
           }
 
           return ListView.separated(
@@ -65,11 +75,10 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                 onDismissed: (_) {
                   provider.deleteCard(card.id);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("تم حذف البطاقة")),
+                    SnackBar(content: Text(l10n.cardDeletedMsg)), // ✅ نص مترجم
                   );
                 },
-                // ✅ هنا الحل: نستخدم ودجت خفيف خاص بنا بدلاً من المكتبة
-                child: _buildCustomCreditCard(card),
+                child: _buildCustomCreditCard(card, l10n), // ✅ تمرير الترجمة
               );
             },
           );
@@ -88,14 +97,13 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
     );
   }
 
-  // --- تصميم البطاقة اليدوي (خفيف وسريع وبدون أخطاء) ---
-  Widget _buildCustomCreditCard(PaymentCardModel card) {
+  Widget _buildCustomCreditCard(PaymentCardModel card, AppLocalizations l10n) {
     return Container(
       width: double.infinity,
-      height: 200, // ارتفاع قياسي للبطاقة
+      height: 200,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E), // لون البطاقة (أسود)
+        color: const Color(0xFF1E1E1E),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -107,41 +115,38 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF2C2C2C),
-            Color(0xFF000000),
-          ],
+          colors: [Color(0xFF2C2C2C), Color(0xFF000000)],
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // الصف العلوي: الشريحة + اللوجو
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // رسم الشريحة الذهبية
               Container(
                 width: 45,
                 height: 30,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFD4AF37), // ذهبي
+                  color: const Color(0xFFD4AF37),
                   borderRadius: BorderRadius.circular(6),
                   gradient: const LinearGradient(
-                    colors: [Color(0xFFD4AF37), Color(0xFFFEE184), Color(0xFFD4AF37)],
+                    colors: [
+                      Color(0xFFD4AF37),
+                      Color(0xFFFEE184),
+                      Color(0xFFD4AF37),
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                 ),
-                child: CustomPaint(painter: ChipPainter()), // تفاصيل الشريحة (اختياري)
+                child: CustomPaint(painter: ChipPainter()),
               ),
-              // اللوجو (نص أو أيقونة حسب النوع)
               _buildCardBrandIcon(card.brand),
             ],
           ),
 
-          // رقم البطاقة
           Row(
             children: [
               const Text(
@@ -157,7 +162,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 22,
-                  fontFamily: 'Courier', // خط يشبه خط البطاقات
+                  fontFamily: 'Courier',
                   fontWeight: FontWeight.bold,
                   letterSpacing: 2,
                 ),
@@ -165,20 +170,19 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
             ],
           ),
 
-          // الصف السفلي: الاسم + التاريخ
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    "CARD HOLDER",
-                    style: TextStyle(color: Colors.grey, fontSize: 10),
+                  Text(
+                    l10n.cardHolderLabel, // ✅ نص مترجم
+                    style: const TextStyle(color: Colors.grey, fontSize: 10),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    "CARD HOLDER", // يمكن وضع card.holderName هنا لو كان متوفراً
+                    l10n.cardHolderLabel, // يمكن وضع اسم صاحب البطاقة لو كان متوفراً
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -190,9 +194,9 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  const Text(
-                    "EXPIRES",
-                    style: TextStyle(color: Colors.grey, fontSize: 10),
+                  Text(
+                    l10n.expiresLabel, // ✅ نص مترجم
+                    style: const TextStyle(color: Colors.grey, fontSize: 10),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -212,7 +216,6 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
     );
   }
 
-  // دالة لتحديد أيقونة نوع البطاقة
   Widget _buildCardBrandIcon(String brand) {
     IconData iconData = Icons.credit_card;
     Color color = Colors.white;
@@ -230,13 +233,23 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
     } else if (brand.toLowerCase().contains('master')) {
       return Row(
         children: [
-          Container(width: 20, height: 20, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
+          Container(
+            width: 20,
+            height: 20,
+            decoration: const BoxDecoration(
+              color: Colors.red,
+              shape: BoxShape.circle,
+            ),
+          ),
           Transform.translate(
             offset: const Offset(-8, 0),
             child: Container(
-              width: 20, 
-              height: 20, 
-              decoration: BoxDecoration(color: Colors.orange.withOpacity(0.8), shape: BoxShape.circle)
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.8),
+                shape: BoxShape.circle,
+              ),
             ),
           ),
         ],
@@ -246,16 +259,16 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
     return Icon(iconData, color: color, size: 30);
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(AppLocalizations l10n) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.credit_card_off, size: 80, color: Colors.grey[300]),
           const SizedBox(height: 16),
-          const Text(
-            "لا توجد بطاقات محفوظة",
-            style: TextStyle(fontSize: 18, color: Colors.grey),
+          Text(
+            l10n.noSavedCards, // ✅ نص مترجم (موجود مسبقاً)
+            style: const TextStyle(fontSize: 18, color: Colors.grey),
           ),
           const SizedBox(height: 10),
           ElevatedButton(
@@ -272,28 +285,45 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                 borderRadius: BorderRadius.circular(20),
               ),
             ),
-            child: const Text("إضافة بطاقة"),
-          )
+            child: Text(l10n.addCardBtn), // ✅ نص مترجم
+          ),
         ],
       ),
     );
   }
 }
 
-// رسم خطوط الشريحة لتبدو واقعية
 class ChipPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.black.withOpacity(0.2)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
+    final paint =
+        Paint()
+          ..color = Colors.black.withOpacity(0.2)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1;
 
-    // رسم خطوط تقريبية للشريحة
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(0, 0, size.width, size.height), const Radius.circular(6)), paint);
-    canvas.drawLine(Offset(size.width / 3, 0), Offset(size.width / 3, size.height), paint);
-    canvas.drawLine(Offset(size.width * 2 / 3, 0), Offset(size.width * 2 / 3, size.height), paint);
-    canvas.drawLine(Offset(0, size.height / 2), Offset(size.width, size.height / 2), paint);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, 0, size.width, size.height),
+        const Radius.circular(6),
+      ),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(size.width / 3, 0),
+      Offset(size.width / 3, size.height),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(size.width * 2 / 3, 0),
+      Offset(size.width * 2 / 3, size.height),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(0, size.height / 2),
+      Offset(size.width, size.height / 2),
+      paint,
+    );
   }
 
   @override

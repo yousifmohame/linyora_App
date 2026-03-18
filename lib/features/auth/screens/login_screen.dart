@@ -20,11 +20,9 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _isPasswordVisible = false;
 
-  // اللون الوردي الخاص بالتطبيق
   final Color _brandColor = const Color(0xFFF105C6);
 
   Future<void> _handleLogin() async {
-    // إخفاء الكيبورد
     FocusScope.of(context).unfocus();
 
     if (!_formKey.currentState!.validate()) return;
@@ -68,199 +66,208 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // --- الهيدر الترحيبي ---
-                  const SizedBox(height: 20),
-                  Center(
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: _brandColor.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.shopping_bag_outlined,
-                        size: 40,
-                        color: _brandColor,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  const Text(
-                    'مرحباً بك مجدداً! 👋',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'سجل الدخول للمتابعة في Linyora',
-                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                  ),
-                  const SizedBox(height: 40),
-
-                  // --- حقل البريد الإلكتروني ---
-                  _buildLabel('البريد الإلكتروني'),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                    decoration: _inputDecoration(
-                      hint: 'example@email.com',
-                      icon: Icons.email_outlined,
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty)
-                        return 'هذا الحقل مطلوب';
-                      if (!value.contains('@')) return 'بريد إلكتروني غير صالح';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 20),
-
-                  // --- حقل كلمة المرور ---
-                  _buildLabel('كلمة المرور'),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: !_isPasswordVisible,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                    decoration: _inputDecoration(
-                      hint: '••••••••',
-                      icon: Icons.lock_outline,
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _isPasswordVisible
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                          color: Colors.grey,
-                        ),
-                        onPressed:
-                            () => setState(
-                              () => _isPasswordVisible = !_isPasswordVisible,
-                            ),
-                      ),
-                    ),
-                    validator:
-                        (value) => value!.isEmpty ? 'هذا الحقل مطلوب' : null,
-                  ),
-
-                  // --- نسيت كلمة المرور ---
-                  Align(
-                    alignment: Alignment.centerLeft, // أو Right حسب اللغة
-                    child: TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ForgotPasswordScreen(),
-                          ),
-                        );
-                      },
-                      child: Text(
-                        'نسيت كلمة المرور؟',
-                        style: TextStyle(
-                          color: _brandColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 30),
-
-                  // --- زر تسجيل الدخول ---
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _handleLogin,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child:
-                          _isLoading
-                              ? const CircularProgressIndicator(
-                                color: Colors.white,
-                              )
-                              : const Text(
-                                'تسجيل الدخول',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // --- الفوتر ---
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        "ليس لديك حساب؟",
-                        style: TextStyle(color: Colors.grey[600]),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const RegisterScreen(),
-                            ),
-                          );
-                        },
-                        child: Text(
-                          'انضم إلينا',
-                          style: TextStyle(
-                            color: _brandColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+      body: Container(
+        // تحديد العرض والطول ديناميكياً
+        width: MediaQuery.of(context).size.width,
+        height: MediaQuery.of(context).size.height,
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/login.jpeg'),
+            fit: BoxFit.cover,
+          ),
+        ),
+        // هنا نضع باقي العناصر بداخل Stack لترتيبها فوق الخلفية
+        child: Stack(
+          children: [
+            Positioned(
+              top: 200,
+              left: 20,
+              child: const Text(
+                'Hi!',
+                style: TextStyle(
+                  fontSize: 40,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             ),
-          ),
+
+            // 🔥 المحتوى
+            SafeArea(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    const SizedBox(height: 240),
+
+                    // 🔥 الكارد الأبيض
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      margin: const EdgeInsets.symmetric(horizontal: 20),
+                      decoration: BoxDecoration(
+                        color: const Color.fromARGB(130, 0, 0, 0),
+                        borderRadius: BorderRadius.circular(25),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 20,
+                          ),
+                        ],
+                      ),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 20),
+
+                            // Email
+                            _buildLabel('البريد الإلكتروني'),
+                            const SizedBox(height: 8),
+                            TextFormField(
+                              controller: _emailController,
+                              decoration: _inputDecoration(
+                                hint: 'example@email.com',
+                                icon: Icons.email_outlined,
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty)
+                                  return 'هذا الحقل مطلوب';
+                                if (!value.contains('@'))
+                                  return 'بريد إلكتروني غير صالح';
+                                return null;
+                              },
+                            ),
+
+                            const SizedBox(height: 20),
+
+                            // Password
+                            _buildLabel('كلمة المرور'),
+                            const SizedBox(height: 8),
+                            TextFormField(
+                              controller: _passwordController,
+                              obscureText: !_isPasswordVisible,
+                              decoration: _inputDecoration(
+                                hint: '••••••••',
+                                icon: Icons.lock_outline,
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _isPasswordVisible
+                                        ? Icons.visibility
+                                        : Icons.visibility_off,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _isPasswordVisible = !_isPasswordVisible;
+                                    });
+                                  },
+                                ),
+                              ),
+                              validator:
+                                  (value) =>
+                                      value!.isEmpty ? 'هذا الحقل مطلوب' : null,
+                            ),
+
+                            // Forgot password
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (_) => const ForgotPasswordScreen(),
+                                    ),
+                                  );
+                                },
+                                child: Text(
+                                  'نسيت كلمة المرور؟',
+                                  style: TextStyle(color: _brandColor),
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 20),
+
+                            // Login button
+                            SizedBox(
+                              width: double.infinity,
+                              height: 55,
+                              child: ElevatedButton(
+                                onPressed: _isLoading ? null : _handleLogin,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _brandColor,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                child:
+                                    _isLoading
+                                        ? const CircularProgressIndicator(
+                                          color: Colors.white,
+                                        )
+                                        : const Text(
+                                          'تسجيل الدخول',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 20),
+
+                            // Register
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text(
+                                  "ليس لديك حساب؟",
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const RegisterScreen(),
+                                      ),
+                                    );
+                                  },
+                                  child: Text(
+                                    'انضم إلينا',
+                                    style: TextStyle(
+                                      color: _brandColor,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 30),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  // ويدجت مساعدة للعناوين الصغيرة
   Widget _buildLabel(String text) {
     return Text(
       text,
-      style: const TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
-        color: Colors.black87,
-      ),
+      style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
     );
   }
 
-  // تصميم موحد للحقول
   InputDecoration _inputDecoration({
     required String hint,
     required IconData icon,
@@ -268,30 +275,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: TextStyle(
-        color: Colors.grey[400],
-        fontWeight: FontWeight.normal,
-      ),
-      prefixIcon: Icon(icon, color: Colors.grey[500]),
+      prefixIcon: Icon(icon),
       suffixIcon: suffixIcon,
       filled: true,
-      fillColor: Colors.grey[50],
-      contentPadding: const EdgeInsets.symmetric(vertical: 18),
+      fillColor: Colors.grey[100],
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: Colors.grey[200]!),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: _brandColor, width: 1.5),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Colors.redAccent),
       ),
     );
   }

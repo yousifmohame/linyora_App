@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:linyora_project/features/orders/screens/tracking_screen.dart';
+
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../../../models/order_model.dart';
 import '../services/order_service.dart';
 import 'order_details_screen.dart';
@@ -24,7 +28,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
 
   List<OrderModel> _allOrders = [];
   bool _isLoading = true;
-  String? _errorMessage;
+  bool _hasError = false; // ✅ تحويل الخطأ لقيمة منطقية لسهولة الترجمة
 
   @override
   void initState() {
@@ -56,7 +60,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
     if (!isBackground) {
       setState(() {
         _isLoading = true;
-        _errorMessage = null;
+        _hasError = false;
       });
     }
 
@@ -68,6 +72,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
       if (mounted) {
         setState(() {
           _allOrders = orders;
+          _hasError = false;
           if (!isBackground) _isLoading = false;
         });
       }
@@ -75,7 +80,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
       if (mounted && !isBackground) {
         setState(() {
           _isLoading = false;
-          _errorMessage = "تعذر تحميل الطلبات، اسحب للأسفل للتحديث";
+          _hasError = true;
         });
       }
     }
@@ -104,12 +109,15 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
       appBar: AppBar(
-        title: const Text(
-          "طلباتي",
-          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+        title: Text(
+          l10n.myOrdersTitle, // ✅ عنوان مترجم
+          style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
@@ -132,63 +140,67 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
             fontWeight: FontWeight.w500,
             fontFamily: 'Cairo',
           ),
-          tabs: const [
-            Tab(text: "الكل"),
-            Tab(text: "نشط"), // pending + processing
-            Tab(text: "في الطريق"), // shipped
-            Tab(text: "مكتمل"), // completed
-            Tab(text: "ملغية"), // cancelled
+          tabs: [
+            Tab(text: l10n.tabAll), // ✅ تبويبات مترجمة
+            Tab(text: l10n.tabActive), 
+            Tab(text: l10n.tabShipped), 
+            Tab(text: l10n.tabCompleted), 
+            Tab(text: l10n.tabCancelled), 
           ],
         ),
       ),
-      body:
-          _isLoading
-              ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFFF105C6)),
-              )
-              : _errorMessage != null
-              ? _buildErrorState()
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFFF105C6)),
+            )
+          : _hasError
+              ? _buildErrorState(l10n) // ✅ تمرير l10n لحالة الخطأ
               : TabBarView(
-                controller: _tabController,
-                children: [
-                  _OrdersList(
-                    orders: _getOrdersByStatus('all'),
-                    onRefresh: () => _fetchOrders(),
-                  ),
-                  _OrdersList(
-                    orders: _getOrdersByStatus('active'),
-                    onRefresh: () => _fetchOrders(),
-                  ),
-                  _OrdersList(
-                    orders: _getOrdersByStatus('shipped'),
-                    onRefresh: () => _fetchOrders(),
-                  ),
-                  _OrdersList(
-                    orders: _getOrdersByStatus('completed'),
-                    onRefresh: () => _fetchOrders(),
-                  ),
-                  _OrdersList(
-                    orders: _getOrdersByStatus('cancelled'),
-                    onRefresh: () => _fetchOrders(),
-                  ),
-                ],
-              ),
+                  controller: _tabController,
+                  children: [
+                    _OrdersList(
+                      orders: _getOrdersByStatus('all'),
+                      onRefresh: () => _fetchOrders(),
+                      l10n: l10n, // ✅ تمرير الترجمة
+                    ),
+                    _OrdersList(
+                      orders: _getOrdersByStatus('active'),
+                      onRefresh: () => _fetchOrders(),
+                      l10n: l10n,
+                    ),
+                    _OrdersList(
+                      orders: _getOrdersByStatus('shipped'),
+                      onRefresh: () => _fetchOrders(),
+                      l10n: l10n,
+                    ),
+                    _OrdersList(
+                      orders: _getOrdersByStatus('completed'),
+                      onRefresh: () => _fetchOrders(),
+                      l10n: l10n,
+                    ),
+                    _OrdersList(
+                      orders: _getOrdersByStatus('cancelled'),
+                      onRefresh: () => _fetchOrders(),
+                      l10n: l10n,
+                    ),
+                  ],
+                ),
     );
   }
 
-  Widget _buildErrorState() {
+  Widget _buildErrorState(AppLocalizations l10n) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.cloud_off_rounded, size: 80, color: Colors.grey[400]),
           const SizedBox(height: 16),
-          Text(_errorMessage!, style: TextStyle(color: Colors.grey[600])),
+          Text(l10n.ordersLoadError, style: TextStyle(color: Colors.grey[600])), // ✅ رسالة مترجمة
           const SizedBox(height: 20),
           ElevatedButton.icon(
             onPressed: () => _fetchOrders(),
             icon: const Icon(Icons.refresh),
-            label: const Text("إعادة المحاولة"),
+            label: Text(l10n.retryBtn), // ✅ نص الزر مترجم
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFF105C6),
               foregroundColor: Colors.white,
@@ -206,8 +218,9 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
 class _OrdersList extends StatelessWidget {
   final List<OrderModel> orders;
   final Future<void> Function() onRefresh;
+  final AppLocalizations l10n; // ✅ استقبال الترجمة
 
-  const _OrdersList({required this.orders, required this.onRefresh});
+  const _OrdersList({required this.orders, required this.onRefresh, required this.l10n});
 
   @override
   Widget build(BuildContext context) {
@@ -243,7 +256,7 @@ class _OrdersList extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    "لا توجد طلبات هنا",
+                    l10n.noOrdersHere, // ✅ رسالة الفراغ مترجمة
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -266,7 +279,7 @@ class _OrdersList extends StatelessWidget {
         itemCount: orders.length,
         separatorBuilder: (context, index) => const SizedBox(height: 16),
         itemBuilder: (context, index) {
-          return _BigStoreOrderCard(order: orders[index]);
+          return _BigStoreOrderCard(order: orders[index], l10n: l10n); // ✅ تمرير l10n
         },
       ),
     );
@@ -275,47 +288,47 @@ class _OrdersList extends StatelessWidget {
 
 class _BigStoreOrderCard extends StatelessWidget {
   final OrderModel order;
+  final AppLocalizations l10n; // ✅ استقبال الترجمة
 
-  const _BigStoreOrderCard({required this.order});
+  const _BigStoreOrderCard({required this.order, required this.l10n});
 
-  // 7. ✅ تحديث الألوان والنصوص لتطابق الموقع تماماً
+  // 7. ✅ تحديث الألوان والنصوص لتطابق الموقع تماماً وتدعم الترجمة
   Map<String, dynamic> _getStatusStyle(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
         return {
-          'color': Colors.amber[800], // Amber-800
-          'bg': Colors.amber[100], // Amber-100
-          'text': 'قيد الانتظار',
-          'icon': Icons.access_time_rounded, // Clock
+          'color': Colors.amber[800],
+          'bg': Colors.amber[100],
+          'text': l10n.statusPending, // ✅ مترجم
+          'icon': Icons.access_time_rounded,
         };
       case 'processing':
         return {
-          'color': Colors.blue[800], // Blue-800
-          'bg': Colors.blue[100], // Blue-100
-          'text': 'قيد التنفيذ',
-          'icon':
-              Icons.cached_rounded, // RefreshCw (Cached is closest in Material)
+          'color': Colors.blue[800],
+          'bg': Colors.blue[100],
+          'text': l10n.statusProcessing, // ✅ مترجم
+          'icon': Icons.cached_rounded,
         };
       case 'shipped':
         return {
-          'color': Colors.indigo[800], // Indigo-800
-          'bg': Colors.indigo[100], // Indigo-100
-          'text': 'تم الشحن',
-          'icon': Icons.local_shipping_rounded, // Truck
+          'color': Colors.indigo[800],
+          'bg': Colors.indigo[100],
+          'text': l10n.statusShipped, // ✅ مترجم
+          'icon': Icons.local_shipping_rounded,
         };
       case 'completed':
         return {
-          'color': Colors.green[800], // Green-800
-          'bg': Colors.green[100], // Green-100
-          'text': 'مكتمل',
-          'icon': Icons.check_circle_outline_rounded, // CheckCircle
+          'color': Colors.green[800],
+          'bg': Colors.green[100],
+          'text': l10n.statusCompleted, // ✅ مترجم
+          'icon': Icons.check_circle_outline_rounded,
         };
       case 'cancelled':
         return {
-          'color': Colors.red[800], // Red-800
-          'bg': Colors.red[100], // Red-100
-          'text': 'ملغي',
-          'icon': Icons.cancel_outlined, // XCircle
+          'color': Colors.red[800],
+          'bg': Colors.red[100],
+          'text': l10n.statusCancelled, // ✅ مترجم
+          'icon': Icons.cancel_outlined,
         };
       default:
         // حالة افتراضية
@@ -335,23 +348,22 @@ class _BigStoreOrderCard extends StatelessWidget {
     String formattedDate;
     try {
       final date = DateTime.parse(order.date);
-      formattedDate = DateFormat('dd MMM yyyy, hh:mm a').format(date);
+      // في التطبيقات متعددة اللغات قد تود استخدام صيغة رقمية بالكامل لسهولة قراءتها باللغتين
+      formattedDate = DateFormat('yyyy-MM-dd, hh:mm a').format(date);
     } catch (_) {
       formattedDate = order.date;
     }
 
     return GestureDetector(
-      onTap:
-          () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder:
-                  (_) => OrderDetailsScreen(
-                    orderId: order.id,
-                    initialOrder: order,
-                  ),
-            ),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => OrderDetailsScreen(
+            orderId: order.id,
+            initialOrder: order,
           ),
+        ),
+      ),
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -380,7 +392,7 @@ class _BigStoreOrderCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "طلب #${order.orderNumber}",
+                        "${l10n.orderNumberPrefix}${order.orderNumber}", // ✅ نص مترجم
                         style: const TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 15,
@@ -403,7 +415,7 @@ class _BigStoreOrderCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: statusStyle['color'].withOpacity(0.2),
-                      ), // إضافة حدود خفيفة مثل الكود الأصلي
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -440,14 +452,13 @@ class _BigStoreOrderCard extends StatelessWidget {
                         child: ListView.separated(
                           scrollDirection: Axis.horizontal,
                           physics: const BouncingScrollPhysics(),
-                          itemCount:
-                              order.items.length > 4 ? 4 : order.items.length,
-                          separatorBuilder:
-                              (_, __) => const SizedBox(width: 12),
+                          itemCount: order.items.length > 4 ? 4 : order.items.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 12),
                           itemBuilder: (context, index) {
                             if (order.items.length > 4 && index == 3) {
                               return _MoreItemsBadge(
                                 count: order.items.length - 3,
+                                l10n: l10n, // ✅ تمرير الترجمة
                               );
                             }
                             return _ProductImage(
@@ -475,11 +486,11 @@ class _BigStoreOrderCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "الإجمالي",
+                        l10n.totalOrderLabel, // ✅ نص مترجم
                         style: TextStyle(color: Colors.grey[500], fontSize: 11),
                       ),
                       Text(
-                        "${order.totalPrice.toStringAsFixed(2)} ر.س",
+                        "${order.totalPrice.toStringAsFixed(2)} ${l10n.currencySAR}", // ✅ عملة مترجمة
                         style: const TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 16,
@@ -497,10 +508,9 @@ class _BigStoreOrderCard extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder:
-                                  (context) => OrderTrackingScreen(
-                                    orderId: order.id, // ✅ نمرر الـ ID فقط
-                                  ),
+                              builder: (context) => OrderTrackingScreen(
+                                orderId: order.id,
+                              ),
                             ),
                           );
                         },
@@ -511,9 +521,9 @@ class _BigStoreOrderCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        child: const Text(
-                          "تتبع",
-                          style: TextStyle(fontSize: 13),
+                        child: Text(
+                          l10n.trackOrderBtn, // ✅ نص مترجم
+                          style: const TextStyle(fontSize: 13),
                         ),
                       ),
                     ),
@@ -522,11 +532,10 @@ class _BigStoreOrderCard extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder:
-                              (_) => OrderDetailsScreen(
-                                orderId: order.id,
-                                initialOrder: order,
-                              ),
+                          builder: (_) => OrderDetailsScreen(
+                            orderId: order.id,
+                            initialOrder: order,
+                          ),
                         ),
                       );
                     },
@@ -538,9 +547,9 @@ class _BigStoreOrderCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: const Text(
-                      "التفاصيل",
-                      style: TextStyle(
+                    child: Text(
+                      l10n.orderDetailsBtn, // ✅ نص مترجم
+                      style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
                       ),
@@ -576,12 +585,11 @@ class _ProductImage extends StatelessWidget {
           imageUrl: imageUrl,
           fit: BoxFit.cover,
           placeholder: (context, url) => Container(color: Colors.grey[50]),
-          errorWidget:
-              (context, url, error) => const Icon(
-                Icons.image_not_supported_outlined,
-                color: Colors.grey,
-                size: 20,
-              ),
+          errorWidget: (context, url, error) => const Icon(
+            Icons.image_not_supported_outlined,
+            color: Colors.grey,
+            size: 20,
+          ),
         ),
       ),
     );
@@ -590,7 +598,8 @@ class _ProductImage extends StatelessWidget {
 
 class _MoreItemsBadge extends StatelessWidget {
   final int count;
-  const _MoreItemsBadge({required this.count});
+  final AppLocalizations l10n; // ✅ استقبال الترجمة
+  const _MoreItemsBadge({required this.count, required this.l10n});
 
   @override
   Widget build(BuildContext context) {
@@ -614,7 +623,7 @@ class _MoreItemsBadge extends StatelessWidget {
             ),
           ),
           Text(
-            "منتجات",
+            l10n.productsLabel, // ✅ نص مترجم استخدمناه مسبقاً
             style: TextStyle(color: Colors.grey[500], fontSize: 10),
           ),
         ],

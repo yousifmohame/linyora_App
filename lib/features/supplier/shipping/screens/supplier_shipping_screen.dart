@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import 'package:linyora_project/features/supplier/shipping/models/supplier_shipping_models.dart';
 import 'package:linyora_project/features/supplier/shipping/services/supplier_shipping_service.dart';
 
@@ -33,8 +37,8 @@ class _SupplierShippingScreenState extends State<SupplierShippingScreen> {
     }
   }
 
-  // نافذة الإضافة/التعديل
-  void _showFormDialog({ShippingCompany? company}) {
+  // ✅ تمرير l10n للديالوج والرسائل
+  void _showFormDialog(AppLocalizations l10n, {ShippingCompany? company}) {
     final nameCtrl = TextEditingController(text: company?.name ?? '');
     final costCtrl = TextEditingController(
       text: company?.shippingCost.toString() ?? '',
@@ -51,33 +55,35 @@ class _SupplierShippingScreenState extends State<SupplierShippingScreen> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   title: Text(
-                    company == null ? "إضافة شركة شحن" : "تعديل شركة الشحن",
-                  ),
+                    company == null
+                        ? l10n.addShippingCompanyTitle
+                        : l10n.editShippingCompanyTitle,
+                  ), // ✅ مترجم
                   content: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       TextField(
                         controller: nameCtrl,
-                        decoration: const InputDecoration(
-                          labelText: "اسم الشركة",
-                          border: OutlineInputBorder(),
-                        ),
+                        decoration: InputDecoration(
+                          labelText: l10n.companyNameLabel,
+                          border: const OutlineInputBorder(),
+                        ), // ✅ مترجم
                       ),
                       const SizedBox(height: 16),
                       TextField(
                         controller: costCtrl,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: "تكلفة الشحن",
-                          border: OutlineInputBorder(),
-                        ),
+                        decoration: InputDecoration(
+                          labelText: l10n.shippingCostLabel,
+                          border: const OutlineInputBorder(),
+                        ), // ✅ مترجم
                       ),
                     ],
                   ),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(ctx),
-                      child: const Text("إلغاء"),
+                      child: Text(l10n.cancelBtn), // ✅ مترجم
                     ),
                     ElevatedButton(
                       onPressed:
@@ -89,9 +95,9 @@ class _SupplierShippingScreenState extends State<SupplierShippingScreen> {
 
                                 if (name.isEmpty || cost == null) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text("يرجى إدخال بيانات صحيحة"),
-                                    ),
+                                    SnackBar(
+                                      content: Text(l10n.enterValidDataMsg),
+                                    ), // ✅ مترجم
                                   );
                                   return;
                                 }
@@ -111,16 +117,24 @@ class _SupplierShippingScreenState extends State<SupplierShippingScreen> {
                                     );
                                   }
                                   Navigator.pop(ctx);
-                                  _fetchCompanies(); // تحديث القائمة
+                                  _fetchCompanies();
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text("تم الحفظ بنجاح ✅"),
-                                    ),
+                                    SnackBar(
+                                      content: Text(
+                                        "${l10n.savedSuccessfullyMsg} ✅",
+                                      ),
+                                    ), // ✅ مترجم
                                   );
                                 } catch (e) {
                                   setDialogState(() => isSaving = false);
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text("خطأ: $e")),
+                                    SnackBar(
+                                      content: Text(
+                                        l10n.errorOccurredWithErrorMsg(
+                                          e.toString(),
+                                        ),
+                                      ),
+                                    ), // ✅ استخدام الدالة المولدة بدل replaceAll
                                   );
                                 }
                               },
@@ -137,10 +151,10 @@ class _SupplierShippingScreenState extends State<SupplierShippingScreen> {
                                   strokeWidth: 2,
                                 ),
                               )
-                              : const Text(
-                                "حفظ",
-                                style: TextStyle(color: Colors.black),
-                              ),
+                              : Text(
+                                l10n.saveBtn,
+                                style: const TextStyle(color: Colors.black),
+                              ), // ✅ مترجم
                     ),
                   ],
                 ),
@@ -148,30 +162,33 @@ class _SupplierShippingScreenState extends State<SupplierShippingScreen> {
     );
   }
 
-  // حذف شركة
-  void _confirmDelete(int id) {
+  // ✅ تمرير l10n لرسائل التأكيد
+  void _confirmDelete(int id, AppLocalizations l10n) {
     showDialog(
       context: context,
       builder:
           (ctx) => AlertDialog(
-            title: const Text("حذف الشركة"),
-            content: const Text("هل أنت متأكد من حذف شركة الشحن هذه؟"),
+            title: Text(l10n.deleteCompanyTitle), // ✅ مترجم
+            content: Text(l10n.confirmDeleteShippingCompanyDesc), // ✅ مترجم
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text("إلغاء"),
+                child: Text(l10n.cancelBtn), // ✅ مترجم
               ),
               ElevatedButton(
                 onPressed: () async {
                   Navigator.pop(ctx);
                   await _service.deleteShippingCompany(id);
                   _fetchCompanies();
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(const SnackBar(content: Text("تم الحذف")));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(l10n.deletedSuccessfullyMsg)),
+                  ); // ✅ مترجم (سابقاً)
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text("حذف", style: TextStyle(color: Colors.white)),
+                child: Text(
+                  l10n.delete,
+                  style: const TextStyle(color: Colors.white),
+                ), // ✅ مترجم
               ),
             ],
           ),
@@ -180,17 +197,19 @@ class _SupplierShippingScreenState extends State<SupplierShippingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4F8),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showFormDialog(),
+        onPressed: () => _showFormDialog(l10n), // ✅ تمرير الترجمة
         backgroundColor: const Color(0xFFF105C6),
         icon: const Icon(Icons.add),
-        label: const Text("إضافة شركة"),
+        label: Text(l10n.addCompanyBtn), // ✅ مترجم
       ),
       body: Stack(
         children: [
-          // الخلفية الجمالية
           Positioned(
             top: -50,
             right: -50,
@@ -210,6 +229,10 @@ class _SupplierShippingScreenState extends State<SupplierShippingScreen> {
                 elevation: 0,
                 pinned: true,
                 iconTheme: const IconThemeData(color: Colors.black),
+                title: Text(
+                  l10n.shippingCompanies,
+                  style: const TextStyle(color: Colors.black),
+                ), // ✅ عنوان اختياري (مترجم)
               ),
 
               SliverToBoxAdapter(
@@ -217,30 +240,29 @@ class _SupplierShippingScreenState extends State<SupplierShippingScreen> {
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
-                      // إحصائية بسيطة
                       _buildStatCard(
-                        "عدد الشركات المضافة",
+                        l10n.numberOfAddedCompanies,
                         "${_companies.length}",
-                      ),
+                      ), // ✅ مترجم
                       const SizedBox(height: 20),
 
                       if (_isLoading)
                         const Center(child: CircularProgressIndicator())
                       else if (_companies.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.all(40),
+                        Padding(
+                          padding: const EdgeInsets.all(40),
                           child: Column(
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.local_shipping_outlined,
                                 size: 60,
                                 color: Colors.grey,
                               ),
-                              SizedBox(height: 10),
+                              const SizedBox(height: 10),
                               Text(
-                                "لا توجد شركات شحن مضافة",
-                                style: TextStyle(color: Colors.grey),
-                              ),
+                                l10n.noShippingCompaniesAddedMsg,
+                                style: const TextStyle(color: Colors.grey),
+                              ), // ✅ مترجم
                             ],
                           ),
                         )
@@ -252,7 +274,10 @@ class _SupplierShippingScreenState extends State<SupplierShippingScreen> {
                           separatorBuilder:
                               (c, i) => const SizedBox(height: 12),
                           itemBuilder:
-                              (ctx, i) => _buildCompanyCard(_companies[i]),
+                              (ctx, i) => _buildCompanyCard(
+                                _companies[i],
+                                l10n,
+                              ), // ✅ تمرير l10n
                         ),
 
                       const SizedBox(height: 80),
@@ -309,7 +334,7 @@ class _SupplierShippingScreenState extends State<SupplierShippingScreen> {
     );
   }
 
-  Widget _buildCompanyCard(ShippingCompany company) {
+  Widget _buildCompanyCard(ShippingCompany company, AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -345,7 +370,7 @@ class _SupplierShippingScreenState extends State<SupplierShippingScreen> {
                   ),
                 ),
                 Text(
-                  "${company.shippingCost} ر.س",
+                  "${company.shippingCost} ${l10n.currencySAR}", // ✅ مترجم (عملة)
                   style: const TextStyle(
                     color: Colors.green,
                     fontWeight: FontWeight.bold,
@@ -356,11 +381,12 @@ class _SupplierShippingScreenState extends State<SupplierShippingScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.edit, color: Colors.blue),
-            onPressed: () => _showFormDialog(company: company),
+            onPressed:
+                () => _showFormDialog(l10n, company: company), // ✅ تمرير l10n
           ),
           IconButton(
             icon: const Icon(Icons.delete, color: Colors.red),
-            onPressed: () => _confirmDelete(company.id),
+            onPressed: () => _confirmDelete(company.id, l10n), // ✅ تمرير l10n
           ),
         ],
       ),

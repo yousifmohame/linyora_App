@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:linyora_project/features/orders/screens/tracking_screen.dart';
+
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../../../models/order_model.dart';
 import '../services/order_service.dart';
 
@@ -30,7 +34,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   bool _isLoading = true;
   Timer? _refreshTimer;
 
-  // 🔥 تحديث: خريطة لتخزين التقييمات (Id المنتج -> بيانات التقييم)
   final Map<int, LocalReviewData> _productReviews = {};
 
   @override
@@ -38,7 +41,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     super.initState();
     if (widget.initialOrder != null) {
       _order = widget.initialOrder;
-      _populateInitialReviews(); // ملء التقييمات إذا كانت موجودة في الموديل
+      _populateInitialReviews();
       _isLoading = false;
     }
     _fetchOrderDetails();
@@ -57,13 +60,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     });
   }
 
-  // ملء البيانات المحلية من الموديل القادم من السيرفر (إذا كان الموديل يدعم ذلك)
-  // 1. ملء التقييمات من البيانات الحقيقية القادمة من السيرفر
   void _populateInitialReviews() {
     if (_order == null) return;
 
     for (var item in _order!.items) {
-      // إذا كانت حالة التقييم القادمة من السيرفر "true"
       if (item.isReviewed) {
         setState(() {
           _productReviews[item.productId] = LocalReviewData(
@@ -75,7 +75,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     }
   }
 
-  // 2. تحديث دالة جلب البيانات لاستدعاء Populate
   Future<void> _fetchOrderDetails({bool isBackground = false}) async {
     if (widget.initialOrder == null && !isBackground) {
       setState(() => _isLoading = true);
@@ -89,7 +88,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           if (!isBackground) _isLoading = false;
         });
 
-        // 🔥 أهم خطوة: تحديث الحالة المحلية بناءً على بيانات السيرفر
         _populateInitialReviews();
       }
     } catch (e) {
@@ -98,12 +96,15 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     }
   }
 
-  // ... (دالة _getStatusAttributes بقيت كما هي) ...
-  Map<String, dynamic> _getStatusAttributes(String status) {
+  // ✅ تمرير الترجمة l10n واستخدام نصوص الحالات التي أضفناها سابقاً
+  Map<String, dynamic> _getStatusAttributes(
+    String status,
+    AppLocalizations l10n,
+  ) {
     switch (status.toLowerCase()) {
       case 'pending':
         return {
-          'label': 'قيد الانتظار',
+          'label': l10n.statusPending,
           'bgColor': Colors.amber.shade100,
           'textColor': Colors.amber.shade900,
           'borderColor': Colors.amber.shade200,
@@ -111,7 +112,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         };
       case 'processing':
         return {
-          'label': 'قيد التنفيذ',
+          'label': l10n.statusProcessing,
           'bgColor': Colors.blue.shade100,
           'textColor': Colors.blue.shade900,
           'borderColor': Colors.blue.shade200,
@@ -121,7 +122,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       case 'on_way':
       case 'out_for_delivery':
         return {
-          'label': 'تم الشحن',
+          'label': l10n.statusShipped,
           'bgColor': Colors.indigo.shade100,
           'textColor': Colors.indigo.shade900,
           'borderColor': Colors.indigo.shade200,
@@ -130,7 +131,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       case 'completed':
       case 'delivered':
         return {
-          'label': 'مكتمل',
+          'label': l10n.statusCompleted,
           'bgColor': Colors.green.shade100,
           'textColor': Colors.green.shade900,
           'borderColor': Colors.green.shade200,
@@ -140,7 +141,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       case 'rejected':
       case 'returned':
         return {
-          'label': 'ملغي',
+          'label': l10n.statusCancelled,
           'bgColor': Colors.red.shade100,
           'textColor': Colors.red.shade900,
           'borderColor': Colors.red.shade200,
@@ -159,12 +160,15 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
       appBar: AppBar(
-        title: const Text(
-          "تفاصيل الطلب",
-          style: TextStyle(
+        title: Text(
+          l10n.orderDetailsTitle, // ✅ مترجم
+          style: const TextStyle(
             color: Colors.black87,
             fontWeight: FontWeight.w700,
             fontSize: 18,
@@ -181,7 +185,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 child: CircularProgressIndicator(color: Color(0xFFF105C6)),
               )
               : _order == null
-              ? _buildErrorState()
+              ? _buildErrorState(l10n) // ✅ تمرير l10n
               : RefreshIndicator(
                 onRefresh: _fetchOrderDetails,
                 color: const Color(0xFFF105C6),
@@ -191,17 +195,17 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildHeaderSection(),
+                      _buildHeaderSection(l10n), // ✅ تمرير l10n
                       const SizedBox(height: 24),
-                      _buildSectionTitle("محتويات الشحنة"),
+                      _buildSectionTitle(l10n.shipmentContentsLabel), // ✅ مترجم
                       const SizedBox(height: 12),
-                      _buildProductsList(),
+                      _buildProductsList(l10n), // ✅ تمرير l10n
                       const SizedBox(height: 24),
-                      _buildSectionTitle("تفاصيل الدفع"),
+                      _buildSectionTitle(l10n.paymentDetailsLabel), // ✅ مترجم
                       const SizedBox(height: 12),
-                      _buildPaymentSummary(),
+                      _buildPaymentSummary(l10n), // ✅ تمرير l10n
                       const SizedBox(height: 30),
-                      _buildActionButtons(),
+                      _buildActionButtons(l10n), // ✅ تمرير l10n
                       const SizedBox(height: 40),
                     ],
                   ),
@@ -221,9 +225,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     );
   }
 
-  // ... (دوال Header و InfoColumn بقيت كما هي) ...
-  Widget _buildHeaderSection() {
-    final statusAttrs = _getStatusAttributes(_order!.status);
+  Widget _buildHeaderSection(AppLocalizations l10n) {
+    final statusAttrs = _getStatusAttributes(
+      _order!.status,
+      l10n,
+    ); // ✅ تمرير l10n
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -268,7 +274,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    "رقم الطلب: ${_order!.orderNumber}",
+                    "${l10n.orderNumberLabel}${_order!.orderNumber}", // ✅ مترجم
                     style: TextStyle(color: Colors.grey[600], fontSize: 13),
                   ),
                 ],
@@ -283,12 +289,15 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _buildInfoColumn(
-                "تاريخ الطلب",
+                l10n.orderDateLabel, // ✅ مترجم
                 _order!.date.length >= 10
                     ? _order!.date.substring(0, 10)
                     : _order!.date,
               ),
-              _buildInfoColumn("عدد العناصر", "${_order!.items.length} منتجات"),
+              _buildInfoColumn(
+                l10n.itemsCountLabel, // ✅ مترجم
+                "${_order!.items.length} ${l10n.productsCountSuffix}", // ✅ مترجم
+              ),
             ],
           ),
         ],
@@ -310,8 +319,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     );
   }
 
-  // --- 🔥 المنطقة المحدثة: قائمة المنتجات ---
-  Widget _buildProductsList() {
+  Widget _buildProductsList(AppLocalizations l10n) {
     bool isOrderCompleted =
         _order!.status.toLowerCase() == 'completed' ||
         _order!.status.toLowerCase() == 'delivered';
@@ -323,7 +331,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       separatorBuilder: (ctx, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final item = _order!.items[index];
-        // التحقق مما إذا كان المنتج مقيماً (محلياً أو من السيرفر)
         final reviewData = _productReviews[item.productId];
         final bool isReviewed = reviewData != null;
 
@@ -401,7 +408,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         ),
                         const Spacer(),
                         Text(
-                          "${(item.price * item.quantity).toStringAsFixed(0)} ر.س",
+                          "${(item.price * item.quantity).toStringAsFixed(0)} ${l10n.currencySAR}", // ✅ عملة مترجمة
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 15,
@@ -414,11 +421,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                       const SizedBox(height: 12),
                       Align(
                         alignment: AlignmentDirectional.centerEnd,
-                        // 🔥 عرض زر "تعديل التقييم" أو "قيم المنتج"
                         child:
                             isReviewed
-                                ? _buildReviewedBadge(item, reviewData!)
-                                : _buildRateButton(item),
+                                ? _buildReviewedBadge(
+                                  item,
+                                  reviewData!,
+                                  l10n,
+                                ) // ✅ تمرير l10n
+                                : _buildRateButton(item, l10n), // ✅ تمرير l10n
                       ),
                     ],
                   ],
@@ -431,8 +441,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     );
   }
 
-  // 🔥 ويدجت جديد: شارة "مقيّم" التفاعلية
-  Widget _buildReviewedBadge(dynamic item, LocalReviewData reviewData) {
+  Widget _buildReviewedBadge(
+    dynamic item,
+    LocalReviewData reviewData,
+    AppLocalizations l10n,
+  ) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -441,6 +454,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               context,
               item.productId,
               item.productName,
+              l10n, // ✅ تمرير l10n
               existingRating: reviewData.rating,
               existingComment: reviewData.comment,
             ),
@@ -458,7 +472,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               const Icon(Icons.star_rounded, size: 16, color: Colors.amber),
               const SizedBox(width: 4),
               Text(
-                "${reviewData.rating}.0", // عرض التقييم
+                "${reviewData.rating}.0",
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
@@ -472,7 +486,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 color: Colors.amber.shade300,
               ),
               Text(
-                "تعديل",
+                l10n.editBtn, // ✅ نص مترجم
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
@@ -488,7 +502,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     );
   }
 
-  Widget _buildRateButton(dynamic item) {
+  Widget _buildRateButton(dynamic item, AppLocalizations l10n) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -497,6 +511,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
               context,
               item.productId,
               item.productName,
+              l10n, // ✅ تمرير l10n
             ),
         borderRadius: BorderRadius.circular(8),
         child: Container(
@@ -506,14 +521,18 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: Colors.grey.shade300),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.star_outline_rounded, size: 18, color: Colors.grey),
-              SizedBox(width: 6),
+              const Icon(
+                Icons.star_outline_rounded,
+                size: 18,
+                color: Colors.grey,
+              ),
+              const SizedBox(width: 6),
               Text(
-                "قيّم المنتج",
-                style: TextStyle(
+                l10n.rateProductBtn, // ✅ نص مترجم
+                style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                   color: Colors.black87,
@@ -526,8 +545,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     );
   }
 
-  // ... (widgets الدفع والملخص بقيت كما هي) ...
-  Widget _buildPaymentSummary() {
+  Widget _buildPaymentSummary(AppLocalizations l10n) {
     double subTotal = _order!.totalPrice - _order!.shippingCost;
     return Container(
       padding: const EdgeInsets.all(20),
@@ -544,11 +562,16 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       ),
       child: Column(
         children: [
-          _buildSummaryRow("المجموع الفرعي", subTotal),
+          _buildSummaryRow(
+            l10n.subtotalLabel,
+            subTotal,
+            l10n,
+          ), // ✅ مترجم (استخدمنا هذه الترجمة في شاشة السلة)
           const SizedBox(height: 12),
           _buildSummaryRow(
-            "رسوم الشحن",
+            l10n.shippingFeesLabel, // ✅ مترجم
             _order!.shippingCost,
+            l10n,
             isGreen: _order!.shippingCost == 0,
           ),
           Padding(
@@ -558,12 +581,15 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                "الإجمالي الكلي",
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              Text(
+                l10n.grandTotalLabel, // ✅ مترجم (أضفناها في شاشة الدفع)
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
               ),
               Text(
-                "${_order!.totalPrice.toStringAsFixed(2)} ر.س",
+                "${_order!.totalPrice.toStringAsFixed(2)} ${l10n.currencySAR}", // ✅ عملة مترجمة
                 style: const TextStyle(
                   fontWeight: FontWeight.w900,
                   fontSize: 18,
@@ -577,13 +603,20 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     );
   }
 
-  Widget _buildSummaryRow(String title, double amount, {bool isGreen = false}) {
+  Widget _buildSummaryRow(
+    String title,
+    double amount,
+    AppLocalizations l10n, {
+    bool isGreen = false,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(title, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
         Text(
-          amount == 0 ? "مجاني" : "${amount.toStringAsFixed(2)} ر.س",
+          amount == 0
+              ? l10n.freeLabel
+              : "${amount.toStringAsFixed(2)} ${l10n.currencySAR}", // ✅ مترجم
           style: TextStyle(
             fontWeight: FontWeight.w600,
             color: isGreen ? Colors.green : Colors.black87,
@@ -593,7 +626,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     );
   }
 
-  Widget _buildActionButtons() {
+  Widget _buildActionButtons(AppLocalizations l10n) {
     if (_order!.status.toLowerCase() == 'cancelled')
       return const SizedBox.shrink();
     return SizedBox(
@@ -608,9 +641,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           );
         },
         icon: const Icon(Icons.local_shipping_outlined, size: 20),
-        label: const Text(
-          "تتبع مسار الشحنة",
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        label: Text(
+          l10n.trackShipmentBtn, // ✅ مترجم
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.black87,
@@ -625,29 +658,29 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     );
   }
 
-  Widget _buildErrorState() {
+  Widget _buildErrorState(AppLocalizations l10n) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.error_outline_rounded, size: 80, color: Colors.grey[300]),
           const SizedBox(height: 20),
-          const Text(
-            "عذراً، حدث خطأ ما",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          Text(
+            l10n.errorOopsLabel, // ✅ مترجم
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
-          const Text(
-            "لم نتمكن من تحميل تفاصيل الطلب",
-            style: TextStyle(color: Colors.grey),
+          Text(
+            l10n.failedToLoadOrderDetailsMsg, // ✅ مترجم
+            style: const TextStyle(color: Colors.grey),
           ),
           const SizedBox(height: 24),
           TextButton.icon(
             onPressed: _fetchOrderDetails,
             icon: const Icon(Icons.refresh, color: Color(0xFFF105C6)),
-            label: const Text(
-              "إعادة المحاولة",
-              style: TextStyle(color: Color(0xFFF105C6)),
+            label: Text(
+              l10n.retryBtn, // ✅ مترجم (ترجمناها مسبقاً)
+              style: const TextStyle(color: Color(0xFFF105C6)),
             ),
           ),
         ],
@@ -655,15 +688,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     );
   }
 
-  // 🔥 تحديث: نافذة التقييم تقبل بيانات موجودة للتعديل
   void _showRatingBottomSheet(
     BuildContext context,
     int productId,
-    String productName, {
+    String productName,
+    AppLocalizations l10n, { // ✅ استقبال l10n
     int? existingRating,
     String? existingComment,
   }) {
-    // إذا كان تعديل، نستخدم القيم الموجودة
     int selectedRating = existingRating ?? 0;
     final TextEditingController commentController = TextEditingController(
       text: existingComment ?? "",
@@ -714,7 +746,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    isEditing ? "تعديل تقييمك" : "كيف كان المنتج؟",
+                    isEditing
+                        ? l10n.editYourRating
+                        : l10n.howWasTheProduct, // ✅ مترجم
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -754,7 +788,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     controller: commentController,
                     maxLines: 3,
                     decoration: InputDecoration(
-                      hintText: "شاركنا تجربتك (اختياري)...",
+                      hintText: l10n.shareYourExperienceHint, // ✅ مترجم
                       filled: true,
                       fillColor: Colors.grey[50],
                       border: OutlineInputBorder(
@@ -776,6 +810,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                   productId,
                                   selectedRating,
                                   commentController.text,
+                                  l10n, // ✅ تمرير l10n
                                   isEditing: isEditing,
                                 );
                               },
@@ -788,7 +823,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         ),
                       ),
                       child: Text(
-                        isEditing ? "تحديث التقييم" : "إرسال التقييم",
+                        isEditing
+                            ? l10n.updateRatingBtn
+                            : l10n.submitRatingBtn, // ✅ مترجم
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -805,22 +842,21 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     );
   }
 
-  // 🔥 تحديث: التعامل مع التعديل وتحديث الواجهة محلياً
   Future<void> _submitRating(
     int productId,
     int stars,
-    String comment, {
+    String comment,
+    AppLocalizations l10n, { // ✅ استقبال الترجمة
     bool isEditing = false,
   }) async {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("جاري معالجة التقييم..."),
-        duration: Duration(seconds: 1),
+      SnackBar(
+        content: Text(l10n.processingRatingMsg), // ✅ مترجم
+        duration: const Duration(seconds: 1),
       ),
     );
 
     try {
-      // استدعاء السيرفر (نفس الدالة تستخدم للإنشاء والتعديل عادةً، أو يتم إنشاء دالة update)
       await _orderService.submitProductReview(
         productId: productId,
         rating: stars,
@@ -829,17 +865,17 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
 
       if (mounted) {
         setState(() {
-          // تحديث البيانات المحلية مباشرة لعرض التغييرات
           _productReviews[productId] = LocalReviewData(
             rating: stars,
             comment: comment,
           );
         });
-        _showSuccessDialog(isEditing ? "تم تحديث تقييمك!" : "شكراً لك!");
+        _showSuccessDialog(
+          isEditing ? l10n.ratingUpdatedSuccess : l10n.thankYouMsg,
+          l10n,
+        ); // ✅ مترجم
       }
     } catch (e) {
-      // في حالة وجود خطأ 409 (تم التقييم مسبقاً) ونحن لسنا في وضع التعديل
-      // هذا يعني أننا نحاول إنشاء تقييم موجود، يمكننا تحديث الواجهة محلياً فقط كحل بديل
       if (e.toString().contains("409") ||
           e.toString().contains("ALREADY_REVIEWED")) {
         if (mounted) {
@@ -850,23 +886,23 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             );
           });
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("تم تحديث بياناتك"),
+            SnackBar(
+              content: Text(l10n.dataUpdatedMsg), // ✅ مترجم
               backgroundColor: Colors.green,
             ),
           );
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text("فشل الإرسال: $e")));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("${l10n.sendFailedMsg}$e")), // ✅ مترجم
+          );
         }
       }
     }
   }
 
-  void _showSuccessDialog(String title) {
+  void _showSuccessDialog(String title, AppLocalizations l10n) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -904,9 +940,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  "تم حفظ رأيك بنجاح",
-                  style: TextStyle(color: Colors.grey),
+                Text(
+                  l10n.opinionSavedSuccess, // ✅ مترجم
+                  style: const TextStyle(color: Colors.grey),
                 ),
               ],
             ),

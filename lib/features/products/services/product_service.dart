@@ -312,8 +312,8 @@ class ProductService {
   Future<ProductModel?> getProductById(int id) async {
     try {
       // ✅ هذا الرابط يستدعي الدالة getProductById في الباك إند
-      final response = await _apiClient.get('/products/$id'); 
-      
+      final response = await _apiClient.get('/products/$id');
+
       if (response.statusCode == 200 && response.data != null) {
         // تحويل البيانات باستخدام المودل الذي قمنا بتحديثه
         return ProductModel.fromJson(response.data);

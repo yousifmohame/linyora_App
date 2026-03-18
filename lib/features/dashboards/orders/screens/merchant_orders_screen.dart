@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import 'package:linyora_project/features/dashboards/orders/screens/merchant_order_details_screen.dart';
 import '../models/merchant_order_model.dart';
 import '../services/merchant_order_service.dart';
@@ -18,7 +22,7 @@ class _MerchantOrdersScreenState extends State<MerchantOrdersScreen> {
 
   bool _isLoading = true;
   String _searchQuery = '';
-  String _statusFilter = 'all'; // all, pending, completed, cancelled
+  String _statusFilter = 'all';
 
   @override
   void initState() {
@@ -42,7 +46,7 @@ class _MerchantOrdersScreenState extends State<MerchantOrdersScreen> {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('خطأ: $e')));
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -65,7 +69,6 @@ class _MerchantOrdersScreenState extends State<MerchantOrdersScreen> {
     });
   }
 
-  // حساب الإحصائيات
   Map<String, dynamic> _calculateStats() {
     return {
       'total': _allOrders.length,
@@ -80,10 +83,13 @@ class _MerchantOrdersScreenState extends State<MerchantOrdersScreen> {
   Widget build(BuildContext context) {
     final stats = _calculateStats();
 
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('إدارة الطلبات'),
+        title: Text(l10n.ordersManagementTitle), // ✅ مترجم
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
@@ -95,56 +101,54 @@ class _MerchantOrdersScreenState extends State<MerchantOrdersScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // 1. قسم الإحصائيات
             SizedBox(
               height: 100,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: [
                   _buildStatCard(
-                    'الكل',
+                    l10n.all,
                     stats['total'].toString(),
                     Colors.blue,
                     Icons.shopping_bag,
-                  ),
+                  ), // ✅ مترجم
                   const SizedBox(width: 8),
                   _buildStatCard(
-                    'قيد الانتظار',
+                    l10n.pending,
                     stats['pending'].toString(),
                     Colors.amber,
                     Icons.hourglass_top,
-                  ),
+                  ), // ✅ مترجم
                   const SizedBox(width: 8),
                   _buildStatCard(
-                    'مكتملة',
+                    l10n.completed,
                     stats['completed'].toString(),
                     Colors.green,
                     Icons.check_circle,
-                  ),
+                  ), // ✅ مترجم
                   const SizedBox(width: 8),
                   _buildStatCard(
-                    'ملغاة',
+                    l10n.cancelled,
                     stats['cancelled'].toString(),
                     Colors.red,
                     Icons.cancel,
-                  ),
+                  ), // ✅ مترجم
                   const SizedBox(width: 8),
                   _buildStatCard(
-                    'الأرباح',
-                    '${stats['revenue'].toStringAsFixed(0)} ر.س',
+                    l10n.profits,
+                    '${stats['revenue'].toStringAsFixed(0)} ${l10n.currencySAR}',
                     Colors.purple,
                     Icons.attach_money,
-                  ),
+                  ), // ✅ مترجم
                 ],
               ),
             ),
 
             const SizedBox(height: 16),
 
-            // 2. البحث والفلترة
             TextField(
               decoration: InputDecoration(
-                hintText: 'ابحث برقم الطلب أو اسم العميل...',
+                hintText: l10n.searchOrderOrCustomerHint, // ✅ مترجم
                 prefixIcon: const Icon(Icons.search),
                 filled: true,
                 fillColor: Colors.white,
@@ -165,29 +169,28 @@ class _MerchantOrdersScreenState extends State<MerchantOrdersScreen> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _buildFilterChip('الكل', 'all'),
+                  _buildFilterChip(l10n.all, 'all'), // ✅ مترجم
                   const SizedBox(width: 8),
-                  _buildFilterChip('قيد الانتظار', 'pending'),
+                  _buildFilterChip(l10n.pending, 'pending'), // ✅ مترجم
                   const SizedBox(width: 8),
-                  _buildFilterChip('مكتمل', 'completed'),
+                  _buildFilterChip(l10n.completed, 'completed'), // ✅ مترجم
                   const SizedBox(width: 8),
-                  _buildFilterChip('ملغي', 'cancelled'),
+                  _buildFilterChip(l10n.cancelled, 'cancelled'), // ✅ مترجم
                 ],
               ),
             ),
 
             const SizedBox(height: 16),
 
-            // 3. قائمة الطلبات
             if (_isLoading)
               const Center(child: CircularProgressIndicator())
             else if (_filteredOrders.isEmpty)
-              const Padding(
-                padding: EdgeInsets.only(top: 40),
+              Padding(
+                padding: const EdgeInsets.only(top: 40),
                 child: Center(
                   child: Text(
-                    'لا توجد طلبات مطابقة',
-                    style: TextStyle(color: Colors.grey),
+                    l10n.noMatchingOrdersMsg, // ✅ مترجم
+                    style: const TextStyle(color: Colors.grey),
                   ),
                 ),
               )
@@ -198,7 +201,10 @@ class _MerchantOrdersScreenState extends State<MerchantOrdersScreen> {
                 itemCount: _filteredOrders.length,
                 separatorBuilder: (ctx, i) => const SizedBox(height: 12),
                 itemBuilder:
-                    (ctx, index) => _buildOrderCard(_filteredOrders[index]),
+                    (ctx, index) => _buildOrderCard(
+                      _filteredOrders[index],
+                      l10n,
+                    ), // ✅ تمرير l10n
               ),
           ],
         ),
@@ -267,7 +273,9 @@ class _MerchantOrdersScreenState extends State<MerchantOrdersScreen> {
     );
   }
 
-  Widget _buildOrderCard(MerchantOrderSummary order) {
+  Widget _buildOrderCard(MerchantOrderSummary order, AppLocalizations l10n) {
+    String langCode = Localizations.localeOf(context).languageCode;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -286,7 +294,6 @@ class _MerchantOrdersScreenState extends State<MerchantOrdersScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -297,12 +304,11 @@ class _MerchantOrdersScreenState extends State<MerchantOrdersScreen> {
                     fontSize: 16,
                   ),
                 ),
-                _buildStatusBadge(order.orderStatus),
+                _buildStatusBadge(order.orderStatus, l10n), // ✅ تمرير l10n
               ],
             ),
             const Divider(height: 24),
 
-            // Info
             _buildInfoRow(Icons.person, order.customerName),
             const SizedBox(height: 8),
             _buildInfoRow(
@@ -313,7 +319,10 @@ class _MerchantOrdersScreenState extends State<MerchantOrdersScreen> {
             const SizedBox(height: 8),
             _buildInfoRow(
               Icons.calendar_today,
-              DateFormat('yyyy-MM-dd').format(order.orderDate),
+              DateFormat(
+                'yyyy-MM-dd',
+                langCode,
+              ).format(order.orderDate), // ✅ تنسيق التاريخ
             ),
 
             const SizedBox(height: 16),
@@ -321,7 +330,7 @@ class _MerchantOrdersScreenState extends State<MerchantOrdersScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '${order.totalAmount.toStringAsFixed(2)} ر.س',
+                  '${order.totalAmount.toStringAsFixed(2)} ${l10n.currencySAR}', // ✅ عملة مترجمة
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
@@ -338,9 +347,7 @@ class _MerchantOrdersScreenState extends State<MerchantOrdersScreen> {
                               orderId: order.orderId,
                             ),
                       ),
-                    ).then(
-                      (_) => _fetchOrders(),
-                    ); // تحديث القائمة عند العودة (في حال تغيرت الحالة)
+                    ).then((_) => _fetchOrders());
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
@@ -351,7 +358,7 @@ class _MerchantOrdersScreenState extends State<MerchantOrdersScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: const Text('عرض التفاصيل'),
+                  child: Text(l10n.viewDetailsBtn), // ✅ مترجم
                 ),
               ],
             ),
@@ -383,29 +390,29 @@ class _MerchantOrdersScreenState extends State<MerchantOrdersScreen> {
     );
   }
 
-  Widget _buildStatusBadge(String status) {
+  Widget _buildStatusBadge(String status, AppLocalizations l10n) {
     Color color;
     String text;
     switch (status.toLowerCase()) {
       case 'completed':
         color = Colors.green;
-        text = 'مكتمل';
+        text = l10n.completed;
         break;
       case 'pending':
         color = Colors.amber;
-        text = 'قيد الانتظار';
+        text = l10n.pending;
         break;
       case 'cancelled':
         color = Colors.red;
-        text = 'ملغي';
+        text = l10n.cancelled;
         break;
       case 'shipped':
         color = Colors.blue;
-        text = 'تم الشحن';
+        text = l10n.shipped;
         break;
       case 'processing':
         color = Colors.orange;
-        text = 'قيد التجهيز';
+        text = l10n.processingOrder;
         break;
       default:
         color = Colors.grey;
@@ -431,7 +438,6 @@ class _MerchantOrdersScreenState extends State<MerchantOrdersScreen> {
   }
 }
 
-// Extension بسيطة لفلترة القائمة
 extension ListFilter<T> on List<T> {
   List<T> filter(bool Function(T) test) {
     final List<T> result = [];

@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:linyora_project/features/reels/services/reels_service.dart';
-import '../../../../models/comment_model.dart'; // تأكد من صحة مسار الموديل
+
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
+import '../../../../models/comment_model.dart';
 
 class CommentsSheet extends StatefulWidget {
   final String reelId;
@@ -51,7 +55,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
     }
   }
 
-  Future<void> _addComment() async {
+  Future<void> _addComment(AppLocalizations l10n) async {
     if (_controller.text.trim().isEmpty) return;
 
     final text = _controller.text;
@@ -65,14 +69,17 @@ class _CommentsSheetState extends State<CommentsSheet> {
       });
       widget.onCommentAdded();
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('فشل إرسال التعليق')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.failedToSendCommentMsg)), // ✅ مترجم
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Container(
       height: MediaQuery.of(context).size.height * 0.5,
       decoration: const BoxDecoration(
@@ -85,11 +92,11 @@ class _CommentsSheetState extends State<CommentsSheet> {
           children: [
             const SizedBox(height: 10),
             Container(width: 40, height: 4, color: Colors.grey[300]),
-            const Padding(
-              padding: EdgeInsets.all(16.0),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
               child: Text(
-                "التعليقات",
-                style: TextStyle(
+                l10n.commentsTitle, // ✅ مترجم
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: Colors.black,
@@ -102,10 +109,10 @@ class _CommentsSheetState extends State<CommentsSheet> {
                   _isLoading
                       ? const Center(child: CircularProgressIndicator())
                       : _comments.isEmpty
-                      ? const Center(
+                      ? Center(
                         child: Text(
-                          "لا توجد تعليقات بعد",
-                          style: TextStyle(color: Colors.black54),
+                          l10n.noCommentsYetMsg, // ✅ مترجم
+                          style: const TextStyle(color: Colors.black54),
                         ),
                       )
                       : ListView.builder(
@@ -167,7 +174,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
                     child: TextField(
                       controller: _controller,
                       decoration: InputDecoration(
-                        hintText: "أضف تعليقاً...",
+                        hintText: l10n.addCommentHint, // ✅ مترجم
                         filled: true,
                         fillColor: Colors.grey[100],
                         border: OutlineInputBorder(
@@ -190,7 +197,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
                         color: Colors.white,
                         size: 20,
                       ),
-                      onPressed: _addComment,
+                      onPressed: () => _addComment(l10n), // ✅ تمرير الترجمة
                     ),
                   ),
                 ],

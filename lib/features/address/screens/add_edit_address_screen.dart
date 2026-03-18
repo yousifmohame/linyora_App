@@ -1,8 +1,12 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // لإضافة اهتزاز خفيف عند الضغط
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:latlong2/latlong.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../providers/address_provider.dart';
 import '../../../models/checkout_models.dart';
 import 'osm_map_screen.dart';
@@ -19,7 +23,6 @@ class AddEditAddressScreen extends StatefulWidget {
 class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // Controllers
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
   late TextEditingController _cityController;
@@ -33,30 +36,33 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
   bool _isDefault = false;
   bool _isLoading = false;
 
-  // الألوان المستخدمة
   final Color _primaryColor = const Color(0xFFF105C6);
-  final Color _fillColor = const Color(0xFFF5F6FA); // لون خلفية الحقول
+  final Color _fillColor = const Color(0xFFF5F6FA);
 
   @override
   void initState() {
     super.initState();
-    
-    // 1. ربط البيانات القديمة (الاسم، الجوال، المدينة، العنوان)
-    _nameController = TextEditingController(text: widget.address?.fullName ?? '');
+
+    _nameController = TextEditingController(
+      text: widget.address?.fullName ?? '',
+    );
     _phoneController = TextEditingController(text: widget.address?.phone ?? '');
     _cityController = TextEditingController(text: widget.address?.city ?? '');
-    _address1Controller = TextEditingController(text: widget.address?.addressLine1 ?? '');
-    
-    // 2. ✅✅✅ التصحيح هنا: ربط الحقول الجديدة (المنطقة، الرمز البريدي)
-    // بدلاً من text: '' نضع القيمة القادمة من المودل
-    _stateController = TextEditingController(text: widget.address?.state ?? ''); 
-    _zipController = TextEditingController(text: widget.address?.postalCode ?? ''); 
-    _countryController = TextEditingController(text: widget.address?.country ?? 'السعودية');
-    
-    // 3. ✅✅✅ التصحيح هنا: ربط الإحداثيات
+    _address1Controller = TextEditingController(
+      text: widget.address?.addressLine1 ?? '',
+    );
+
+    _stateController = TextEditingController(text: widget.address?.state ?? '');
+    _zipController = TextEditingController(
+      text: widget.address?.postalCode ?? '',
+    );
+    _countryController = TextEditingController(
+      text: widget.address?.country ?? 'السعودية',
+    );
+
     _lat = widget.address?.latitude;
     _long = widget.address?.longitude;
-    
+
     _isDefault = widget.address?.isDefault ?? false;
   }
 
@@ -73,7 +79,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
   }
 
   Future<void> _pickLocation() async {
-    HapticFeedback.mediumImpact(); // تأثير اهتزاز خفيف
+    HapticFeedback.mediumImpact();
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const OsmMapScreen()),
@@ -88,13 +94,13 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
     }
   }
 
-  Future<void> _save() async {
+  Future<void> _save(AppLocalizations l10n) async {
     if (!_formKey.currentState!.validate()) return;
 
     if (_lat == null || _long == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("⚠️ الرجاء تحديد موقع التوصيل على الخريطة"),
+        SnackBar(
+          content: Text(l10n.selectLocationWarning), // ✅ مترجم
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
         ),
@@ -132,13 +138,13 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
       if (!mounted) return;
       Navigator.pop(context, true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("✅ تم حفظ العنوان بنجاح"),
+        SnackBar(
+          content: Text(l10n.addressSavedSuccess), // ✅ مترجم
           backgroundColor: Colors.green,
         ),
       );
     } catch (e) {
-      String errorMessage = "فشل الحفظ";
+      String errorMessage = l10n.saveFailedMsg; // ✅ مترجم
       if (e is DioException) {
         if (e.response?.data != null && e.response?.data is Map) {
           final serverMsg = e.response?.data['message'];
@@ -156,11 +162,16 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(
-          widget.address == null ? "عنوان جديد" : "تعديل العنوان",
+          widget.address == null
+              ? l10n.addNewAddressTitle
+              : l10n.editAddressTitle, // ✅ مترجم
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
         centerTitle: true,
@@ -172,7 +183,6 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      // جعل الزر عائماً في الأسفل لضمان سهولة الوصول
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
@@ -187,9 +197,9 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
         ),
         child: SafeArea(
           child: ElevatedButton(
-            onPressed: _isLoading ? null : _save,
+            onPressed: _isLoading ? null : () => _save(l10n), // ✅ تمرير l10n
             style: ElevatedButton.styleFrom(
-              backgroundColor: _primaryColor, // استخدام اللون الرئيسي للتطبيق
+              backgroundColor: _primaryColor,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -207,7 +217,9 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                       ),
                     )
                     : Text(
-                      widget.address == null ? "حفظ العنوان" : "تحديث البيانات",
+                      widget.address == null
+                          ? l10n.saveAddressBtn
+                          : l10n.updateDataBtn, // ✅ مترجم
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -224,95 +236,95 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. قسم الخريطة (الأهم للتوصيل)
-              _buildSectionTitle("موقع التوصيل"),
+              _buildSectionTitle(l10n.deliveryLocationSection), // ✅ مترجم
               const SizedBox(height: 10),
-              _buildMapSelector(),
+              _buildMapSelector(l10n), // ✅ تمرير الترجمة
 
               const SizedBox(height: 25),
 
-              // 2. معلومات الاتصال
-              _buildSectionTitle("بيانات المستلم"),
+              _buildSectionTitle(l10n.recipientDataSection), // ✅ مترجم
               const SizedBox(height: 10),
               _buildModernTextField(
                 controller: _nameController,
-                label: "الاسم الكامل",
-                hint: "مثال: محمد أحمد",
+                label: l10n.fullNameLabel, // ✅ مترجم
+                hint: l10n.fullNameHint, // ✅ مترجم
                 icon: Icons.person_outline,
+                l10n: l10n,
               ),
               const SizedBox(height: 12),
               _buildModernTextField(
                 controller: _phoneController,
-                label: "رقم الجوال",
-                hint: "05xxxxxxxx",
+                label: l10n.phoneNumberLabel, // ✅ مترجم
+                hint: l10n.phoneHint, // ✅ مترجم
                 icon: Icons.phone_android_outlined,
                 isPhone: true,
+                l10n: l10n,
               ),
 
               const SizedBox(height: 25),
 
-              // 3. تفاصيل العنوان
-              _buildSectionTitle("تفاصيل العنوان"),
+              _buildSectionTitle(l10n.addressDetailsSection), // ✅ مترجم
               const SizedBox(height: 10),
 
-              // سطر الدولة والمدينة
               Row(
                 children: [
                   Expanded(
                     child: _buildModernTextField(
                       controller: _countryController,
-                      label: "الدولة",
+                      label: l10n.countryLabel, // ✅ مترجم
                       icon: Icons.flag_outlined,
-                      readOnly: true, // عادة الدولة ثابتة
+                      readOnly: true,
+                      l10n: l10n,
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: _buildModernTextField(
                       controller: _cityController,
-                      label: "المدينة",
+                      label: l10n.cityLabel, // ✅ مترجم
                       icon: Icons.location_city_outlined,
+                      l10n: l10n,
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
 
-              // سطر المنطقة والرمز البريدي
               Row(
                 children: [
                   Expanded(
                     child: _buildModernTextField(
                       controller: _stateController,
-                      label: "المنطقة / الحي",
+                      label: l10n.regionDistrictLabel, // ✅ مترجم
                       icon: Icons.map_outlined,
+                      l10n: l10n,
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: _buildModernTextField(
                       controller: _zipController,
-                      label: "الرمز البريدي",
+                      label: l10n.postalCodeLabel, // ✅ مترجم
                       icon: Icons.markunread_mailbox_outlined,
                       isPhone: true,
+                      l10n: l10n,
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
 
-              // تفاصيل الشارع
               _buildModernTextField(
                 controller: _address1Controller,
-                label: "اسم الشارع / وصف المنزل",
-                hint: "مثال: بجوار مسجد...",
+                label: l10n.streetNameDescLabel, // ✅ مترجم
+                hint: l10n.streetNameHint, // ✅ مترجم
                 icon: Icons.home_outlined,
                 maxLines: 2,
+                l10n: l10n,
               ),
 
               const SizedBox(height: 20),
 
-              // 4. خيار الافتراضي
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -325,13 +337,16 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
                 ),
                 child: SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text(
-                    "تعيين كعنوان افتراضي",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  title: Text(
+                    l10n.setAsDefaultLabel, // ✅ مترجم
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
                   ),
-                  subtitle: const Text(
-                    "سيتم استخدام هذا العنوان تلقائياً للطلبات القادمة",
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  subtitle: Text(
+                    l10n.setAsDefaultDesc, // ✅ مترجم
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                   value: _isDefault,
                   activeColor: _primaryColor,
@@ -345,8 +360,6 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
     );
   }
 
-  // --- Widgets ---
-
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
@@ -358,7 +371,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
     );
   }
 
-  Widget _buildMapSelector() {
+  Widget _buildMapSelector(AppLocalizations l10n) {
     bool isSelected = _lat != null;
     return GestureDetector(
       onTap: _pickLocation,
@@ -369,24 +382,18 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
           color:
               isSelected
                   ? Colors.green.withOpacity(0.05)
-                  : const Color(0xFFFFF0F5), // لون خلفية خفيف
+                  : const Color(0xFFFFF0F5),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? Colors.green : _primaryColor.withOpacity(0.3),
             width: 1.5,
-            style:
-                isSelected
-                    ? BorderStyle.solid
-                    : BorderStyle.none, // حدود متقطعة أو متصلة
+            style: isSelected ? BorderStyle.solid : BorderStyle.none,
           ),
           image:
               isSelected
                   ? null
                   : const DecorationImage(
-                    // يمكنك وضع صورة خريطة ثابتة هنا كخلفية لزيادة الجمالية
-                    image: AssetImage(
-                      'assets/images/map_placeholder.png',
-                    ), // تأكد من وجود صورة أو احذف السطر
+                    image: AssetImage('assets/images/map_placeholder.png'),
                     fit: BoxFit.cover,
                     opacity: 0.1,
                   ),
@@ -402,8 +409,8 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
             const SizedBox(height: 8),
             Text(
               isSelected
-                  ? "تم تحديد الموقع بنجاح"
-                  : "اضغط لتحديد الموقع على الخريطة",
+                  ? l10n.locationSelectedSuccess
+                  : l10n.tapToSelectLocation, // ✅ مترجم
               style: TextStyle(
                 color: isSelected ? Colors.green.shade700 : _primaryColor,
                 fontWeight: FontWeight.bold,
@@ -412,13 +419,13 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
             ),
             if (isSelected)
               Text(
-                "إحداثيات: ${_lat!.toStringAsFixed(4)}, ${_long!.toStringAsFixed(4)}",
+                "${l10n.coordinatesLabel}${_lat!.toStringAsFixed(4)}, ${_long!.toStringAsFixed(4)}", // ✅ مترجم
                 style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
               )
             else
-              const Text(
-                "خطوة ضرورية لتوصيل الطلب لباب منزلك",
-                style: TextStyle(color: Colors.grey, fontSize: 11),
+              Text(
+                l10n.locationRequiredDesc, // ✅ مترجم
+                style: const TextStyle(color: Colors.grey, fontSize: 11),
               ),
           ],
         ),
@@ -434,6 +441,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
     bool isPhone = false,
     bool readOnly = false,
     int maxLines = 1,
+    required AppLocalizations l10n, // ✅ استقبال الترجمة
   }) {
     return TextFormField(
       controller: controller,
@@ -443,7 +451,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
       style: const TextStyle(fontWeight: FontWeight.w500),
       validator: (val) {
         if (readOnly) return null;
-        if (val == null || val.isEmpty) return "هذا الحقل مطلوب";
+        if (val == null || val.isEmpty) return l10n.requiredFieldMsg; // ✅ مترجم
         return null;
       },
       decoration: InputDecoration(
@@ -459,7 +467,7 @@ class _AddEditAddressScreenState extends State<AddEditAddressScreen> {
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none, // بدون حدود افتراضياً
+          borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),

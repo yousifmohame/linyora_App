@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:linyora_project/features/categories/screens/category_products_screen.dart';
+
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../../../../models/category_model.dart';
 import '../services/category_service.dart';
 
@@ -60,6 +64,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     // --- حسابات التجاوب ---
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isTablet = screenWidth > 600;
@@ -69,9 +76,12 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          "الأقسام",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        title: Text(
+          l10n.categoriesTitle, // ✅ عنوان مترجم
+          style: const TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
         leading: const BackButton(color: Colors.black),
@@ -90,7 +100,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                     controller: _searchController,
                     onChanged: (value) => _applyFilters(),
                     decoration: InputDecoration(
-                      hintText: "ابحث عن قسم...",
+                      hintText: l10n.searchCategoryHint, // ✅ نص مترجم
                       prefixIcon: const Icon(Icons.search, color: Colors.grey),
                       filled: true,
                       fillColor: Colors.grey[100],
@@ -108,7 +118,12 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                         child: SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           child: Row(
-                            children: [_buildFilterChip('الكل', 'all')],
+                            children: [
+                              _buildFilterChip(
+                                l10n.allFilter,
+                                'all',
+                              ), // ✅ نص مترجم
+                            ],
                           ),
                         ),
                       ),
@@ -172,7 +187,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   _isLoading
                       ? _buildLoadingSkeleton(isTablet)
                       : _filteredCategories.isEmpty
-                      ? _buildEmptyState()
+                      ? _buildEmptyState(l10n) // ✅ تمرير الترجمة
                       : RefreshIndicator(
                         onRefresh: _fetchCategories,
                         color: const Color(0xFFF105C6),
@@ -271,16 +286,16 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(AppLocalizations l10n) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.search_off, size: 60, color: Colors.grey[300]),
           const SizedBox(height: 10),
-          const Text(
-            "لا توجد أقسام مطابقة",
-            style: TextStyle(color: Colors.grey),
+          Text(
+            l10n.noCategoriesFound, // ✅ نص مترجم
+            style: const TextStyle(color: Colors.grey),
           ),
         ],
       ),
@@ -401,6 +416,9 @@ class _CategoryListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ استدعاء الترجمة هنا في الويدجت الخاص ببطاقة القائمة
+    final l10n = AppLocalizations.of(context)!;
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -480,7 +498,7 @@ class _CategoryListCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${category.productCount} منتج',
+                    '${category.productCount} ${l10n.productsLabel}', // ✅ نص ديناميكي مترجم
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ],

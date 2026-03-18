@@ -1,8 +1,12 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import 'package:linyora_project/features/models/requests/models/agreement_request_model.dart';
 import 'package:linyora_project/features/models/requests/services/agreement_service.dart';
-import '../../screens/model_nav.dart'; // افترض وجود هذا الملف
+import '../../screens/model_nav.dart';
 
 class ModelRequestsScreen extends StatefulWidget {
   const ModelRequestsScreen({Key? key}) : super(key: key);
@@ -18,12 +22,10 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
   List<AgreementRequest> _filteredRequests = [];
   bool _isLoading = true;
 
-  // Filters
   String _statusFilter = 'all';
   String _searchTerm = '';
   final TextEditingController _searchController = TextEditingController();
 
-  // Colors Palette
   final Color _roseColor = const Color(0xFFE11D48);
   final Color _purpleColor = const Color(0xFF9333EA);
 
@@ -67,34 +69,32 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
     });
   }
 
-  // --- Actions ---
-
+  // ✅ تمرير l10n للـ Dialog و SnackBar
   Future<void> _handleAction(
     Future Function() action,
     String successMessage,
+    AppLocalizations l10n,
   ) async {
     try {
-      // ✅ 1. تحسين عرض Loading Dialog لتجنب الشاشة السوداء
       showDialog(
         context: context,
         barrierDismissible: false,
         builder:
             (_) => Center(
-              // Center مهم لتوسط الشاشة
               child: Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white, // خلفية بيضاء للمربع
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Column(
-                  mainAxisSize: MainAxisSize.min, // لتصغير الحجم
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 16),
                     Text(
-                      "جاري المعالجة...",
-                      style: TextStyle(
+                      l10n.processingMsg, // ✅ مترجم (ترجمناها سابقاً)
+                      style: const TextStyle(
                         decoration: TextDecoration.none,
                         color: Colors.black,
                         fontSize: 14,
@@ -108,9 +108,8 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
 
       await action();
 
-      // ✅ 2. التأكد من إغلاق الـ Dialog فقط إذا كانت الشاشة لا تزال موجودة
       if (mounted) {
-        Navigator.pop(context); // إغلاق Loading
+        Navigator.pop(context);
       }
 
       if (mounted) {
@@ -120,21 +119,24 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
             backgroundColor: Colors.green,
           ),
         );
-        _fetchRequests(); // تحديث القائمة
+        _fetchRequests();
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context); // إغلاق Loading عند الخطأ
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("حدث خطأ: $e"), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text("${l10n.errorOccurredMsg}$e"),
+            backgroundColor: Colors.red,
+          ), // ✅ مترجم
         );
       }
     }
   }
 
-  void _showRejectDialog(AgreementRequest req) {
+  void _showRejectDialog(AgreementRequest req, AppLocalizations l10n) {
     String reason = '';
-    String selectedReason = 'busy'; // default
+    String selectedReason = 'busy';
 
     showDialog(
       context: context,
@@ -145,45 +147,50 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
-                title: const Row(
+                title: Row(
                   children: [
-                    Icon(Icons.warning_amber_rounded, color: Colors.amber),
-                    SizedBox(width: 8),
-                    Text("رفض الطلب"),
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.amber,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(l10n.rejectRequestTitle), // ✅ مترجم
                   ],
                 ),
                 content: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      "لماذا تريدين رفض طلب ${req.merchantName}؟",
+                      "${l10n.whyRejectRequestMsg}${req.merchantName}؟", // ✅ مترجم
                       style: const TextStyle(color: Colors.grey),
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
                       value: selectedReason,
-                      items: const [
+                      items: [
                         DropdownMenuItem(
                           value: 'busy',
-                          child: Text("مشغول حالياً"),
-                        ),
+                          child: Text(l10n.busyCurrentlyReason),
+                        ), // ✅ مترجم
                         DropdownMenuItem(
                           value: 'budget',
-                          child: Text("الميزانية غير مناسبة"),
-                        ),
+                          child: Text(l10n.budgetNotSuitableReason),
+                        ), // ✅ مترجم
                         DropdownMenuItem(
                           value: 'other',
-                          child: Text("سبب آخر"),
-                        ),
+                          child: Text(l10n.otherReason),
+                        ), // ✅ مترجم
                       ],
                       onChanged: (val) => setState(() => selectedReason = val!),
-                      decoration: _inputDecoration("السبب"),
+                      decoration: _inputDecoration(l10n.reasonLabel), // ✅ مترجم
                     ),
                     if (selectedReason == 'other') ...[
                       const SizedBox(height: 12),
                       TextField(
                         onChanged: (val) => reason = val,
-                        decoration: _inputDecoration("اكتب السبب هنا..."),
+                        decoration: _inputDecoration(
+                          l10n.writeReasonHereHint,
+                        ), // ✅ مترجم
                         maxLines: 2,
                       ),
                     ],
@@ -192,7 +199,7 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx),
-                    child: const Text("إلغاء"),
+                    child: Text(l10n.cancelBtn), // ✅ مترجم
                   ),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
@@ -209,12 +216,13 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
                                   ? reason
                                   : selectedReason,
                         ),
-                        "تم رفض الطلب",
+                        l10n.requestRejectedSuccessMsg, // ✅ مترجم
+                        l10n,
                       );
                     },
-                    child: const Text(
-                      "تأكيد الرفض",
-                      style: TextStyle(color: Colors.white),
+                    child: Text(
+                      l10n.confirmRejectionBtn, // ✅ مترجم
+                      style: const TextStyle(color: Colors.white),
                     ),
                   ),
                 ],
@@ -224,10 +232,11 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
     );
   }
 
-  // --- UI Components ---
-
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     final stats = {
       'total': _requests.length,
       'pending': _requests.where((r) => r.status == 'pending').length,
@@ -239,7 +248,6 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // Background Gradient
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -266,43 +274,45 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
           SafeArea(
             child: Column(
               children: [
-                _buildHeader(),
+                _buildHeader(l10n), // ✅ تمرير l10n
 
-                // Stats
                 SizedBox(
                   height: 80,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     children: [
-                      _buildStatCard("الكل", stats['total']!, Colors.pink),
                       _buildStatCard(
-                        "قيد الانتظار",
+                        l10n.statusAll,
+                        stats['total']!,
+                        Colors.pink,
+                      ), // ✅ مترجم
+                      _buildStatCard(
+                        l10n.statusPending,
                         stats['pending']!,
                         Colors.amber,
-                      ),
+                      ), // ✅ مترجم
                       _buildStatCard(
-                        "جاري التنفيذ",
+                        l10n.statusInProgress,
                         stats['in_progress']!,
                         Colors.purple,
-                      ),
+                      ), // ✅ مترجم
                       _buildStatCard(
-                        "تم التسليم",
+                        l10n.statusDelivered,
                         stats['delivered']!,
                         Colors.yellow.shade700,
-                      ),
+                      ), // ✅ مترجم
                       _buildStatCard(
-                        "مكتمل",
+                        l10n.statusCompleted,
                         stats['completed']!,
                         Colors.green,
-                      ),
+                      ), // ✅ مترجم
                     ],
                   ),
                 ),
 
                 const SizedBox(height: 16),
 
-                // Filters
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Container(
@@ -321,9 +331,9 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
                             _applyFilters();
                           },
                           decoration: _inputDecoration(
-                            "بحث عن تاجر أو منتج",
+                            l10n.searchMerchantOrProductHint,
                             icon: Icons.search,
-                          ),
+                          ), // ✅ مترجم
                         ),
                         const SizedBox(height: 10),
                         Row(
@@ -331,32 +341,32 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
                             Expanded(
                               child: DropdownButtonFormField<String>(
                                 value: _statusFilter,
-                                items: const [
+                                items: [
                                   DropdownMenuItem(
                                     value: 'all',
-                                    child: Text("جميع الحالات"),
-                                  ),
+                                    child: Text(l10n.allStatuses),
+                                  ), // ✅ مترجم
                                   DropdownMenuItem(
                                     value: 'pending',
-                                    child: Text("قيد الانتظار"),
-                                  ),
+                                    child: Text(l10n.statusPending),
+                                  ), // ✅ مترجم
                                   DropdownMenuItem(
                                     value: 'in_progress',
-                                    child: Text("جاري التنفيذ"),
-                                  ),
+                                    child: Text(l10n.statusInProgress),
+                                  ), // ✅ مترجم
                                   DropdownMenuItem(
                                     value: 'completed',
-                                    child: Text("مكتمل"),
-                                  ),
+                                    child: Text(l10n.statusCompleted),
+                                  ), // ✅ مترجم
                                 ],
                                 onChanged: (val) {
                                   _statusFilter = val!;
                                   _applyFilters();
                                 },
                                 decoration: _inputDecoration(
-                                  "تصفية بالحالة",
+                                  l10n.filterByStatusHint,
                                   icon: Icons.filter_list,
-                                ),
+                                ), // ✅ مترجم
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -383,19 +393,20 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
 
                 const SizedBox(height: 16),
 
-                // List
                 Expanded(
                   child:
                       _isLoading
                           ? const Center(child: CircularProgressIndicator())
                           : _filteredRequests.isEmpty
-                          ? _buildEmptyState()
+                          ? _buildEmptyState(l10n) // ✅ تمرير l10n
                           : ListView.builder(
                             padding: const EdgeInsets.all(16),
                             itemCount: _filteredRequests.length,
                             itemBuilder:
-                                (context, index) =>
-                                    _buildRequestCard(_filteredRequests[index]),
+                                (context, index) => _buildRequestCard(
+                                  _filteredRequests[index],
+                                  l10n,
+                                ), // ✅ تمرير l10n
                           ),
                 ),
               ],
@@ -406,9 +417,7 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
     );
   }
 
-  // --- Widget Builders ---
-
-  Widget _buildHeader() {
+  Widget _buildHeader(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -434,7 +443,7 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
                   ),
                 ],
               ),
-              const SizedBox(width: 40), // Spacer
+              const SizedBox(width: 40),
             ],
           ),
           const SizedBox(height: 10),
@@ -443,18 +452,18 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
                 (bounds) => LinearGradient(
                   colors: [_roseColor, _purpleColor],
                 ).createShader(bounds),
-            child: const Text(
-              "طلبات الاتفاقيات",
-              style: TextStyle(
+            child: Text(
+              l10n.agreementRequestsTitle, // ✅ مترجم
+              style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
               ),
             ),
           ),
-          const Text(
-            "إدارة طلبات التعاون مع التجار",
-            style: TextStyle(color: Colors.grey),
+          Text(
+            l10n.manageCollabRequestsDesc, // ✅ مترجم
+            style: const TextStyle(color: Colors.grey),
           ),
         ],
       ),
@@ -492,7 +501,7 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
     );
   }
 
-  Widget _buildRequestCard(AgreementRequest req) {
+  Widget _buildRequestCard(AgreementRequest req, AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -505,7 +514,6 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
       ),
       child: Column(
         children: [
-          // Header Gradient
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -563,42 +571,39 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
                     ),
                   ],
                 ),
-                _buildStatusBadge(req.status),
+                _buildStatusBadge(req.status, l10n), // ✅ تمرير l10n
               ],
             ),
           ),
 
-          // Body
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                // Info Boxes
                 Row(
                   children: [
                     Expanded(
                       child: _buildInfoBox(
                         Icons.inventory_2,
-                        "الباقة",
+                        l10n.packageLabel,
                         req.packageTitle,
                         Colors.purple,
-                      ),
+                      ), // ✅ مترجم
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: _buildInfoBox(
                         Icons.shopping_bag,
-                        "المنتج",
+                        l10n.productLabel,
                         req.productName,
                         Colors.blue,
-                      ),
+                      ), // ✅ مترجم
                     ),
                   ],
                 ),
 
                 const SizedBox(height: 12),
 
-                // Details Grid
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -610,19 +615,19 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
                     children: [
                       _buildDetailItem(
                         Icons.attach_money,
-                        "${req.tierPrice} ر.س",
+                        "${req.tierPrice} ${l10n.currencySAR}",
                         Colors.green,
-                      ),
+                      ), // ✅ مترجم
                       _buildDetailItem(
                         Icons.access_time,
-                        "${req.deliveryDays} أيام",
+                        "${req.deliveryDays} ${l10n.daysLabel}",
                         Colors.amber,
-                      ),
+                      ), // ✅ مترجم
                       _buildDetailItem(
                         Icons.rate_review,
-                        "${req.revisions} تعديل",
+                        "${req.revisions} ${l10n.revisionsLabel}",
                         Colors.blue,
-                      ),
+                      ), // ✅ مترجم
                     ],
                   ),
                 ),
@@ -641,7 +646,7 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "المميزات:",
+                          l10n.featuresLabel, // ✅ مترجم
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
@@ -676,9 +681,7 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
                 ],
 
                 const SizedBox(height: 16),
-
-                // Actions
-                _buildActionButtons(req),
+                _buildActionButtons(req, l10n), // ✅ تمرير l10n
               ],
             ),
           ),
@@ -687,14 +690,14 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
     );
   }
 
-  Widget _buildActionButtons(AgreementRequest req) {
+  Widget _buildActionButtons(AgreementRequest req, AppLocalizations l10n) {
     if (req.status == 'pending') {
       return Row(
         children: [
           Expanded(
             child: ElevatedButton.icon(
               icon: const Icon(Icons.check, size: 16),
-              label: const Text("قبول"),
+              label: Text(l10n.acceptBtn), // ✅ مترجم
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
                 foregroundColor: Colors.white,
@@ -702,7 +705,8 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
               onPressed:
                   () => _handleAction(
                     () => _service.respondToRequest(req.id, 'accepted'),
-                    "تم قبول الطلب",
+                    l10n.requestAcceptedSuccessMsg, // ✅ مترجم
+                    l10n,
                   ),
             ),
           ),
@@ -710,12 +714,12 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
           Expanded(
             child: OutlinedButton.icon(
               icon: const Icon(Icons.close, size: 16),
-              label: const Text("رفض"),
+              label: Text(l10n.rejectBtn), // ✅ مترجم
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.red,
                 side: const BorderSide(color: Colors.red),
               ),
-              onPressed: () => _showRejectDialog(req),
+              onPressed: () => _showRejectDialog(req, l10n), // ✅ تمرير l10n
             ),
           ),
         ],
@@ -725,7 +729,7 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
         width: double.infinity,
         child: ElevatedButton.icon(
           icon: const Icon(Icons.play_arrow, size: 16),
-          label: const Text("بدء التنفيذ"),
+          label: Text(l10n.startExecutionBtn), // ✅ مترجم
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.blue,
             foregroundColor: Colors.white,
@@ -733,7 +737,8 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
           onPressed:
               () => _handleAction(
                 () => _service.startRequest(req.id),
-                "تم بدء المشروع",
+                l10n.projectStartedSuccessMsg, // ✅ مترجم
+                l10n,
               ),
         ),
       );
@@ -742,7 +747,7 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
         width: double.infinity,
         child: ElevatedButton.icon(
           icon: const Icon(Icons.check_circle_outline, size: 16),
-          label: const Text("تسليم العمل"),
+          label: Text(l10n.deliverWorkBtn), // ✅ مترجم
           style: ElevatedButton.styleFrom(
             backgroundColor: _purpleColor,
             foregroundColor: Colors.white,
@@ -750,7 +755,8 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
           onPressed:
               () => _handleAction(
                 () => _service.deliverRequest(req.id),
-                "تم تسليم العمل",
+                l10n.workDeliveredSuccessMsg, // ✅ مترجم
+                l10n,
               ),
         ),
       );
@@ -763,7 +769,7 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
-          "في انتظار موافقة التاجر",
+          l10n.waitingForMerchantApprovalMsg, // ✅ مترجم
           textAlign: TextAlign.center,
           style: TextStyle(
             color: Colors.amber.shade900,
@@ -776,7 +782,7 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
     return const SizedBox();
   }
 
-  Widget _buildStatusBadge(String status) {
+  Widget _buildStatusBadge(String status, AppLocalizations l10n) {
     Color color;
     String text;
     IconData icon;
@@ -784,32 +790,32 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
     switch (status) {
       case 'pending':
         color = Colors.amber;
-        text = "قيد الانتظار";
+        text = l10n.statusPending;
         icon = Icons.access_time;
         break;
       case 'accepted':
         color = Colors.blue;
-        text = "مقبول";
+        text = l10n.statusAccepted;
         icon = Icons.check_circle;
         break;
       case 'in_progress':
         color = Colors.purple;
-        text = "جاري التنفيذ";
+        text = l10n.statusInProgress;
         icon = Icons.bolt;
         break;
       case 'delivered':
         color = Colors.orange;
-        text = "تم التسليم";
+        text = l10n.statusDelivered;
         icon = Icons.local_shipping;
         break;
       case 'completed':
         color = Colors.green;
-        text = "مكتمل";
+        text = l10n.statusCompleted;
         icon = Icons.task_alt;
         break;
       case 'rejected':
         color = Colors.red;
-        text = "مرفوض";
+        text = l10n.statusRejected;
         icon = Icons.cancel;
         break;
       default:
@@ -891,20 +897,20 @@ class _ModelRequestsScreenState extends State<ModelRequestsScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(AppLocalizations l10n) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.handshake_outlined, size: 60, color: Colors.grey.shade300),
           const SizedBox(height: 16),
-          const Text(
-            "لا توجد طلبات",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          Text(
+            l10n.noRequestsMsg, // ✅ مترجم
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-          const Text(
-            "لم تصلك أي طلبات تعاون حتى الآن",
-            style: TextStyle(color: Colors.grey),
+          Text(
+            l10n.noCollabRequestsYetMsg, // ✅ مترجم
+            style: const TextStyle(color: Colors.grey),
           ),
         ],
       ),

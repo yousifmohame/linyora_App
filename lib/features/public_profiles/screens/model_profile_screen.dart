@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart'; // 1. استيراد المكتبة
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:linyora_project/features/reels/screens/model_reels_viewer.dart';
 import 'package:linyora_project/features/shared/widgets/full_screen_image_viewer.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+// ✅ استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../../../models/public_profile_models.dart';
 import '../services/public_profile_service.dart';
 import 'package:share_plus/share_plus.dart';
@@ -62,10 +66,13 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
 
   @override
   Widget build(BuildContext context) {
+    // ✅ تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     if (_isLoading)
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     if (_modelData == null)
-      return const Scaffold(body: Center(child: Text("المستخدم غير موجود")));
+      return Scaffold(body: Center(child: Text(l10n.userNotFound))); // ✅ مترجم
 
     final profile = _modelData!.profile;
 
@@ -100,7 +107,6 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
                   children: [
-                    // Avatar & Verification
                     Transform.translate(
                       offset: const Offset(0, 0),
                       child: Stack(
@@ -122,7 +128,9 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
                               child:
                                   profile.profilePictureUrl == null
                                       ? Text(
-                                        profile.name[0],
+                                        profile.name.isNotEmpty
+                                            ? profile.name[0]
+                                            : 'U',
                                         style: const TextStyle(fontSize: 30),
                                       )
                                       : null,
@@ -145,7 +153,7 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
                         ],
                       ),
                     ),
-                    // Name & Role
+
                     Text(
                       profile.name,
                       style: const TextStyle(
@@ -177,25 +185,26 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
 
                     const SizedBox(height: 20),
 
-                    // Stats
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         _buildStatItem(
-                          "المتابعين",
+                          l10n.followersStat,
                           "${profile.stats.followers + profile.followersCount}",
-                        ),
-                        _buildStatItem("ريلز", "${_modelData!.reels.length}"),
+                        ), // ✅ مترجم
                         _buildStatItem(
-                          "خدمات",
+                          l10n.reelsTab,
+                          "${_modelData!.reels.length}",
+                        ), // ✅ مترجم
+                        _buildStatItem(
+                          l10n.servicesTab,
                           "${_modelData!.services.length + _modelData!.offers.length}",
-                        ),
+                        ), // ✅ مترجم
                       ],
                     ),
 
                     const SizedBox(height: 20),
 
-                    // Bio
                     if (profile.bio != null)
                       Text(
                         profile.bio!,
@@ -205,14 +214,11 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
 
                     const SizedBox(height: 20),
 
-                    // Social Links (Improved with FontAwesome)
-                    // Social Links (تم التصحيح لإخفاء الأيقونات الفارغة)
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          // Instagram
                           if (profile.socialLinks.instagram != null &&
                               profile.socialLinks.instagram!.isNotEmpty)
                             _buildSocialBtn(
@@ -221,7 +227,6 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
                               profile.socialLinks.instagram!,
                             ),
 
-                          // Twitter / X
                           if (profile.socialLinks.twitter != null &&
                               profile.socialLinks.twitter!.isNotEmpty)
                             _buildSocialBtn(
@@ -230,7 +235,6 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
                               profile.socialLinks.twitter!,
                             ),
 
-                          // TikTok
                           if (profile.socialLinks.tiktok != null &&
                               profile.socialLinks.tiktok!.isNotEmpty)
                             _buildSocialBtn(
@@ -239,7 +243,6 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
                               profile.socialLinks.tiktok!,
                             ),
 
-                          // Snapchat
                           if (profile.socialLinks.snapchat != null &&
                               profile.socialLinks.snapchat!.isNotEmpty)
                             _buildSocialBtn(
@@ -249,7 +252,6 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
                               iconColor: Colors.black,
                             ),
 
-                          // YouTube
                           if (profile.socialLinks.youtube != null &&
                               profile.socialLinks.youtube!.isNotEmpty)
                             _buildSocialBtn(
@@ -258,7 +260,6 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
                               profile.socialLinks.youtube!,
                             ),
 
-                          // Facebook
                           if (profile.socialLinks.facebook != null &&
                               profile.socialLinks.facebook!.isNotEmpty)
                             _buildSocialBtn(
@@ -272,7 +273,6 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
 
                     const SizedBox(height: 20),
 
-                    // Actions
                     Row(
                       children: [
                         Expanded(
@@ -294,8 +294,8 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
                             ),
                             child: Text(
                               profile.isFollowedByMe
-                                  ? "إلغاء المتابعة"
-                                  : "متابعة",
+                                  ? l10n.unfollowBtn
+                                  : l10n.followBtn, // ✅ مترجم
                             ),
                           ),
                         ),
@@ -308,19 +308,15 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
                           child: IconButton(
                             icon: const Icon(Icons.share_outlined),
                             onPressed: () {
-                              // 1. تجهيز رابط البروفايل (يمكنك تغيير الدومين لاحقاً)
                               final String profileUrl =
                                   "https://linyora.com/profile/${profile.id}";
-
-                              // 2. تجهيز النص الجذاب للمشاركة
                               final String shareText =
-                                  "🌟 اكتشف بروفايل ${profile.name} المميز على تطبيق لينيورا!\n\nتصفح الأعمال والخدمات الحصرية هنا: 👇\n$profileUrl";
-
-                              // 3. فتح نافذة المشاركة الأصلية في النظام
+                                  "${l10n.shareProfileIntro}${profile.name}${l10n.shareProfileMid}$profileUrl"; // ✅ مترجم
                               Share.share(
                                 shareText,
-                                subject: "بروفايل ${profile.name} على لينيورا",
-                              );
+                                subject:
+                                    "${profile.name} ${l10n.shareProfileSubject}",
+                              ); // ✅ مترجم
                             },
                           ),
                         ),
@@ -337,10 +333,19 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
                   labelColor: const Color(0xFFF105C6),
                   unselectedLabelColor: Colors.grey,
                   indicatorColor: const Color(0xFFF105C6),
-                  tabs: const [
-                    Tab(text: "أعمالي", icon: Icon(Icons.grid_on)),
-                    Tab(text: "ريلز", icon: Icon(Icons.video_collection)),
-                    Tab(text: "خدمات", icon: Icon(Icons.shopping_bag)),
+                  tabs: [
+                    Tab(
+                      text: l10n.portfolioTab,
+                      icon: const Icon(Icons.grid_on),
+                    ), // ✅ مترجم
+                    Tab(
+                      text: l10n.reelsTab,
+                      icon: const Icon(Icons.video_collection),
+                    ), // ✅ مترجم
+                    Tab(
+                      text: l10n.servicesTab,
+                      icon: const Icon(Icons.shopping_bag),
+                    ), // ✅ مترجم
                   ],
                 ),
               ),
@@ -351,12 +356,9 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
         body: TabBarView(
           controller: _tabController,
           children: [
-            // Portfolio Tab
-            _buildPortfolioGrid(profile.portfolio),
-            // Reels Tab
-            _buildReelsGrid(),
-            // Services Tab
-            _buildServicesList(),
+            _buildPortfolioGrid(profile.portfolio, l10n), // ✅ تمرير l10n
+            _buildReelsGrid(l10n), // ✅ تمرير l10n
+            _buildServicesList(l10n), // ✅ تمرير l10n
           ],
         ),
       ),
@@ -375,7 +377,6 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
     );
   }
 
-  // تم تحديث هذه الدالة لتقبل أيقونات FontAwesome
   Widget _buildSocialBtn(
     IconData icon,
     Color bgColor,
@@ -383,15 +384,13 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
     Color iconColor = Colors.white,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 6,
-      ), // زيادة المسافة قليلاً
+      padding: const EdgeInsets.symmetric(horizontal: 6),
       child: InkWell(
         onTap: () => launchUrl(Uri.parse(url)),
         child: Container(
-          padding: const EdgeInsets.all(10), // حجم الدائرة
+          padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: bgColor, // لون الخلفية الرسمي
+            color: bgColor,
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
@@ -401,19 +400,14 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
               ),
             ],
           ),
-          child: FaIcon(
-            // استخدام FaIcon بدلاً من Icon
-            icon,
-            color: iconColor,
-            size: 20,
-          ),
+          child: FaIcon(icon, color: iconColor, size: 20),
         ),
       ),
     );
   }
 
-  Widget _buildPortfolioGrid(List<String> images) {
-    if (images.isEmpty) return const Center(child: Text("لا توجد صور"));
+  Widget _buildPortfolioGrid(List<String> images, AppLocalizations l10n) {
+    if (images.isEmpty) return Center(child: Text(l10n.noImagesMsg)); // ✅ مترجم
     return GridView.builder(
       padding: const EdgeInsets.all(2),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -449,9 +443,9 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
     );
   }
 
-  Widget _buildReelsGrid() {
+  Widget _buildReelsGrid(AppLocalizations l10n) {
     if (_modelData!.reels.isEmpty)
-      return const Center(child: Text("لا توجد ريلز"));
+      return Center(child: Text(l10n.noReelsMsg)); // ✅ مترجم
 
     return GridView.builder(
       padding: const EdgeInsets.all(2),
@@ -500,7 +494,7 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
     );
   }
 
-  Widget _buildServicesList() {
+  Widget _buildServicesList(AppLocalizations l10n) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -514,7 +508,7 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
               ),
               subtitle: Text(s.description, maxLines: 2),
               trailing: Text(
-                "${s.startingPrice} ر.س",
+                "${s.startingPrice} ${l10n.currencySAR}", // ✅ عملة مترجمة
                 style: const TextStyle(
                   color: Colors.purple,
                   fontWeight: FontWeight.bold,
@@ -534,7 +528,7 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
               ),
               subtitle: Text(o.description),
               trailing: Text(
-                "${o.price} ر.س",
+                "${o.price} ${l10n.currencySAR}", // ✅ عملة مترجمة
                 style: const TextStyle(
                   color: Colors.purple,
                   fontWeight: FontWeight.bold,

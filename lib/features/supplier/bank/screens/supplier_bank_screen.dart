@@ -2,6 +2,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import 'package:linyora_project/features/supplier/bank/models/supplier_bank_models.dart';
 import 'package:linyora_project/features/supplier/bank/services/supplier_bank_service.dart';
 
@@ -17,13 +21,11 @@ class _SupplierBankScreenState extends State<SupplierBankScreen> {
   final SupplierBankService _service = SupplierBankService();
   final ImagePicker _picker = ImagePicker();
 
-  // Controllers
   final _bankNameCtrl = TextEditingController();
   final _holderNameCtrl = TextEditingController();
   final _ibanCtrl = TextEditingController();
   final _accountNumCtrl = TextEditingController();
 
-  // State
   String? _certificateUrl;
   String _status = 'pending';
   String? _rejectionReason;
@@ -55,7 +57,8 @@ class _SupplierBankScreenState extends State<SupplierBankScreen> {
     }
   }
 
-  Future<void> _pickAndUploadImage() async {
+  // ✅ تمرير l10n للسناك بار
+  Future<void> _pickAndUploadImage(AppLocalizations l10n) async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image == null) return;
 
@@ -63,24 +66,25 @@ class _SupplierBankScreenState extends State<SupplierBankScreen> {
     try {
       final url = await _service.uploadCertificate(File(image.path));
       setState(() => _certificateUrl = url);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("تم رفع الشهادة بنجاح ✅")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.uploadCertificateSuccessMsg)),
+      ); // ✅ مترجم
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("فشل رفع الملف ❌")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.uploadFileFailedMsg)),
+      ); // ✅ مترجم
     } finally {
       setState(() => _isUploading = false);
     }
   }
 
-  Future<void> _submit() async {
+  // ✅ تمرير l10n للسناك بار
+  Future<void> _submit(AppLocalizations l10n) async {
     if (!_formKey.currentState!.validate()) return;
     if (_certificateUrl == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("يرجى رفع شهادة الآيبان")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.pleaseUploadIbanCertificateMsg)),
+      ); // ✅ مترجم
       return;
     }
 
@@ -92,22 +96,22 @@ class _SupplierBankScreenState extends State<SupplierBankScreen> {
         iban: _ibanCtrl.text,
         accountNumber: _accountNumCtrl.text,
         ibanCertificateUrl: _certificateUrl,
-        status: 'pending', // سيتحول لـ pending عند التعديل
+        status: 'pending',
       );
 
       await _service.saveBankDetails(details);
 
       if (mounted) {
-        setState(() => _status = 'pending'); // تحديث الواجهة
+        setState(() => _status = 'pending');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("تم حفظ البيانات بنجاح ✅")),
-        );
+          SnackBar(content: Text(l10n.dataSavedSuccessMsg)),
+        ); // ✅ مترجم
       }
     } catch (e) {
       if (mounted)
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text("فشل الحفظ ❌")));
+        ).showSnackBar(SnackBar(content: Text(l10n.saveFailedMsg))); // ✅ مترجم
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -115,6 +119,9 @@ class _SupplierBankScreenState extends State<SupplierBankScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     if (_isLoading) return const Center(child: CircularProgressIndicator());
 
     return Scaffold(
@@ -141,10 +148,9 @@ class _SupplierBankScreenState extends State<SupplierBankScreen> {
                     key: _formKey,
                     child: Column(
                       children: [
-                        _buildStatusAlert(),
+                        _buildStatusAlert(l10n), // ✅ تمرير l10n
                         const SizedBox(height: 20),
 
-                        // 1. المعلومات الأساسية
                         Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
@@ -154,16 +160,16 @@ class _SupplierBankScreenState extends State<SupplierBankScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Row(
+                              Row(
                                 children: [
-                                  Icon(
+                                  const Icon(
                                     Icons.account_balance,
                                     color: Colors.pink,
                                   ),
-                                  SizedBox(width: 8),
+                                  const SizedBox(width: 8),
                                   Text(
-                                    "المعلومات الأساسية",
-                                    style: TextStyle(
+                                    l10n.basicInformationLabel, // ✅ مترجم
+                                    style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 16,
                                     ),
@@ -173,36 +179,39 @@ class _SupplierBankScreenState extends State<SupplierBankScreen> {
                               const SizedBox(height: 20),
 
                               _buildTextField(
-                                "اسم البنك",
+                                l10n.bankNameLabel,
                                 _bankNameCtrl,
+                                l10n,
                                 icon: Icons.museum,
-                              ),
+                              ), // ✅ مترجم
                               const SizedBox(height: 16),
                               _buildTextField(
-                                "اسم صاحب الحساب",
+                                l10n.accountHolderNameLabel,
                                 _holderNameCtrl,
+                                l10n,
                                 icon: Icons.person,
-                              ),
+                              ), // ✅ مترجم
                               const SizedBox(height: 16),
                               _buildTextField(
-                                "رقم الآيبان (IBAN)",
+                                l10n.ibanLabel,
                                 _ibanCtrl,
+                                l10n,
                                 icon: Icons.credit_card,
-                                hint: "SA00 0000 ...",
-                              ),
+                                hint: l10n.ibanHint,
+                              ), // ✅ مترجم
                               const SizedBox(height: 16),
                               _buildTextField(
-                                "رقم الحساب (اختياري)",
+                                l10n.accountNumberOptionalLabel,
                                 _accountNumCtrl,
+                                l10n,
                                 isRequired: false,
-                              ),
+                              ), // ✅ مترجم
                             ],
                           ),
                         ),
 
                         const SizedBox(height: 20),
 
-                        // 2. رفع الشهادة
                         Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
@@ -212,13 +221,16 @@ class _SupplierBankScreenState extends State<SupplierBankScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Row(
+                              Row(
                                 children: [
-                                  Icon(Icons.description, color: Colors.pink),
-                                  SizedBox(width: 8),
+                                  const Icon(
+                                    Icons.description,
+                                    color: Colors.pink,
+                                  ),
+                                  const SizedBox(width: 8),
                                   Text(
-                                    "شهادة الآيبان",
-                                    style: TextStyle(
+                                    l10n.ibanCertificateLabel, // ✅ مترجم
+                                    style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 16,
                                     ),
@@ -229,7 +241,11 @@ class _SupplierBankScreenState extends State<SupplierBankScreen> {
 
                               InkWell(
                                 onTap:
-                                    _isUploading ? null : _pickAndUploadImage,
+                                    _isUploading
+                                        ? null
+                                        : () => _pickAndUploadImage(
+                                          l10n,
+                                        ), // ✅ تمرير l10n
                                 child: Container(
                                   height: 150,
                                   width: double.infinity,
@@ -253,7 +269,8 @@ class _SupplierBankScreenState extends State<SupplierBankScreen> {
                                             ),
                                             child: _buildFilePreview(
                                               _certificateUrl!,
-                                            ), // ✅ دالة العرض الذكية
+                                              l10n,
+                                            ), // ✅ تمرير l10n
                                           )
                                           : Column(
                                             mainAxisAlignment:
@@ -265,9 +282,9 @@ class _SupplierBankScreenState extends State<SupplierBankScreen> {
                                                 color: Colors.pink.shade300,
                                               ),
                                               const SizedBox(height: 10),
-                                              const Text(
-                                                "اضغط لرفع صورة الشهادة (PDF أو صورة)",
-                                                style: TextStyle(
+                                              Text(
+                                                l10n.tapToUploadCertificateImageMsg, // ✅ مترجم
+                                                style: const TextStyle(
                                                   color: Colors.grey,
                                                 ),
                                               ),
@@ -281,11 +298,13 @@ class _SupplierBankScreenState extends State<SupplierBankScreen> {
 
                         const SizedBox(height: 30),
 
-                        // زر الحفظ
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton.icon(
-                            onPressed: _isSaving ? null : _submit,
+                            onPressed:
+                                _isSaving
+                                    ? null
+                                    : () => _submit(l10n), // ✅ تمرير l10n
                             icon:
                                 _isSaving
                                     ? const SizedBox(
@@ -297,9 +316,9 @@ class _SupplierBankScreenState extends State<SupplierBankScreen> {
                                       ),
                                     )
                                     : const Icon(Icons.save),
-                            label: const Text(
-                              "حفظ البيانات",
-                              style: TextStyle(
+                            label: Text(
+                              l10n.saveDataBtn, // ✅ مترجم (موجود مسبقاً)
+                              style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
                                 color: Colors.white,
@@ -328,7 +347,7 @@ class _SupplierBankScreenState extends State<SupplierBankScreen> {
     );
   }
 
-  Widget _buildFilePreview(String url) {
+  Widget _buildFilePreview(String url, AppLocalizations l10n) {
     bool isPdf = url.toLowerCase().contains('.pdf');
 
     if (isPdf) {
@@ -339,14 +358,17 @@ class _SupplierBankScreenState extends State<SupplierBankScreen> {
           children: [
             const Icon(Icons.picture_as_pdf, size: 48, color: Colors.red),
             const SizedBox(height: 8),
-            const Text(
-              "ملف PDF",
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
-            ),
+            Text(
+              l10n.pdfFileLabel,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.red,
+              ),
+            ), // ✅ مترجم
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8.0),
               child: Text(
-                url.split('/').last, // عرض اسم الملف فقط
+                url.split('/').last,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 10, color: Colors.grey),
@@ -357,7 +379,6 @@ class _SupplierBankScreenState extends State<SupplierBankScreen> {
         ),
       );
     } else {
-      // إذا كان صورة عادية
       return CachedNetworkImage(
         imageUrl: url,
         fit: BoxFit.cover,
@@ -365,18 +386,18 @@ class _SupplierBankScreenState extends State<SupplierBankScreen> {
         placeholder:
             (context, url) => const Center(child: CircularProgressIndicator()),
         errorWidget:
-            (context, url, error) => const Column(
+            (context, url, error) => Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.error_outline, color: Colors.red),
-                Text("تعذر تحميل الصورة"),
+                const Icon(Icons.error_outline, color: Colors.red),
+                Text(l10n.cannotLoadImageMsg), // ✅ مترجم
               ],
             ),
       );
     }
   }
 
-  Widget _buildStatusAlert() {
+  Widget _buildStatusAlert(AppLocalizations l10n) {
     Color color;
     IconData icon;
     String title;
@@ -385,18 +406,19 @@ class _SupplierBankScreenState extends State<SupplierBankScreen> {
     if (_status == 'approved') {
       color = Colors.green;
       icon = Icons.check_circle;
-      title = "الحساب موثق";
-      desc = "بياناتك البنكية موثقة وجاهزة لاستقبال التحويلات.";
+      title = l10n.accountVerifiedTitle; // ✅ مترجم (موجود مسبقاً)
+      desc = l10n.accountVerifiedDesc; // ✅ مترجم (موجود مسبقاً)
     } else if (_status == 'rejected') {
       color = Colors.red;
       icon = Icons.error;
-      title = "تم الرفض";
-      desc = "السبب: ${_rejectionReason ?? 'غير محدد'}";
+      title = l10n.dataRejectedTitle; // ✅ مترجم (موجود مسبقاً)
+      desc =
+          "${l10n.reasonPrefix}${_rejectionReason ?? l10n.notAvailable}"; // ✅ مترجم ومدمج (موجود مسبقاً)
     } else {
       color = Colors.amber;
       icon = Icons.access_time_filled;
-      title = "قيد المراجعة";
-      desc = "جاري مراجعة بياناتك البنكية من قبل الإدارة.";
+      title = l10n.underReviewTitle; // ✅ مترجم (موجود مسبقاً)
+      desc = l10n.bankDataUnderReviewDesc; // ✅ مترجم (موجود مسبقاً)
     }
 
     return Container(
@@ -437,14 +459,18 @@ class _SupplierBankScreenState extends State<SupplierBankScreen> {
 
   Widget _buildTextField(
     String label,
-    TextEditingController controller, {
+    TextEditingController controller,
+    AppLocalizations l10n, {
     IconData? icon,
     String? hint,
     bool isRequired = true,
   }) {
     return TextFormField(
       controller: controller,
-      validator: isRequired ? (v) => v!.isEmpty ? "مطلوب" : null : null,
+      validator:
+          isRequired
+              ? (v) => v!.isEmpty ? l10n.requiredField : null
+              : null, // ✅ مترجم (موجود مسبقاً)
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,

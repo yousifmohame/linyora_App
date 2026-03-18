@@ -2,6 +2,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import 'package:linyora_project/features/supplier/settings/models/supplier_settings_models.dart';
 import 'package:linyora_project/features/supplier/settings/services/supplier_settings_service.dart';
 
@@ -20,8 +24,7 @@ class _SupplierSettingsScreenState extends State<SupplierSettingsScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isUploading = false;
-  String _activeTab =
-      'general'; // general, store, social, notifications, privacy, subscription
+  String _activeTab = 'general';
 
   @override
   void initState() {
@@ -42,25 +45,27 @@ class _SupplierSettingsScreenState extends State<SupplierSettingsScreen> {
     }
   }
 
-  Future<void> _saveSettings() async {
+  // ✅ تمرير l10n للسناك بار
+  Future<void> _saveSettings(AppLocalizations l10n) async {
     setState(() => _isSaving = true);
     try {
       await _service.updateSettings(_settings!);
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("تم حفظ التغييرات ✅")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("${l10n.changesSavedSuccessfullyMsg} ✅")),
+        ); // ✅ مترجم
     } catch (e) {
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("فشل الحفظ ❌")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("${l10n.saveFailedMsg} ❌")),
+        ); // ✅ مترجم
     } finally {
       setState(() => _isSaving = false);
     }
   }
 
-  Future<void> _uploadBanner() async {
+  // ✅ تمرير l10n للسناك بار
+  Future<void> _uploadBanner(AppLocalizations l10n) async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image == null) return;
 
@@ -68,13 +73,13 @@ class _SupplierSettingsScreenState extends State<SupplierSettingsScreen> {
     try {
       final url = await _service.uploadBanner(File(image.path));
       setState(() => _settings!.storeBannerUrl = url);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("تم رفع البانر ✅")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("${l10n.imageUploadedSuccessMsg} ✅")),
+      ); // ✅ مترجم
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("فشل الرفع ❌")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("${l10n.uploadFailedMsg} ❌")),
+      ); // ✅ مترجم
     } finally {
       setState(() => _isUploading = false);
     }
@@ -82,6 +87,9 @@ class _SupplierSettingsScreenState extends State<SupplierSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     if (_isLoading)
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
@@ -89,7 +97,6 @@ class _SupplierSettingsScreenState extends State<SupplierSettingsScreen> {
       backgroundColor: const Color(0xFFF3F4F6),
       body: CustomScrollView(
         slivers: [
-          // Tabs List
           SliverToBoxAdapter(
             child: Container(
               height: 60,
@@ -98,22 +105,37 @@ class _SupplierSettingsScreenState extends State<SupplierSettingsScreen> {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 children: [
-                  _buildTabItem('general', "عام", Icons.settings),
-                  _buildTabItem('store', "المتجر", Icons.store),
-                  _buildTabItem('social', "التواصل", Icons.share),
+                  _buildTabItem(
+                    'general',
+                    l10n.generalTab,
+                    Icons.settings,
+                  ), // ✅ مترجم
+                  _buildTabItem('store', l10n.storeTab, Icons.store), // ✅ مترجم
+                  _buildTabItem(
+                    'social',
+                    l10n.socialTab,
+                    Icons.share,
+                  ), // ✅ مترجم
                   _buildTabItem(
                     'notifications',
-                    "الإشعارات",
+                    l10n.notificationsTab,
                     Icons.notifications,
-                  ),
-                  _buildTabItem('privacy', "الخصوصية", Icons.privacy_tip),
-                  _buildTabItem('subscription', "الاشتراك", Icons.diamond),
+                  ), // ✅ مترجم
+                  _buildTabItem(
+                    'privacy',
+                    l10n.privacyTab,
+                    Icons.privacy_tip,
+                  ), // ✅ مترجم
+                  _buildTabItem(
+                    'subscription',
+                    l10n.subscriptionTab,
+                    Icons.diamond,
+                  ), // ✅ مترجم
                 ],
               ),
             ),
           ),
 
-          // Content Area
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -127,17 +149,16 @@ class _SupplierSettingsScreenState extends State<SupplierSettingsScreen> {
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     children: [
-                      _buildActiveContent(),
+                      _buildActiveContent(l10n), // ✅ تمرير l10n
                       const SizedBox(height: 24),
-                      if (_activeTab !=
-                          'subscription') // لا نظهر زر الحفظ في صفحة الاشتراك
+                      if (_activeTab != 'subscription')
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
                             onPressed:
                                 (_isSaving || _isUploading)
                                     ? null
-                                    : _saveSettings,
+                                    : () => _saveSettings(l10n), // ✅ تمرير l10n
                             style: ElevatedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               backgroundColor: Colors.transparent,
@@ -170,9 +191,9 @@ class _SupplierSettingsScreenState extends State<SupplierSettingsScreen> {
                                         strokeWidth: 2,
                                       ),
                                     )
-                                    : const Text(
-                                      "حفظ التغييرات",
-                                      style: TextStyle(
+                                    : Text(
+                                      l10n.saveChangesBtn, // ✅ مترجم
+                                      style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
                                         color: Colors.white,
@@ -191,8 +212,6 @@ class _SupplierSettingsScreenState extends State<SupplierSettingsScreen> {
       ),
     );
   }
-
-  // --- Widgets ---
 
   Widget _buildTabItem(String id, String label, IconData icon) {
     bool isActive = _activeTab == id;
@@ -243,116 +262,141 @@ class _SupplierSettingsScreenState extends State<SupplierSettingsScreen> {
     );
   }
 
-  Widget _buildActiveContent() {
+  Widget _buildActiveContent(AppLocalizations l10n) {
     switch (_activeTab) {
       case 'general':
-        return _buildGeneralTab();
+        return _buildGeneralTab(l10n);
       case 'store':
-        return _buildStoreTab();
+        return _buildStoreTab(l10n);
       case 'social':
-        return _buildSocialTab();
+        return _buildSocialTab(l10n);
       case 'notifications':
-        return _buildNotificationsTab();
+        return _buildNotificationsTab(l10n);
       case 'privacy':
-        return _buildPrivacyTab();
+        return _buildPrivacyTab(l10n);
       case 'subscription':
-        return _buildSubscriptionTab();
+        return _buildSubscriptionTab(l10n);
       default:
         return const SizedBox();
     }
   }
 
-  // 1. General Tab
-  Widget _buildGeneralTab() {
+  Widget _buildGeneralTab(AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader("الإعدادات العامة", "اللغة والعملة"),
+        _buildSectionHeader(
+          l10n.generalSettingsTitle,
+          l10n.languageAndCurrencySubtitle,
+        ), // ✅ مترجم
         const SizedBox(height: 20),
-        _buildDropdown("اللغة", "العربية"),
+        _buildDropdown(l10n.languageLabel, "العربية", [
+          "العربية",
+          "English",
+        ]), // ✅ مترجم
         const SizedBox(height: 16),
-        _buildDropdown("العملة", "ريال سعودي (SAR)"),
+        _buildDropdown(l10n.currencyLabel, "SAR", ["SAR", "USD"]), // ✅ مترجم
       ],
     );
   }
 
-  // 2. Store Tab
-  Widget _buildStoreTab() {
+  Widget _buildStoreTab(AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader("معلومات المتجر", "تخصيص هوية متجرك"),
+        _buildSectionHeader(
+          l10n.storeInfoTitle,
+          l10n.customizeStoreIdentitySubtitle,
+        ), // ✅ مترجم
         const SizedBox(height: 20),
         _buildTextField(
-          "اسم المتجر",
+          l10n.storeNameLabel,
           _settings!.storeName,
           (v) => _settings!.storeName = v,
           icon: Icons.store,
-        ),
+        ), // ✅ مترجم
         const SizedBox(height: 16),
         _buildTextField(
-          "وصف المتجر",
+          l10n.storeDescriptionLabel,
           _settings!.storeDescription,
           (v) => _settings!.storeDescription = v,
           icon: Icons.description,
           maxLines: 3,
-        ),
+        ), // ✅ مترجم
         const SizedBox(height: 20),
-        const Text(
-          "بانر المتجر",
-          style: TextStyle(fontWeight: FontWeight.bold),
+
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: Text(
+            l10n.storeBannerTitle,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ), // ✅ مترجم
         ),
         const SizedBox(height: 8),
-        InkWell(
-          onTap: _uploadBanner,
+        GestureDetector(
+          onTap: () => _uploadBanner(l10n), // ✅ تمرير l10n
           child: Container(
             height: 150,
             width: double.infinity,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade300),
-              color: Colors.grey[100],
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.grey.shade300,
+                style: BorderStyle.solid,
+              ),
+              image:
+                  _settings!.storeBannerUrl != null
+                      ? DecorationImage(
+                        image: CachedNetworkImageProvider(
+                          _settings!.storeBannerUrl!,
+                        ),
+                        fit: BoxFit.cover,
+                      )
+                      : null,
             ),
             child:
-                _settings!.storeBannerUrl != null
-                    ? ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: CachedNetworkImage(
-                        imageUrl: _settings!.storeBannerUrl!,
-                        fit: BoxFit.cover,
+                _isUploading
+                    ? Center(
+                      child: CircularProgressIndicator(
+                        color: Colors.purple[400],
                       ),
                     )
-                    : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.cloud_upload,
-                          size: 40,
-                          color: Colors.blue[300],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _isUploading ? "جاري الرفع..." : "اضغط لرفع الصورة",
-                          style: TextStyle(color: Colors.grey[600]),
-                        ),
-                      ],
-                    ),
+                    : (_settings!.storeBannerUrl == null
+                        ? Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.cloud_upload,
+                              color: Colors.blue[300],
+                              size: 40,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              l10n.tapToUploadBannerMsg,
+                              style: TextStyle(color: Colors.grey[600]),
+                            ), // ✅ مترجم
+                          ],
+                        )
+                        : null),
           ),
         ),
       ],
     );
   }
 
-  // 3. Social Tab
-  Widget _buildSocialTab() {
+  Widget _buildSocialTab(AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader("روابط التواصل", "حسابات التواصل الاجتماعي"),
+        _buildSectionHeader(
+          l10n.socialMediaLinksTitle,
+          l10n.socialMediaLinksSubtitle,
+        ), // ✅ مترجم
         const SizedBox(height: 20),
         _buildTextField(
           "Instagram",
-          _settings!.socialLinks.instagram,
+          _settings!.socialLinks.instagram ?? '',
           (v) => _settings!.socialLinks.instagram = v,
           icon: Icons.camera_alt,
           color: Colors.pink,
@@ -360,7 +404,7 @@ class _SupplierSettingsScreenState extends State<SupplierSettingsScreen> {
         const SizedBox(height: 16),
         _buildTextField(
           "Twitter (X)",
-          _settings!.socialLinks.twitter,
+          _settings!.socialLinks.twitter ?? '',
           (v) => _settings!.socialLinks.twitter = v,
           icon: Icons.alternate_email,
           color: Colors.blue,
@@ -368,7 +412,7 @@ class _SupplierSettingsScreenState extends State<SupplierSettingsScreen> {
         const SizedBox(height: 16),
         _buildTextField(
           "Facebook",
-          _settings!.socialLinks.facebook,
+          _settings!.socialLinks.facebook ?? '',
           (v) => _settings!.socialLinks.facebook = v,
           icon: Icons.facebook,
           color: Colors.indigo,
@@ -377,64 +421,62 @@ class _SupplierSettingsScreenState extends State<SupplierSettingsScreen> {
     );
   }
 
-  // 4. Notifications Tab
-  Widget _buildNotificationsTab() {
+  Widget _buildNotificationsTab(AppLocalizations l10n) {
     return Column(
       children: [
         _buildSwitchTile(
-          "البريد الإلكتروني",
-          "استلام إشعارات عبر الإيميل",
+          l10n.emailNotificationsLabel,
+          l10n.receiveEmailNotificationsSubtitle,
           _settings!.notifications.email,
           (v) => setState(() => _settings!.notifications.email = v),
           Icons.email,
           Colors.blue,
-        ),
+        ), // ✅ مترجم
         _buildSwitchTile(
-          "إشعارات التطبيق",
-          "تنبيهات فورية على الجوال",
+          l10n.appNotificationsLabel,
+          l10n.appNotificationsSubtitle,
           _settings!.notifications.push,
           (v) => setState(() => _settings!.notifications.push = v),
           Icons.notifications_active,
           Colors.amber,
-        ),
+        ), // ✅ مترجم
         _buildSwitchTile(
-          "رسائل SMS",
-          "استلام رسائل نصية",
+          l10n.smsMessagesLabel,
+          l10n.smsNotificationsSubtitle,
           _settings!.notifications.sms,
           (v) => setState(() => _settings!.notifications.sms = v),
           Icons.message,
           Colors.green,
-        ),
+        ), // ✅ مترجم
       ],
     );
   }
 
-  // 5. Privacy Tab
-  Widget _buildPrivacyTab() {
+  Widget _buildPrivacyTab(AppLocalizations l10n) {
     return Column(
       children: [
         _buildSwitchTile(
-          "إظهار البريد",
-          "عرض البريد الإلكتروني في المتجر",
+          l10n.showEmailLabel,
+          l10n.showEmailSubtitle,
           _settings!.privacy.showEmail,
           (v) => setState(() => _settings!.privacy.showEmail = v),
           Icons.visibility,
           Colors.grey,
-        ),
+        ), // ✅ مترجم
+        const Divider(),
         _buildSwitchTile(
-          "إظهار الهاتف",
-          "عرض رقم الهاتف للعملاء",
+          l10n.showPhoneLabel,
+          l10n.showPhoneSubtitle,
           _settings!.privacy.showPhone,
           (v) => setState(() => _settings!.privacy.showPhone = v),
           Icons.phone,
           Colors.grey,
-        ),
+        ), // ✅ مترجم
       ],
     );
   }
 
-  // 6. Subscription Tab (Special Offer)
-  Widget _buildSubscriptionTab() {
+  Widget _buildSubscriptionTab(AppLocalizations l10n) {
     return Column(
       children: [
         Container(
@@ -455,19 +497,19 @@ class _SupplierSettingsScreenState extends State<SupplierSettingsScreen> {
                 child: const Icon(Icons.diamond, size: 32, color: Colors.green),
               ),
               const SizedBox(height: 16),
-              const Text(
-                "عرض خاص لفترة محدودة!",
-                style: TextStyle(
+              Text(
+                l10n.specialOfferTitle, // ✅ مترجم
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: Colors.black87,
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                "استمتع بجميع مزايا الباقة المتقدمة مجانًا. ابدأ البيع، ووسّع نطاق عملك دون أي تكاليف اشتراك.",
+              Text(
+                l10n.specialOfferDesc, // ✅ مترجم
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.black54),
+                style: const TextStyle(color: Colors.black54),
               ),
               const SizedBox(height: 20),
               Container(
@@ -479,9 +521,9 @@ class _SupplierSettingsScreenState extends State<SupplierSettingsScreen> {
                   color: Colors.green.shade100,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Text(
-                  "اشتراك مجاني",
-                  style: TextStyle(
+                child: Text(
+                  l10n.freeSubscriptionLabel, // ✅ مترجم
+                  style: const TextStyle(
                     color: Colors.green,
                     fontWeight: FontWeight.bold,
                   ),
@@ -493,10 +535,10 @@ class _SupplierSettingsScreenState extends State<SupplierSettingsScreen> {
                 child: ElevatedButton.icon(
                   onPressed:
                       () => ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("تم تفعيل الاشتراك المجاني!"),
+                        SnackBar(
+                          content: Text(l10n.freeSubscriptionActivatedMsg),
                         ),
-                      ),
+                      ), // ✅ مترجم
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -505,9 +547,9 @@ class _SupplierSettingsScreenState extends State<SupplierSettingsScreen> {
                     ),
                   ),
                   icon: const Icon(Icons.stars, color: Colors.white),
-                  label: const Text(
-                    "فعّل اشتراكك المجاني الآن",
-                    style: TextStyle(
+                  label: Text(
+                    l10n.activateFreeSubscriptionBtn, // ✅ مترجم
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                     ),
@@ -521,7 +563,6 @@ class _SupplierSettingsScreenState extends State<SupplierSettingsScreen> {
     );
   }
 
-  // Helpers
   Widget _buildSectionHeader(String title, String subtitle) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -565,7 +606,7 @@ class _SupplierSettingsScreenState extends State<SupplierSettingsScreen> {
     );
   }
 
-  Widget _buildDropdown(String label, String value) {
+  Widget _buildDropdown(String label, String value, List<String> items) {
     return InputDecorator(
       decoration: InputDecoration(
         labelText: label,

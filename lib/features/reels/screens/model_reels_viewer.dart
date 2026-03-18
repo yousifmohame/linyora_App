@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:linyora_project/models/product_model.dart';
 import 'package:preload_page_view/preload_page_view.dart';
 import 'package:video_player/video_player.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../../../models/reel_model.dart';
 import '../../reels/services/reels_service.dart';
-import '../../public_profiles/services/public_profile_service.dart'; // ✅ إضافة خدمة البروفايل
-import '../../public_profiles/screens/model_profile_screen.dart'; // ✅ شاشة البروفايل
-import '../../products/screens/product_details_screen.dart'; // ✅ شاشة تفاصيل المنتج
+import '../../public_profiles/services/public_profile_service.dart';
+import '../../public_profiles/screens/model_profile_screen.dart';
+import '../../products/screens/product_details_screen.dart';
 import 'widgets/optimized_video_player.dart';
 import 'reels_screen.dart';
 import 'widgets/comments_sheet.dart';
@@ -30,7 +34,7 @@ class _ModelReelsViewerState extends State<ModelReelsViewer> {
   final Map<int, VideoPlayerController> _controllers = {};
 
   final ReelsService _reelsService = ReelsService();
-  final PublicProfileService _profileService = PublicProfileService(); // ✅
+  final PublicProfileService _profileService = PublicProfileService();
 
   late List<ReelModel> _videos;
   int _focusedIndex = 0;
@@ -83,8 +87,6 @@ class _ModelReelsViewerState extends State<ModelReelsViewer> {
     _initController(index + 1);
   }
 
-  // --- دوال التفاعل الكاملة ---
-
   Future<void> _handleLike(int index) async {
     final reel = _videos[index];
     final bool wasLiked = reel.isLiked;
@@ -109,26 +111,25 @@ class _ModelReelsViewerState extends State<ModelReelsViewer> {
     }
   }
 
-  Future<void> _handleShare(int index) async {
+  // ✅ تمرير l10n للترجمة
+  Future<void> _handleShare(int index, AppLocalizations l10n) async {
     final reel = _videos[index];
     try {
       await _reelsService.trackShare(reel.id.toString());
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('تمت المشاركة بنجاح!')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.shareSuccessMsg)), // ✅ مترجم
+        );
       }
     } catch (_) {}
   }
 
-  // ✅ 1. دالة المتابعة
   Future<void> _handleFollow(int index) async {
     final reel = _videos[index];
     if (reel.user == null) return;
 
     final bool wasFollowing = reel.user!.isFollowing;
 
-    // تحديث الحالة لجميع الفيديوهات التابعة لنفس المستخدم
     setState(() {
       for (var v in _videos) {
         if (v.user?.id == reel.user!.id) {
@@ -140,7 +141,6 @@ class _ModelReelsViewerState extends State<ModelReelsViewer> {
     try {
       await _profileService.toggleFollow(reel.user!.id, !wasFollowing);
     } catch (e) {
-      // تراجع عند الخطأ
       if (mounted) {
         setState(() {
           for (var v in _videos) {
@@ -153,12 +153,11 @@ class _ModelReelsViewerState extends State<ModelReelsViewer> {
     }
   }
 
-  // ✅ 2. دالة الانتقال للبروفايل
   void _navigateToProfile(int index) {
     final reel = _videos[index];
     if (reel.user == null) return;
 
-    _controllers[index]?.pause(); // إيقاف الفيديو مؤقتاً
+    _controllers[index]?.pause();
 
     Navigator.push(
       context,
@@ -166,14 +165,17 @@ class _ModelReelsViewerState extends State<ModelReelsViewer> {
         builder: (_) => ModelProfileScreen(modelId: reel.user!.id.toString()),
       ),
     ).then((_) {
-      // إعادة التشغيل عند العودة
       if (mounted) _controllers[index]?.play();
     });
   }
 
-  // ✅ 3. دالة عرض المنتجات
-  void _showProductsSheet(BuildContext context, List<ProductModel> products) {
-    _controllers[_focusedIndex]?.pause(); // إيقاف الفيديو
+  // ✅ تمرير l10n
+  void _showProductsSheet(
+    BuildContext context,
+    List<ProductModel> products,
+    AppLocalizations l10n,
+  ) {
+    _controllers[_focusedIndex]?.pause();
 
     showModalBottomSheet(
       context: context,
@@ -208,7 +210,7 @@ class _ModelReelsViewerState extends State<ModelReelsViewer> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        "المنتجات في هذا الفيديو (${products.length})",
+                        "${l10n.productsInThisVideoTitle} (${products.length})", // ✅ مترجم (ديناميكي)
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -249,7 +251,6 @@ class _ModelReelsViewerState extends State<ModelReelsViewer> {
                               ),
                               trailing: ElevatedButton(
                                 onPressed: () {
-                                  // الانتقال لتفاصيل المنتج
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
@@ -269,9 +270,9 @@ class _ModelReelsViewerState extends State<ModelReelsViewer> {
                                   ),
                                   minimumSize: const Size(60, 32),
                                 ),
-                                child: const Text(
-                                  "شراء",
-                                  style: TextStyle(fontSize: 12),
+                                child: Text(
+                                  l10n.buyBtn, // ✅ مترجم
+                                  style: const TextStyle(fontSize: 12),
                                 ),
                               ),
                             );
@@ -283,12 +284,12 @@ class _ModelReelsViewerState extends State<ModelReelsViewer> {
                 ),
           ),
     ).then((_) {
-      if (mounted) _controllers[_focusedIndex]?.play(); // إعادة التشغيل
+      if (mounted) _controllers[_focusedIndex]?.play();
     });
   }
 
   void _showComments(BuildContext context, int index) {
-    _controllers[index]?.pause(); // إيقاف الفيديو أثناء التعليق (اختياري)
+    _controllers[index]?.pause();
     final reel = _videos[index];
     showModalBottomSheet(
       context: context,
@@ -309,6 +310,9 @@ class _ModelReelsViewerState extends State<ModelReelsViewer> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -346,19 +350,18 @@ class _ModelReelsViewerState extends State<ModelReelsViewer> {
 
                   ReelContentOverlay(
                     reel: _videos[index],
-                    // ✅ تم ربط جميع الدوال الآن
+                    l10n: l10n, // ✅ تمرير l10n (الذي حدثناه في الدرس السابق)
                     onLike: () => _handleLike(index),
                     onComment: () => _showComments(context, index),
-                    onShare: () => _handleShare(index),
-                    onFollow: () => _handleFollow(index), // ✅ ربط المتابعة
-                    onProfileTap:
-                        () => _navigateToProfile(index), // ✅ ربط البروفايل
+                    onShare: () => _handleShare(index, l10n), // ✅ تمرير l10n
+                    onFollow: () => _handleFollow(index),
+                    onProfileTap: () => _navigateToProfile(index),
                     onShowProducts:
                         (products) => _showProductsSheet(
                           context,
                           products,
-                        ), // ✅ ربط المنتجات
-                    // ✅ إصلاح حالة التحميل: تظهر العناصر فقط عند جاهزية الفيديو
+                          l10n,
+                        ), // ✅ تمرير l10n
                     isLoading: !isReady,
                   ),
                 ],

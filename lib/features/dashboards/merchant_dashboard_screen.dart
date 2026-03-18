@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+// ✅ 1. استيراد الترجمة ومزود اللغة
+import 'package:linyora_project/l10n/app_localizations.dart';
+import 'package:linyora_project/features/shared/providers/locale_provider.dart';
+
 import 'package:linyora_project/features/agreements/screens/merchant_agreements_screen.dart';
 import 'package:linyora_project/features/bank/screens/bank_settings_screen.dart';
 import 'package:linyora_project/features/browse/screens/browse_models_screen.dart';
@@ -10,11 +16,8 @@ import 'package:linyora_project/features/settings/screens/settings_screen.dart';
 import 'package:linyora_project/features/shared/wallet/screens/wallet_screen.dart';
 import 'package:linyora_project/features/shipping/screens/merchant_shipping_screen.dart';
 import 'package:linyora_project/features/subscriptions/screens/my_subscription_screen.dart';
-// ✅ 1. استيراد شاشة الإشعارات
 import 'package:linyora_project/features/home/screens/notifications_screen.dart';
-import 'package:provider/provider.dart';
 import 'package:linyora_project/features/auth/providers/auth_provider.dart';
-import 'package:linyora_project/models/user_model.dart';
 
 // Services & Models
 import 'package:linyora_project/features/dashboards/services/merchant_service.dart';
@@ -45,23 +48,17 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
   int _currentIndex = 0;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  // ✅ 2. متغيرات الإشعارات
   int _unreadNotificationsCount = 0;
-  // سنستخدم MerchantService لجلب الإشعارات (تأكد من إضافة دالة getNotifications فيه)
   final MerchantService _merchantService = MerchantService();
 
   @override
   void initState() {
     super.initState();
-    // ✅ 3. جلب الإشعارات عند البدء
     _fetchUnreadNotifications();
   }
 
-  // ✅ 4. دالة جلب عدد الإشعارات غير المقروءة
   Future<void> _fetchUnreadNotifications() async {
     try {
-      // نفترض أن دالة getNotifications موجودة في MerchantService وتعيد List<NotificationModel>
-      // إذا لم تكن موجودة، يجب إضافتها لتستدعي '/api/notifications'
       final notifications = await _merchantService.getNotifications();
       if (mounted) {
         setState(() {
@@ -77,12 +74,13 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final user = Provider.of<AuthProvider>(context).user;
-    if (user == null)
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
-    // ============================================================
-    // 1️⃣ منطق الأقفال (Lock Logic)
-    // ============================================================
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
+    if (user == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     final bool isVerified = user.verificationStatus == 'approved';
     final bool isSubscribed = user.isSubscribed;
@@ -92,91 +90,93 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
     final Map<String, dynamic> subscriptionNavItem =
         isSubscribed
             ? {
-              'title': 'اشتراكي',
+              'title': l10n.mySubscription, // ✅ مترجم
               'icon': Icons.credit_card,
               'page': const MySubscriptionScreen(),
               'show': isVerified,
+              'isLocked': false,
             }
             : {
-              'title': 'اشترك الآن',
+              'title': l10n.subscribeNow, // ✅ مترجم
               'icon': Icons.star_border,
               'page': const SubscriptionPlansScreen(),
               'show': isVerified,
+              'isLocked': false,
             };
 
     final List<Map<String, dynamic>> allNavLinks = [
       {
-        'title': 'لوحة التحكم',
+        'title': l10n.dashboardTitle, // ✅ مترجم
         'icon': Icons.dashboard_outlined,
         'page': const _MerchantHomeView(),
         'show': true,
         'isLocked': false,
       },
       {
-        'title': 'توثيق الحساب',
+        'title': l10n.accountVerification, // ✅ مترجم
         'icon': Icons.verified_user_outlined,
         'page': const VerificationScreen(),
         'show': !isVerified,
         'isLocked': false,
       },
       {
-        'title': 'إدارة المنتجات',
+        'title': l10n.productsManagement, // ✅ مترجم
         'icon': Icons.inventory_2_outlined,
         'page': const MerchantProductsScreen(),
         'show': isVerified,
         'isLocked': !isSubscribed,
       },
       {
-        'title': 'الطلبات',
+        'title': l10n.orders, // ✅ مترجم
         'icon': Icons.shopping_bag_outlined,
         'page': const MerchantOrdersScreen(),
         'show': isVerified,
         'isLocked': !isSubscribed,
       },
       {
-        'title': 'معاينه المتجر',
-        'icon': Icons.shopping_bag_outlined,
+        'title': l10n.storePreview, // ✅ مترجم
+        'icon': Icons.store_outlined,
         'page': const MyStoreScreen(),
         'show': isVerified,
         'isLocked': !isSubscribed,
       },
       {
-        'title': 'قصص المتجر',
+        'title': l10n.storeStories, // ✅ مترجم
         'icon': Icons.history_edu_outlined,
         'page': const MerchantStoriesScreen(),
         'show': isVerified,
         'isLocked': !isSubscribed,
       },
       {
-        'title': 'العارضات و المؤثرات',
-        'icon': Icons.history_edu_outlined,
+        'title': l10n.modelsAndInfluencers, // ✅ مترجم
+        'icon': Icons.groups_outlined,
         'page': const BrowseModelsScreen(),
         'show': isVerified,
         'isLocked': !isSubscribed,
       },
       {
-        'title': 'المحادثات',
-        'icon': Icons.history_edu_outlined,
+        'title': l10n.conversationsTitle, // ✅ مترجم
+        'icon': Icons.message_outlined,
         'page': ChatListScreen(currentUserId: user.id),
         'show': isVerified,
         'isLocked': !isSubscribed,
       },
       {
-        'title': 'الإتفاقيات',
-        'icon': Icons.history_edu_outlined,
-        'page': MerchantAgreementsScreen(),
+        'title': l10n.agreementsLabel, // ✅ مترجم
+        'icon': Icons.handshake_outlined,
+        'page': const MerchantAgreementsScreen(),
         'show': isVerified,
         'isLocked': !isSubscribed,
       },
       {
-        'title': 'المعلومات البنكيه',
-        'icon': Icons.history_edu_outlined,
-        'page': BankSettingsScreen(),
+        'title': l10n.bankInfo, // ✅ مترجم
+        'icon': Icons.account_balance_outlined,
+        'page': const BankSettingsScreen(),
         'show': isVerified,
         'isLocked': !isSubscribed,
       },
       {
-        'title': 'الدروب شيبينج',
+        'title': l10n.dropshipping, // ✅ مترجم
         'icon': Icons.cloud_download_outlined,
         'page': const MerchantDropshippingScreen(),
         'show': isVerified,
@@ -184,21 +184,21 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
       },
       subscriptionNavItem,
       {
-        'title': 'الشحن',
+        'title': l10n.shipping, // ✅ مترجم
         'icon': Icons.local_shipping_outlined,
         'page': const MerchantShippingScreen(),
         'show': isVerified,
         'isLocked': !isSubscribed,
       },
       {
-        'title': 'المحفظة',
+        'title': l10n.financialWallet, // ✅ مترجم
         'icon': Icons.account_balance_wallet_outlined,
         'page': const WalletScreen(),
         'show': isVerified,
         'isLocked': !isSubscribed,
       },
       {
-        'title': 'الإعدادات',
+        'title': l10n.settings, // ✅ مترجم
         'icon': Icons.settings_outlined,
         'page': const SettingsScreen(),
         'show': true,
@@ -229,9 +229,7 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
           icon: const Icon(Icons.menu, color: Colors.black),
           onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
-        // ✅ 5. إضافة زر الإشعارات وزر التحديث
         actions: [
-          // زر الإشعارات
           Stack(
             alignment: Alignment.center,
             children: [
@@ -242,14 +240,12 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
                   size: 28,
                 ),
                 onPressed: () async {
-                  // الذهاب لصفحة الإشعارات
                   await Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => const NotificationsScreen(),
                     ),
                   );
-                  // تحديث العدد عند العودة
                   _fetchUnreadNotifications();
                 },
               ),
@@ -287,13 +283,12 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
             ],
           ),
 
-          // زر التحديث (فقط في لوحة التحكم الرئيسية)
           if (_currentIndex == 0)
             IconButton(
               icon: const Icon(Icons.refresh, color: Colors.black),
               onPressed: () {
                 setState(() {});
-                _fetchUnreadNotifications(); // تحديث الإشعارات أيضاً
+                _fetchUnreadNotifications();
               },
             ),
 
@@ -354,49 +349,69 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
             Expanded(
               child: ListView.builder(
                 padding: EdgeInsets.zero,
-                itemCount: visibleNavItems.length + 1,
+                itemCount:
+                    visibleNavItems.length +
+                    2, // +1 لزر اللغة +1 لزر تسجيل الخروج
                 itemBuilder: (context, index) {
-                  if (index == visibleNavItems.length) {
+                  // ✅✅✅ زر تغيير اللغة المضاف أعلى القائمة ✅✅✅
+                  if (index == 0) {
+                    return Column(
+                      children: [
+                        ListTile(
+                          leading: const Icon(
+                            Icons.language,
+                            color: Colors.orange,
+                          ),
+                          title: Text(
+                            l10n.changeLanguageLabel, // ✅ مترجم (أضفناها في لوحة המودل)
+                            style: TextStyle(
+                              color: Colors.grey[800],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          onTap: () {
+                            Provider.of<LocaleProvider>(
+                              context,
+                              listen: false,
+                            ).toggleLocale();
+                            Navigator.pop(context);
+                          },
+                        ),
+                        const Divider(height: 1, indent: 60),
+                      ],
+                    );
+                  }
+
+                  // زر تسجيل الخروج في النهاية
+                  if (index == visibleNavItems.length + 1) {
                     return ListTile(
                       leading: const Icon(Icons.logout, color: Colors.red),
-                      title: const Text(
-                        'تسجيل الخروج',
-                        style: TextStyle(color: Colors.red),
+                      title: Text(
+                        l10n.logout, // ✅ مترجم
+                        style: const TextStyle(color: Colors.red),
                       ),
                       onTap: () async {
-                        // 1. إغلاق القائمة الجانبية (Drawer) أولاً
                         Navigator.pop(context);
-
-                        // 2. تنفيذ عملية الخروج في البروفايدر
                         await Provider.of<AuthProvider>(
                           context,
                           listen: false,
                         ).logout();
-
-                        // 3. التحقق من أن السياق (Context) لا يزال صالحاً قبل الانتقال
                         if (context.mounted) {
-                          // 4. الانتقال إلى شاشة تسجيل الدخول وحذف كل الصفحات السابقة من الذاكرة
                           Navigator.of(context).pushAndRemoveUntil(
                             MaterialPageRoute(
                               builder: (context) => const MainLayoutScreen(),
                             ),
                             (route) => false,
                           );
-
-                          // أو استخدم هذا الكود إذا لم تكن تستخدم المسارات المسماة:
-                          /*
-        Navigator.of(context).pushAndRemoveUntil(
-           MaterialPageRoute(builder: (context) => const LoginScreen()),
-           (route) => false,
-        );
-        */
                         }
                       },
                     );
                   }
 
-                  final item = visibleNavItems[index];
-                  final bool isSelected = _currentIndex == index;
+                  // ضبط الـ index لتخطي زر اللغة
+                  final itemIndex = index - 1;
+                  final item = visibleNavItems[itemIndex];
+                  final bool isSelected = _currentIndex == itemIndex;
                   final bool isLocked = item['isLocked'] == true;
 
                   return ListTile(
@@ -442,17 +457,20 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
                       Navigator.pop(context);
 
                       if (isLocked) {
-                        _showSubscriptionLockedDialog(context, item['title']);
+                        _showSubscriptionLockedDialog(
+                          context,
+                          item['title'],
+                          l10n,
+                        ); // ✅ تمرير l10n
                       } else {
-                        if (item['title'] == 'اشترك الآن' ||
-                            item['title'] == 'اشتراكي') {
-                          // التعامل مع عنصر الاشتراك المخصص
+                        if (item['title'] == l10n.subscribeNow ||
+                            item['title'] == l10n.mySubscription) {
                           Navigator.push(
                             context,
                             MaterialPageRoute(builder: (_) => item['page']),
                           );
                         } else {
-                          setState(() => _currentIndex = index);
+                          setState(() => _currentIndex = itemIndex);
                         }
                       }
                     },
@@ -467,19 +485,29 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
     );
   }
 
-  void _showSubscriptionLockedDialog(BuildContext context, String featureName) {
+  void _showSubscriptionLockedDialog(
+    BuildContext context,
+    String featureName,
+    AppLocalizations l10n,
+  ) {
     showDialog(
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text("الميزة مغلقة 🔒"),
-            content: Text(
-              "عذراً، ميزة ($featureName) تتطلب اشتراكاً فعالاً للوصول إليها.",
+            title: Row(
+              children: [
+                const Icon(Icons.lock, color: Color(0xFF9333EA)),
+                const SizedBox(width: 8),
+                Text(
+                  l10n.featureLockedTitle,
+                ), // ✅ مترجم (مستخدم مسبقاً في المودل)
+              ],
             ),
+            content: Text(l10n.featureRequiresSubscriptionMsg(featureName)),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text("إلغاء"),
+                child: Text(l10n.cancelBtn), // ✅ مترجم
               ),
               ElevatedButton(
                 onPressed: () {
@@ -495,7 +523,7 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
                   backgroundColor: const Color(0xFFF43F5E),
                   foregroundColor: Colors.white,
                 ),
-                child: const Text("اشترك الآن"),
+                child: Text(l10n.subscribeNow), // ✅ مترجم
               ),
             ],
           ),
@@ -504,7 +532,7 @@ class _MerchantDashboardScreenState extends State<MerchantDashboardScreen> {
 }
 
 // -----------------------------------------------------------------------------
-// ✅ محتوى الصفحة الرئيسية (بدون فرض الاشتراك، فقط الاتفاقية)
+// ✅ محتوى الصفحة الرئيسية
 // -----------------------------------------------------------------------------
 
 class _MerchantHomeView extends StatefulWidget {
@@ -529,25 +557,19 @@ class _MerchantHomeViewState extends State<_MerchantHomeView> {
     });
   }
 
-  // ✅ التحقق من الاتفاقية فقط، وعدم إجبار الاشتراك هنا
   Future<void> _checkAgreementAndFetchData() async {
     if (!mounted) return;
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    // 🔄 1. خطوة جديدة: إجبار التطبيق على تحديث بيانات المستخدم من السيرفر أولاً
     try {
       await authProvider.refreshUser();
     } catch (e) {
       debugPrint("Warning: Failed to refresh user data: $e");
-      // في حال فشل التحديث (مثلاً لا يوجد إنترنت)، سنعتمد على البيانات المحلية الحالية
     }
 
-    // 2. الآن نقرأ بيانات المستخدم (بعد أن تم تحديثها من السيرفر)
     final user = authProvider.user;
-
     if (user == null) return;
 
-    // 3. التحقق الآن يتم بناءً على أحدث بيانات من قاعدة البيانات
     if (user.hasAcceptedAgreement == false) {
       await showDialog(
         context: context,
@@ -557,20 +579,14 @@ class _MerchantHomeViewState extends State<_MerchantHomeView> {
             (context) => AgreementModal(
               agreementKey: "merchant_agreement",
               onAgreed: () async {
-                // عند الموافقة، نحدث البيانات مرة أخرى للتأكيد
                 await authProvider.refreshUser();
                 if (mounted) {
-                  // نغلق المودال يدوياً هنا لأنه داخل showDialog
-                  // (ملاحظة: AgreementModal عادة يغلق نفسه، لكن للتأكد)
-                  // Navigator.of(context).pop();
-
                   _fetchDashboardData();
                 }
               },
             ),
       );
     } else {
-      // ✅ المستخدم وافق مسبقاً (والبيانات محدثة) -> حمل البيانات
       _fetchDashboardData();
     }
   }
@@ -600,6 +616,8 @@ class _MerchantHomeViewState extends State<_MerchantHomeView> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 3. تعريف الترجمة للوحة الداخلية
+    final l10n = AppLocalizations.of(context)!;
     final user = Provider.of<AuthProvider>(context).user;
     final isVerified = user?.verificationStatus == 'approved';
 
@@ -609,11 +627,14 @@ class _MerchantHomeViewState extends State<_MerchantHomeView> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('حدث خطأ: $_error', textAlign: TextAlign.center),
+            Text(
+              '${l10n.errorOccurredMsg} $_error',
+              textAlign: TextAlign.center,
+            ), // ✅ مترجم
             const SizedBox(height: 10),
             ElevatedButton(
               onPressed: _fetchDashboardData,
-              child: const Text('إعادة المحاولة'),
+              child: Text(l10n.retryBtn), // ✅ مترجم
             ),
           ],
         ),
@@ -626,22 +647,31 @@ class _MerchantHomeViewState extends State<_MerchantHomeView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isVerified)
-            _buildVerificationAlert(user?.verificationStatus ?? 'pending'),
+            _buildVerificationAlert(
+              user?.verificationStatus ?? 'pending',
+              l10n,
+            ), // ✅ تمرير l10n
 
           const SizedBox(height: 16),
-          _buildWelcomeCard(user?.name ?? 'التاجر'),
+          _buildWelcomeCard(
+            user?.name ?? l10n.defaultMerchantName,
+            l10n,
+          ), // ✅ تمرير l10n
 
           const SizedBox(height: 16),
           if (_data != null) ...[
-            _buildStatsGrid(_data!),
+            _buildStatsGrid(_data!, l10n), // ✅ تمرير l10n
 
             const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  "تحليل المبيعات",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                Text(
+                  l10n.salesAnalysis, // ✅ مترجم
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 Container(
                   decoration: BoxDecoration(
@@ -650,8 +680,8 @@ class _MerchantHomeViewState extends State<_MerchantHomeView> {
                   ),
                   child: Row(
                     children: [
-                      _buildPeriodButton('أسبوعي', 'week'),
-                      _buildPeriodButton('شهري', 'month'),
+                      _buildPeriodButton(l10n.weekly, 'week'), // ✅ مترجم
+                      _buildPeriodButton(l10n.monthly, 'month'), // ✅ مترجم
                     ],
                   ),
                 ),
@@ -668,12 +698,7 @@ class _MerchantHomeViewState extends State<_MerchantHomeView> {
             ),
 
             const SizedBox(height: 24),
-            RecentOrdersList(
-              orders: _data!.recentOrders,
-              onViewAll: () {
-                // يمكن إضافة منطق لفتح تاب الطلبات
-              },
-            ),
+            RecentOrdersList(orders: _data!.recentOrders, onViewAll: () {}),
             const SizedBox(height: 30),
           ],
         ],
@@ -681,7 +706,6 @@ class _MerchantHomeViewState extends State<_MerchantHomeView> {
     );
   }
 
-  // --- Widgets المساعدة (نفس الكود السابق) ---
   Widget _buildPeriodButton(String label, String value) {
     final isSelected = _salesPeriod == value;
     return GestureDetector(
@@ -713,7 +737,7 @@ class _MerchantHomeViewState extends State<_MerchantHomeView> {
     );
   }
 
-  Widget _buildVerificationAlert(String status) {
+  Widget _buildVerificationAlert(String status, AppLocalizations l10n) {
     Color bgColor;
     Color textColor;
     String title;
@@ -723,20 +747,20 @@ class _MerchantHomeViewState extends State<_MerchantHomeView> {
       case 'rejected':
         bgColor = Colors.red.shade50;
         textColor = Colors.red.shade800;
-        title = 'تم رفض التوثيق';
-        message = 'يرجى مراجعة البيانات وإعادة المحاولة.';
+        title = l10n.verificationRejected; // ✅ مترجم
+        message = l10n.pleaseReviewAndRetry; // ✅ مترجم
         break;
       case 'not_submitted':
         bgColor = Colors.amber.shade50;
         textColor = Colors.amber.shade800;
-        title = 'مطلوب التوثيق';
-        message = 'يرجى إكمال بيانات توثيق التاجر للبدء في البيع.';
+        title = l10n.verificationRequired; // ✅ مترجم
+        message = l10n.pleaseCompleteVerification; // ✅ مترجم
         break;
       default:
         bgColor = Colors.blue.shade50;
         textColor = Colors.blue.shade800;
-        title = 'قيد المراجعة';
-        message = 'جاري مراجعة بياناتك، سيتم تفعيل حسابك قريباً.';
+        title = l10n.underReview; // ✅ مترجم
+        message = l10n.dataUnderReviewMsg; // ✅ مترجم
     }
 
     return Container(
@@ -775,14 +799,17 @@ class _MerchantHomeViewState extends State<_MerchantHomeView> {
                   ),
                 );
               },
-              child: Text('بدء التوثيق', style: TextStyle(color: textColor)),
+              child: Text(
+                l10n.startVerification,
+                style: TextStyle(color: textColor),
+              ), // ✅ مترجم
             ),
         ],
       ),
     );
   }
 
-  Widget _buildWelcomeCard(String userName) {
+  Widget _buildWelcomeCard(String userName, AppLocalizations l10n) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -803,7 +830,7 @@ class _MerchantHomeViewState extends State<_MerchantHomeView> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'مرحباً، $userName 👋',
+            '${l10n.welcomeHello}$userName 👋', // ✅ مترجم مدمج
             style: const TextStyle(
               color: Colors.white,
               fontSize: 20,
@@ -811,16 +838,16 @@ class _MerchantHomeViewState extends State<_MerchantHomeView> {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'إليك نظرة سريعة على أداء متجرك اليوم.',
-            style: TextStyle(color: Colors.white70, fontSize: 14),
+          Text(
+            l10n.storePerformanceToday, // ✅ مترجم
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatsGrid(MerchantDashboardData data) {
+  Widget _buildStatsGrid(MerchantDashboardData data, AppLocalizations l10n) {
     return GridView.count(
       crossAxisCount: 2,
       shrinkWrap: true,
@@ -830,28 +857,31 @@ class _MerchantHomeViewState extends State<_MerchantHomeView> {
       childAspectRatio: 1.3,
       children: [
         StatCard(
-          title: 'إجمالي المبيعات',
-          value: '${data.totalSales.toStringAsFixed(2)} ر.س',
+          title: l10n.totalSales, // ✅ مترجم
+          value:
+              '${data.totalSales.toStringAsFixed(2)} ${l10n.currencySAR}', // ✅ عملة مترجمة
           icon: Icons.attach_money,
         ),
         StatCard(
-          title: 'الطلبات الجديدة',
+          title: l10n.newOrders, // ✅ مترجم
           value: '+${data.recentOrders.length}',
           icon: Icons.shopping_cart_outlined,
         ),
         StatCard(
-          title: 'المنتجات النشطة',
+          title: l10n.activeProducts, // ✅ مترجم
           value: '${data.activeProducts} / ${data.totalProducts}',
           icon: Icons.inventory_2_outlined,
         ),
         StatCard(
-          title: 'التقييم العام',
+          title: l10n.overallRating, // ✅ مترجم
           value: data.averageRating.toStringAsFixed(1),
-          description: 'من ${data.totalReviews} تقييم',
+          description: l10n.fromTotalReviews(
+            data.totalReviews.toString(),
+          ), // ✅ مترجم ذكي
           icon: Icons.star_border,
         ),
         StatCard(
-          title: 'المشاهدات الشهرية',
+          title: l10n.monthlyViews, // ✅ مترجم
           value: data.monthlyViews.toString(),
           icon: Icons.visibility_outlined,
         ),

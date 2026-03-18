@@ -10,6 +10,9 @@ import 'package:shimmer/shimmer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 // --- استيرادات مشروعك ---
 import 'package:linyora_project/core/utils/event_bus.dart';
 import 'package:linyora_project/features/public_profiles/screens/model_profile_screen.dart';
@@ -39,23 +42,24 @@ class _ReelsScreenState extends State<ReelsScreen>
   int _focusedIndex = 0;
   bool _isAppActive = true;
 
+  late final WidgetsBindingObserver _lifecycleObserver;
+
   @override
   void initState() {
     super.initState();
+    _lifecycleObserver = _AppLifecycleObserver(
+      onResume: () {
+        _isAppActive = true;
+        if (widget.isActive) _playVideoAt(_focusedIndex);
+      },
+      onPause: () {
+        _isAppActive = false;
+        _pauseAll();
+      },
+    );
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
     _loadReels();
   }
-
-  late final WidgetsBindingObserver _lifecycleObserver = _AppLifecycleObserver(
-    onResume: () {
-      _isAppActive = true;
-      if (widget.isActive) _playVideoAt(_focusedIndex);
-    },
-    onPause: () {
-      _isAppActive = false;
-      _pauseAll();
-    },
-  );
 
   @override
   void dispose() {
@@ -121,9 +125,7 @@ class _ReelsScreenState extends State<ReelsScreen>
       reelId: _videos[index].id.toString(),
       vsync: this,
       onVideoWatched: (id) {
-        _reelsService.trackView(id); // الاتصال بالسيرفر
-        // (اختياري) تحديث العداد محلياً لعدم الانتظار
-        // setState(() { _videos[index].viewsCount++; });
+        _reelsService.trackView(id);
       },
       onStateChanged: (isPlaying, isBuffering) {
         if (mounted && index == _focusedIndex) setState(() {});
@@ -153,8 +155,7 @@ class _ReelsScreenState extends State<ReelsScreen>
   Future<void> _pauseAll() async {
     for (var c in _videoControllers.values.toList()) {
       if (c.isPlaying) {
-        // نتأكد أنه يعمل أولاً
-        await c.pause(); // ننتظر حتى يتوقف فعلياً
+        await c.pause();
       }
     }
   }
@@ -176,11 +177,12 @@ class _ReelsScreenState extends State<ReelsScreen>
     _videoControllers.clear();
   }
 
-  // ✅✅✅ تم نقل دالة عرض المنتجات لداخل الكلاس لتتمكن من الوصول لـ _pauseAll
-  void _showProductsSheet(BuildContext context, List<ProductModel> products) {
-    // (اختياري) إيقاف الفيديو عند فتح القائمة لتركيز الانتباه
-    // _pauseAll();
-
+  // ✅ تمرير l10n
+  void _showProductsSheet(
+    BuildContext context,
+    List<ProductModel> products,
+    AppLocalizations l10n,
+  ) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -221,7 +223,7 @@ class _ReelsScreenState extends State<ReelsScreen>
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            "المنتجات في هذا الفيديو (${products.length})",
+                            "${l10n.productsInThisVideoTitle} (${products.length})", // ✅ مترجم (ديناميكي)
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -240,13 +242,10 @@ class _ReelsScreenState extends State<ReelsScreen>
                             final product = products[index];
 
                             return InkWell(
-                              // عند الضغط على الكارت أو زر الشراء
                               onTap: () async {
-                                // 1. اجعل الدالة async
-                                // ✅ 2. انتظر حتى يتوقف الصوت تماماً
                                 await _pauseAll();
 
-                                if (!context.mounted) return; // تحقق من السياق
+                                if (!context.mounted) return;
 
                                 Navigator.push(
                                   context,
@@ -257,7 +256,6 @@ class _ReelsScreenState extends State<ReelsScreen>
                                         ),
                                   ),
                                 ).then((_) {
-                                  // العودة للتشغيل
                                   if (widget.isActive && _isAppActive) {
                                     _playVideoAt(_focusedIndex);
                                   }
@@ -266,7 +264,6 @@ class _ReelsScreenState extends State<ReelsScreen>
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // الصورة
                                   Container(
                                     width: 80,
                                     height: 80,
@@ -295,8 +292,6 @@ class _ReelsScreenState extends State<ReelsScreen>
                                             : null,
                                   ),
                                   const SizedBox(width: 12),
-
-                                  // التفاصيل
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:
@@ -312,15 +307,11 @@ class _ReelsScreenState extends State<ReelsScreen>
                                           ),
                                         ),
                                         const SizedBox(height: 4),
-                                        // يمكنك إضافة السعر هنا
                                       ],
                                     ),
                                   ),
-
-                                  // زر الشراء
                                   ElevatedButton(
                                     onPressed: () async {
-                                      // ✅ 1. إيقاف الفيديو قبل الانتقال
                                       await _pauseAll();
 
                                       Navigator.push(
@@ -333,7 +324,6 @@ class _ReelsScreenState extends State<ReelsScreen>
                                               ),
                                         ),
                                       ).then((_) {
-                                        // ✅ 2. إعادة تشغيل الفيديو عند العودة
                                         if (widget.isActive && _isAppActive) {
                                           _playVideoAt(_focusedIndex);
                                         }
@@ -351,9 +341,9 @@ class _ReelsScreenState extends State<ReelsScreen>
                                       ),
                                       minimumSize: const Size(60, 36),
                                     ),
-                                    child: const Text(
-                                      "شراء",
-                                      style: TextStyle(fontSize: 12),
+                                    child: Text(
+                                      l10n.buyBtn, // ✅ مترجم
+                                      style: const TextStyle(fontSize: 12),
                                     ),
                                   ),
                                 ],
@@ -367,7 +357,6 @@ class _ReelsScreenState extends State<ReelsScreen>
                 ),
           ),
     ).then((_) {
-      // ✅ تشغيل الفيديو عند إغلاق القائمة (إذا لم ينتقل لصفحة أخرى)
       if (widget.isActive && _isAppActive) {
         _playVideoAt(_focusedIndex);
       }
@@ -376,6 +365,9 @@ class _ReelsScreenState extends State<ReelsScreen>
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     if (_isLoading) {
       return const Scaffold(
         backgroundColor: Colors.black,
@@ -479,13 +471,17 @@ class _ReelsScreenState extends State<ReelsScreen>
                     child: ReelContentOverlay(
                       reel: _videos[index],
                       isLoading: !isReady,
+                      l10n: l10n, // ✅ تمرير الترجمة
                       onLike: () => _handleLike(index),
                       onComment: () => _showComments(context, index),
-                      onShare: () => _handleShare(index),
+                      onShare: () => _handleShare(index, l10n), // ✅ تمرير l10n
                       onFollow: () => _handleFollow(index),
-                      // ✅ تم تمرير الدالة الجديدة هنا
                       onShowProducts:
-                          (products) => _showProductsSheet(context, products),
+                          (products) => _showProductsSheet(
+                            context,
+                            products,
+                            l10n,
+                          ), // ✅ تمرير l10n
                       onProfileTap: () {
                         _pauseAll();
                         Navigator.push(
@@ -531,9 +527,10 @@ class _ReelsScreenState extends State<ReelsScreen>
     }
   }
 
-  Future<void> _handleShare(int index) async {
+  // ✅ تمرير l10n لترجمة نص المشاركة
+  Future<void> _handleShare(int index, AppLocalizations l10n) async {
     await Share.share(
-      'شاهد هذا الفيديو: https://linyora.com/reels/${_videos[index].id}',
+      '${l10n.watchThisVideoMsg}https://linyora.com/reels/${_videos[index].id}',
     );
     try {
       await _reelsService.trackShare(_videos[index].id.toString());
@@ -659,7 +656,7 @@ class ReelSkeleton extends StatelessWidget {
                       Container(
                         width: 40,
                         height: 40,
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           color: Colors.white,
                           shape: BoxShape.circle,
                         ),
@@ -691,8 +688,8 @@ class ReelContentOverlay extends StatelessWidget {
   final ReelModel reel;
   final bool isLoading;
   final VoidCallback onLike, onComment, onShare, onFollow, onProfileTap;
-  // ✅ إضافة دالة الـ Callback لعرض المنتجات
   final Function(List<ProductModel>) onShowProducts;
+  final AppLocalizations l10n; // ✅ استقبال الترجمة
 
   const ReelContentOverlay({
     Key? key,
@@ -703,7 +700,8 @@ class ReelContentOverlay extends StatelessWidget {
     required this.onShare,
     required this.onFollow,
     required this.onProfileTap,
-    required this.onShowProducts, // ✅
+    required this.onShowProducts,
+    required this.l10n, // ✅
   }) : super(key: key);
 
   @override
@@ -752,11 +750,10 @@ class ReelContentOverlay extends StatelessWidget {
                     ),
                   ),
 
-                // ✅ زر عرض المنتجات
                 if (hasProducts) ...[
                   const SizedBox(height: 12),
                   GestureDetector(
-                    onTap: () => onShowProducts(reel.products!), // ✅ استدعاء
+                    onTap: () => onShowProducts(reel.products!),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -777,7 +774,7 @@ class ReelContentOverlay extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            "عرض المنتجات (${reel.products!.length})",
+                            "${l10n.viewProductsBtn} (${reel.products!.length})", // ✅ مترجم (ديناميكي)
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 12,
@@ -829,17 +826,16 @@ class ReelContentOverlay extends StatelessWidget {
             const SizedBox(height: 16),
             _GlassyActionButton(
               icon: Icons.share_rounded,
-              label: 'مشاركة',
+              label: l10n.shareActionBtn, // ✅ مترجم
               onTap: onShare,
             ),
-            // ✅ أيقونة التسوق الجانبية
             if (hasProducts) ...[
               const SizedBox(height: 16),
               _GlassyActionButton(
                 icon: Icons.shopping_bag,
-                label: 'تسوق',
+                label: l10n.shopActionBtn, // ✅ مترجم
                 iconColor: Colors.amber,
-                onTap: () => onShowProducts(reel.products!), // ✅ استدعاء
+                onTap: () => onShowProducts(reel.products!),
               ),
             ],
             const SizedBox(height: 120),

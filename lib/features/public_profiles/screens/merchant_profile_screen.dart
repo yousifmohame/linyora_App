@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/widgets/optimized_image.dart';
 import 'package:share_plus/share_plus.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../../../features/shared/widgets/product_card.dart';
 import '../../../models/public_profile_models.dart';
 import '../services/public_profile_service.dart';
@@ -55,16 +59,23 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
     }
   }
 
-  void _shareProfile() {
+  // ✅ تمرير l10n للترجمة
+  void _shareProfile(AppLocalizations l10n) {
     if (_merchant == null) return;
     final String profileUrl = "https://linyora.com/store/${_merchant!.id}";
     final String shareText =
-        "🛍️ تسوق من متجر ${_merchant!.storeName} المميز على تطبيق لينيورا!\n\nاستكشف أحدث المنتجات والعروض الحصرية: 👇\n$profileUrl";
-    Share.share(shareText, subject: "متجر ${_merchant!.storeName} على لينيورا");
+        "${l10n.shareStoreIntro}${_merchant!.storeName}${l10n.shareStoreMid}$profileUrl";
+    Share.share(
+      shareText,
+      subject: "${_merchant!.storeName} ${l10n.shareStoreSubject}",
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -72,17 +83,12 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
     if (_merchant == null) {
       return Scaffold(
         appBar: AppBar(),
-        body: const Center(child: Text("المتجر غير موجود")),
+        body: Center(child: Text(l10n.storeNotFound)), // ✅ مترجم
       );
     }
 
-    // --- حسابات التجاوب (Responsive Calculations) ---
     final double screenWidth = MediaQuery.of(context).size.width;
-
-    // تحديد عدد الأعمدة: 2 للموبايل، 3 للتابلت، 4 للشاشات العريضة جداً
     int crossAxisCount = screenWidth > 900 ? 4 : (screenWidth > 600 ? 4 : 2);
-
-    // ضبط نسبة الطول للعرض: في التابلت نجعل الكارت أعرض قليلاً
     double childAspectRatio = screenWidth > 600 ? 0.55 : 0.55;
 
     return Scaffold(
@@ -107,14 +113,12 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
             ),
           ),
 
-          // معلومات البروفايل (Profile Header)
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Avatar & Verification
                   Transform.translate(
                     offset: const Offset(0, 0),
                     child: Row(
@@ -174,7 +178,6 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
                             ),
                           ],
                         ),
-                        // Action Buttons
                         Row(
                           children: [
                             ElevatedButton(
@@ -193,7 +196,9 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
                                 ),
                               ),
                               child: Text(
-                                _merchant!.isFollowedByMe ? "أتابعه" : "متابعة",
+                                _merchant!.isFollowedByMe
+                                    ? l10n.followingBtn
+                                    : l10n.followBtn, // ✅ مترجم
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -203,13 +208,15 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
                                 border: Border.all(color: Colors.grey[300]!),
                               ),
                               child: IconButton(
-                                onPressed: _shareProfile,
+                                onPressed:
+                                    () =>
+                                        _shareProfile(l10n), // ✅ تمرير الترجمة
                                 icon: const Icon(
                                   Icons.share_outlined,
                                   size: 20,
                                 ),
                                 color: Colors.black87,
-                                tooltip: "مشاركة المتجر",
+                                tooltip: l10n.shareStoreTooltip, // ✅ مترجم
                               ),
                             ),
                           ],
@@ -218,11 +225,10 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
                     ),
                   ),
 
-                  // Store Info
                   Text(
                     _merchant!.storeName.isNotEmpty
                         ? _merchant!.storeName
-                        : "تاجر",
+                        : l10n.defaultMerchantName, // ✅ مترجم
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -230,27 +236,29 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
                   ),
                   const SizedBox(height: 8),
 
-                  // Badges
                   Wrap(
                     spacing: 8,
                     children: [
-                      _buildBadge(Icons.verified, "تاجر معتمد", Colors.blue),
+                      _buildBadge(
+                        Icons.verified,
+                        l10n.verifiedMerchantBadge,
+                        Colors.blue,
+                      ), // ✅ مترجم
                       _buildBadge(
                         Icons.star,
-                        "تقييم ${_merchant!.rating}",
+                        "${l10n.ratingBadge} ${_merchant!.rating}",
                         Colors.orange,
-                      ),
+                      ), // ✅ مترجم
                       _buildBadge(
                         Icons.local_shipping,
-                        "توصيل سريع",
+                        l10n.fastDeliveryBadge,
                         Colors.green,
-                      ),
+                      ), // ✅ مترجم
                     ],
                   ),
 
                   const SizedBox(height: 16),
 
-                  // Stats Grid
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -261,18 +269,26 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _buildStat("متابع", _merchant!.followersCount),
+                        _buildStat(
+                          l10n.followersStat,
+                          _merchant!.followersCount,
+                        ), // ✅ مترجم
                         _buildVerticalDivider(),
-                        _buildStat("يتابع", _merchant!.followingCount),
+                        _buildStat(
+                          l10n.followingStat,
+                          _merchant!.followingCount,
+                        ), // ✅ مترجم
                         _buildVerticalDivider(),
-                        _buildStat("منتجات", _merchant!.postsCount),
+                        _buildStat(
+                          l10n.productsStat,
+                          _merchant!.postsCount,
+                        ), // ✅ مترجم
                       ],
                     ),
                   ),
 
                   const SizedBox(height: 16),
 
-                  // Bio
                   if (_merchant!.bio != null && _merchant!.bio!.isNotEmpty)
                     Text(
                       _merchant!.bio!,
@@ -281,7 +297,6 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
 
                   const SizedBox(height: 16),
 
-                  // Location
                   if (_merchant!.location != null &&
                       _merchant!.location!.isNotEmpty)
                     Row(
@@ -300,9 +315,12 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
                     ),
 
                   const SizedBox(height: 1),
-                  const Text(
-                    "المنتجات",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  Text(
+                    l10n.productsHeader, // ✅ مترجم
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 12),
                 ],
@@ -310,20 +328,20 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
             ),
           ),
 
-          // Products Grid (متجاوب الآن)
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             sliver:
                 _merchant!.products.isEmpty
-                    ? const SliverToBoxAdapter(
+                    ? SliverToBoxAdapter(
                       child: Padding(
-                        padding: EdgeInsets.all(20.0),
-                        child: Center(child: Text("لا توجد منتجات")),
+                        padding: const EdgeInsets.all(20.0),
+                        child: Center(
+                          child: Text(l10n.noProductsAvailable),
+                        ), // ✅ مترجم
                       ),
                     )
                     : SliverGrid(
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        // استخدام القيم المحسوبة بناءً على حجم الشاشة
                         crossAxisCount: crossAxisCount,
                         childAspectRatio: childAspectRatio,
                         mainAxisSpacing: 10,
@@ -334,8 +352,6 @@ class _MerchantProfileScreenState extends State<MerchantProfileScreen> {
                       }, childCount: _merchant!.products.length),
                     ),
           ),
-
-          // مسافة سفلية إضافية
           const SliverToBoxAdapter(child: SizedBox(height: 40)),
         ],
       ),

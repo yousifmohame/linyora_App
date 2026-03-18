@@ -309,7 +309,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           // 2. النقاط (الآن تأتي صحيحة من السيرفر)
           _buildStatItem(
             _isLoadingStats ? "..." : "$_points",
-            "نقاطي", // أو l10n.myPoints
+            l10n.points, // أو l10n.myPoints
           ),
 
           _buildVerticalDivider(),

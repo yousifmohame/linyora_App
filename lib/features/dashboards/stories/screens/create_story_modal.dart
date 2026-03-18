@@ -2,10 +2,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
-import 'package:dotted_border/dotted_border.dart'; // إضافة باكيج لحدود منقطة جميلة
+import 'package:dotted_border/dotted_border.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../services/merchant_stories_service.dart';
 
-// ألوان القصة
 const List<Map<String, dynamic>> kStoryColors = [
   {'value': '#000000', 'color': Colors.black, 'label': 'أسود'},
   {'value': '#3B82F6', 'color': Color(0xFF3B82F6), 'label': 'أزرق'},
@@ -32,8 +35,7 @@ class _CreateStoryModalState extends State<CreateStoryModal>
   File? _selectedFile;
   VideoPlayerController? _videoController;
   final TextEditingController _textController = TextEditingController();
-  final TextEditingController _captionController =
-      TextEditingController(); // للنص مع الميديا
+  final TextEditingController _captionController = TextEditingController();
   String _selectedColor = '#000000';
   bool _isSubmitting = false;
 
@@ -58,7 +60,6 @@ class _CreateStoryModalState extends State<CreateStoryModal>
           _activeTab = 'text';
           break;
       }
-      // تنظيف عند الانتقال للنص
       if (_activeTab == 'text') {
         _selectedFile = null;
         _disposeVideoController();
@@ -80,7 +81,8 @@ class _CreateStoryModalState extends State<CreateStoryModal>
     super.dispose();
   }
 
-  Future<void> _pickFile() async {
+  // ✅ تمرير l10n
+  Future<void> _pickFile(AppLocalizations l10n) async {
     XFile? file;
     try {
       if (_activeTab == 'image') {
@@ -102,7 +104,7 @@ class _CreateStoryModalState extends State<CreateStoryModal>
             _disposeVideoController();
             _videoController = VideoPlayerController.file(_selectedFile!)
               ..initialize().then((_) {
-                setState(() {}); // تحديث الواجهة عند جاهزية الفيديو
+                setState(() {});
                 _videoController!.setLooping(true);
                 _videoController!.play();
               });
@@ -112,28 +114,27 @@ class _CreateStoryModalState extends State<CreateStoryModal>
     } catch (e) {
       debugPrint('Error picking file: $e');
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('فشل اختيار الملف')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.failedToPickFileMsg)),
+        ); // ✅ مترجم
     }
   }
 
-  Future<void> _submit() async {
-    // التحقق من المدخلات
+  // ✅ تمرير l10n
+  Future<void> _submit(AppLocalizations l10n) async {
     if ((_activeTab == 'image' || _activeTab == 'video') &&
         _selectedFile == null) {
-      _showErrorSnackBar('يرجى اختيار ملف');
+      _showErrorSnackBar(l10n.pleaseSelectFileMsg); // ✅ مترجم (سابقاً)
       return;
     }
     if (_activeTab == 'text' && _textController.text.trim().isEmpty) {
-      _showErrorSnackBar('يرجى كتابة نص للقصة');
+      _showErrorSnackBar(l10n.pleaseWriteStoryTextMsg); // ✅ مترجم
       return;
     }
 
     setState(() => _isSubmitting = true);
 
     try {
-      // نستخدم النص المناسب حسب النوع
       final textContent =
           _activeTab == 'text'
               ? _textController.text
@@ -151,12 +152,12 @@ class _CreateStoryModalState extends State<CreateStoryModal>
       if (success && mounted) {
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Row(
               children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 8),
-                Text('تم النشر بنجاح!'),
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Text(l10n.publishedSuccessfullyMsg), // ✅ مترجم
               ],
             ),
             backgroundColor: Colors.green,
@@ -165,7 +166,8 @@ class _CreateStoryModalState extends State<CreateStoryModal>
         );
       }
     } catch (e) {
-      if (mounted) _showErrorSnackBar('حدث خطأ أثناء النشر: $e');
+      if (mounted)
+        _showErrorSnackBar('${l10n.errorPublishingMsg}$e'); // ✅ مترجم
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -189,39 +191,40 @@ class _CreateStoryModalState extends State<CreateStoryModal>
 
   @override
   Widget build(BuildContext context) {
-    // نستخدم GestureDetector لإخفاء الكيبورد عند اللمس في أي مكان
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Container(
-        height: MediaQuery.of(context).size.height * 0.92, // ارتفاع مريح
+        height: MediaQuery.of(context).size.height * 0.92,
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(
           children: [
-            _buildHeader(),
-            _buildTabBar(),
+            _buildHeader(l10n), // ✅ تمرير l10n
+            _buildTabBar(l10n), // ✅ تمرير l10n
             Expanded(
               child: TabBarView(
                 controller: _tabController,
-                physics:
-                    const NeverScrollableScrollPhysics(), // نمنع السحب باليد لضمان استقرار التجربة
+                physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  _buildMediaTab(isImage: true),
-                  _buildMediaTab(isImage: false),
-                  _buildTextTab(),
+                  _buildMediaTab(isImage: true, l10n: l10n), // ✅ تمرير l10n
+                  _buildMediaTab(isImage: false, l10n: l10n), // ✅ تمرير l10n
+                  _buildTextTab(l10n), // ✅ تمرير l10n
                 ],
               ),
             ),
-            _buildFooter(),
+            _buildFooter(l10n), // ✅ تمرير l10n
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
@@ -254,20 +257,20 @@ class _CreateStoryModalState extends State<CreateStoryModal>
             ),
           ),
           const SizedBox(width: 12),
-          const Column(
+          Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'قصة جديدة',
-                style: TextStyle(
+                l10n.newStoryBtn, // ✅ مترجم (سابقاً)
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
                 ),
               ),
               Text(
-                'شارك لحظاتك المميزة',
-                style: TextStyle(color: Colors.white70, fontSize: 12),
+                l10n.shareYourSpecialMomentsMsg, // ✅ مترجم
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
               ),
             ],
           ),
@@ -284,7 +287,7 @@ class _CreateStoryModalState extends State<CreateStoryModal>
     );
   }
 
-  Widget _buildTabBar() {
+  Widget _buildTabBar(AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.all(16),
       height: 50,
@@ -312,25 +315,36 @@ class _CreateStoryModalState extends State<CreateStoryModal>
         labelStyle: const TextStyle(
           fontWeight: FontWeight.bold,
           fontFamily: 'Cairo',
-        ), // تأكد من نوع الخط
-        tabs: const [
-          Tab(text: 'صورة', icon: Icon(Icons.image_outlined, size: 18)),
-          Tab(text: 'فيديو', icon: Icon(Icons.videocam_outlined, size: 18)),
-          Tab(text: 'نص', icon: Icon(Icons.text_fields, size: 18)),
+        ),
+        tabs: [
+          Tab(
+            text: l10n.imageType,
+            icon: const Icon(Icons.image_outlined, size: 18),
+          ), // ✅ مترجم (سابقاً)
+          Tab(
+            text: l10n.videoType,
+            icon: const Icon(Icons.videocam_outlined, size: 18),
+          ), // ✅ مترجم (سابقاً)
+          Tab(
+            text: l10n.textType,
+            icon: const Icon(Icons.text_fields, size: 18),
+          ), // ✅ مترجم (سابقاً)
         ],
       ),
     );
   }
 
-  Widget _buildMediaTab({required bool isImage}) {
+  Widget _buildMediaTab({
+    required bool isImage,
+    required AppLocalizations l10n,
+  }) {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         children: [
           const SizedBox(height: 10),
-          // Upload Area with Dotted Border
           GestureDetector(
-            onTap: _pickFile,
+            onTap: () => _pickFile(l10n), // ✅ تمرير l10n
             child: DottedBorder(
               options: RoundedRectDottedBorderOptions(
                 color:
@@ -339,10 +353,8 @@ class _CreateStoryModalState extends State<CreateStoryModal>
                         : Colors.pink.shade200,
                 strokeWidth: 2,
                 dashPattern: const [8, 4],
-
                 radius: const Radius.circular(24),
               ),
-
               child: Container(
                 height: 320,
                 width: double.infinity,
@@ -402,8 +414,8 @@ class _CreateStoryModalState extends State<CreateStoryModal>
                             const SizedBox(height: 16),
                             Text(
                               isImage
-                                  ? 'اضغط لاختيار صورة'
-                                  : 'اضغط لاختيار فيديو',
+                                  ? l10n.tapToSelectImageMsg
+                                  : l10n.tapToSelectVideoMsg, // ✅ مترجم
                               style: const TextStyle(
                                 color: Color(0xFFF43F5E),
                                 fontWeight: FontWeight.bold,
@@ -412,7 +424,7 @@ class _CreateStoryModalState extends State<CreateStoryModal>
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'يدعم PNG, JPG, MP4',
+                              l10n.supportedMediaFormatsMsg, // ✅ مترجم
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[600],
@@ -426,11 +438,10 @@ class _CreateStoryModalState extends State<CreateStoryModal>
 
           const SizedBox(height: 24),
 
-          // Caption Field
           TextField(
             controller: _captionController,
             decoration: InputDecoration(
-              hintText: 'أضف تعليقاً توضيحياً (اختياري)...',
+              hintText: l10n.addCaptionOptionalHint, // ✅ مترجم
               prefixIcon: const Icon(Icons.edit_note, color: Colors.grey),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -448,22 +459,22 @@ class _CreateStoryModalState extends State<CreateStoryModal>
     );
   }
 
-  Widget _buildTextTab() {
+  Widget _buildTextTab(AppLocalizations l10n) {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 10),
-          const Text(
-            'محتوى النص',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          Text(
+            l10n.textContentLabel, // ✅ مترجم
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
           ),
           const SizedBox(height: 8),
           TextField(
             controller: _textController,
             decoration: InputDecoration(
-              hintText: 'اكتب قصتك هنا...',
+              hintText: l10n.writeYourStoryHereHint, // ✅ مترجم
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
@@ -474,13 +485,13 @@ class _CreateStoryModalState extends State<CreateStoryModal>
             ),
             maxLines: 4,
             style: const TextStyle(fontSize: 16),
-            onChanged: (_) => setState(() {}), // تحديث المعاينة فوراً
+            onChanged: (_) => setState(() {}),
           ),
 
           const SizedBox(height: 24),
-          const Text(
-            'لون الخلفية',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          Text(
+            l10n.backgroundColorLabel, // ✅ مترجم
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
           ),
           const SizedBox(height: 12),
 
@@ -529,9 +540,9 @@ class _CreateStoryModalState extends State<CreateStoryModal>
 
           const SizedBox(height: 32),
 
-          const Text(
-            'معاينة',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          Text(
+            l10n.previewLabel, // ✅ مترجم
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
           ),
           const SizedBox(height: 12),
           Container(
@@ -556,8 +567,8 @@ class _CreateStoryModalState extends State<CreateStoryModal>
             padding: const EdgeInsets.all(24),
             child: Text(
               _textController.text.isEmpty
-                  ? 'سيظهر نصك هنا...'
-                  : _textController.text,
+                  ? l10n.yourTextWillAppearHereMsg
+                  : _textController.text, // ✅ مترجم
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 18,
@@ -574,7 +585,7 @@ class _CreateStoryModalState extends State<CreateStoryModal>
     );
   }
 
-  Widget _buildFooter() {
+  Widget _buildFooter(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -592,7 +603,8 @@ class _CreateStoryModalState extends State<CreateStoryModal>
           width: double.infinity,
           height: 54,
           child: ElevatedButton(
-            onPressed: _isSubmitting ? null : _submit,
+            onPressed:
+                _isSubmitting ? null : () => _submit(l10n), // ✅ تمرير l10n
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFF43F5E),
               foregroundColor: Colors.white,
@@ -612,14 +624,14 @@ class _CreateStoryModalState extends State<CreateStoryModal>
                         strokeWidth: 2,
                       ),
                     )
-                    : const Row(
+                    : Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.send_rounded, size: 20),
-                        SizedBox(width: 8),
+                        const Icon(Icons.send_rounded, size: 20),
+                        const SizedBox(width: 8),
                         Text(
-                          'نشر القصة',
-                          style: TextStyle(
+                          l10n.publishStoryBtn, // ✅ مترجم (سابقاً)
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),

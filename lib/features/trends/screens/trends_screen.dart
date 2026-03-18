@@ -2,6 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:linyora_project/features/trends/services/trend_service.dart';
+
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../../../models/promoted_product_model.dart';
 import '../../products/screens/product_details_screen.dart';
 
@@ -39,21 +43,19 @@ class _TrendsScreenState extends State<TrendsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // --- حسابات التجاوب (Responsive Calculations) ---
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     final double screenWidth = MediaQuery.of(context).size.width;
-
-    // 1. عدد الأعمدة: 2 للموبايل، 3 للتابلت، 4 للشاشات الكبيرة
     int crossAxisCount = screenWidth > 900 ? 4 : (screenWidth > 600 ? 4 : 2);
-
-    // 2. نسبة الأبعاد: نزيد العرض قليلاً في التابلت لتتناسق العناصر
     double childAspectRatio = screenWidth > 600 ? 0.55 : 0.58;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: const Text(
-          "عروض مميزه 🔥",
-          style: TextStyle(
+        title: Text(
+          l10n.specialOffersTitle, // ✅ مترجم
+          style: const TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.w900,
             fontSize: 22,
@@ -63,7 +65,6 @@ class _TrendsScreenState extends State<TrendsScreen> {
         elevation: 0,
         centerTitle: false,
         actions: [
-          // عداد وقت عالمي
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -71,7 +72,9 @@ class _TrendsScreenState extends State<TrendsScreen> {
               color: Colors.black,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Center(child: _GlobalCountDown()),
+            child: const Center(
+              child: _GlobalCountDown(),
+            ), // ستعتمد على l10n بداخلها
           ),
         ],
       ),
@@ -79,12 +82,12 @@ class _TrendsScreenState extends State<TrendsScreen> {
           _isLoading
               ? _buildGridSkeleton(crossAxisCount, childAspectRatio)
               : _products.isEmpty
-              ? _buildEmptyState()
+              ? _buildEmptyState(l10n) // ✅ تمرير l10n
               : GridView.builder(
                 padding: const EdgeInsets.all(8),
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount, // ديناميكي
-                  childAspectRatio: childAspectRatio, // ديناميكي
+                  crossAxisCount: crossAxisCount,
+                  childAspectRatio: childAspectRatio,
                   crossAxisSpacing: 8,
                   mainAxisSpacing: 8,
                 ),
@@ -93,13 +96,13 @@ class _TrendsScreenState extends State<TrendsScreen> {
                   return _TrendGridCard(
                     product: _products[index],
                     index: index,
+                    l10n: l10n, // ✅ تمرير l10n
                   );
                 },
               ),
     );
   }
 
-  // نمرر القيم المحسوبة للسكيلتون ليكون مطابقاً للشبكة الحقيقية
   Widget _buildGridSkeleton(int crossAxisCount, double aspectRatio) {
     return GridView.builder(
       padding: const EdgeInsets.all(8),
@@ -126,16 +129,21 @@ class _TrendsScreenState extends State<TrendsScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
-    return const Center(child: Text("لا توجد عروض حالياً"));
+  Widget _buildEmptyState(AppLocalizations l10n) {
+    return Center(child: Text(l10n.noOffersCurrently)); // ✅ مترجم
   }
 }
 
 class _TrendGridCard extends StatelessWidget {
   final PromotedProductModel product;
   final int index;
+  final AppLocalizations l10n; // ✅ استقبال الترجمة
 
-  const _TrendGridCard({required this.product, required this.index});
+  const _TrendGridCard({
+    required this.product,
+    required this.index,
+    required this.l10n,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -166,7 +174,6 @@ class _TrendGridCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. الصورة مع التايمر والشارات
             Expanded(
               child: Stack(
                 children: [
@@ -183,8 +190,6 @@ class _TrendGridCard extends StatelessWidget {
                           (_, __) => Container(color: Colors.grey[100]),
                     ),
                   ),
-
-                  // شارة "خصم ساخن"
                   if (index < 3)
                     Positioned(
                       top: 0,
@@ -201,9 +206,9 @@ class _TrendGridCard extends StatelessWidget {
                             bottomRight: Radius.circular(12),
                           ),
                         ),
-                        child: const Text(
-                          "HOT 🔥",
-                          style: TextStyle(
+                        child: Text(
+                          l10n.hotBadge, // ✅ مترجم
+                          style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
                             fontSize: 10,
@@ -211,8 +216,6 @@ class _TrendGridCard extends StatelessWidget {
                         ),
                       ),
                     ),
-
-                  // عداد وقت صغير
                   if (index < 4)
                     Positioned(
                       bottom: 0,
@@ -221,14 +224,18 @@ class _TrendGridCard extends StatelessWidget {
                       child: Container(
                         height: 24,
                         color: Colors.black.withOpacity(0.6),
-                        child: const Row(
+                        child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.timer, color: Colors.white, size: 12),
-                            SizedBox(width: 4),
+                            const Icon(
+                              Icons.timer,
+                              color: Colors.white,
+                              size: 12,
+                            ),
+                            const SizedBox(width: 4),
                             Text(
-                              "ينتهي قريباً",
-                              style: TextStyle(
+                              l10n.endingSoon, // ✅ مترجم
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 10,
                                 fontWeight: FontWeight.w500,
@@ -241,14 +248,11 @@ class _TrendGridCard extends StatelessWidget {
                 ],
               ),
             ),
-
-            // 2. التفاصيل
             Padding(
               padding: const EdgeInsets.all(10.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // السعر
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.baseline,
                     textBaseline: TextBaseline.alphabetic,
@@ -261,9 +265,9 @@ class _TrendGridCard extends StatelessWidget {
                           color: Colors.black,
                         ),
                       ),
-                      const Text(
-                        " ر.س",
-                        style: TextStyle(
+                      Text(
+                        " ${l10n.currencySAR}", // ✅ عملة مترجمة
+                        style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
@@ -280,10 +284,7 @@ class _TrendGridCard extends StatelessWidget {
                         ),
                     ],
                   ),
-
                   const SizedBox(height: 6),
-
-                  // شريط التقدم
                   Stack(
                     children: [
                       Container(
@@ -308,7 +309,7 @@ class _TrendGridCard extends StatelessWidget {
                       ),
                       Center(
                         child: Text(
-                          "تم بيع ${(soldPercentage * 100).toInt()}%",
+                          "${l10n.soldPercentageLabel} ${(soldPercentage * 100).toInt()}%", // ✅ مترجم (ديناميكي)
                           style: const TextStyle(
                             fontSize: 9,
                             color: Colors.black87,
@@ -319,9 +320,7 @@ class _TrendGridCard extends StatelessWidget {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 8),
-
                   if (product.promotionTierName.isNotEmpty)
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -362,7 +361,6 @@ class _TrendGridCard extends StatelessWidget {
   }
 }
 
-// ودجت العد التنازلي
 class _GlobalCountDown extends StatefulWidget {
   const _GlobalCountDown({Key? key}) : super(key: key);
 
@@ -396,6 +394,9 @@ class _GlobalCountDownState extends State<_GlobalCountDown> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ استدعاء الترجمة محلياً هنا
+    final l10n = AppLocalizations.of(context)!;
+
     String twoDigits(int n) => n.toString().padLeft(2, '0');
     final hours = twoDigits(_timeLeft.inHours);
     final minutes = twoDigits(_timeLeft.inMinutes.remainder(60));
@@ -404,9 +405,9 @@ class _GlobalCountDownState extends State<_GlobalCountDown> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text(
-          "ينتهي في ",
-          style: TextStyle(color: Colors.white, fontSize: 10),
+        Text(
+          l10n.endsInLabel, // ✅ مترجم
+          style: const TextStyle(color: Colors.white, fontSize: 10),
         ),
         _buildBox(hours),
         const Text(

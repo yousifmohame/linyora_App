@@ -2,8 +2,12 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:linyora_project/features/models/offers/models/offer_models.dart';
 import 'package:linyora_project/features/models/offers/screens/model_offer_form_screen.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../services/offers_service.dart';
-import '../../screens/model_nav.dart'; // القائمة الجانبية
+import '../../screens/model_nav.dart';
 
 class InfluencerOffersScreen extends StatefulWidget {
   const InfluencerOffersScreen({Key? key}) : super(key: key);
@@ -17,7 +21,6 @@ class _ModelOffersScreenState extends State<InfluencerOffersScreen> {
   List<ServicePackage> _packages = [];
   bool _isLoading = true;
 
-  // Colors
   final Color _roseColor = const Color(0xFFE11D48);
   final Color _purpleColor = const Color(0xFF9333EA);
 
@@ -42,48 +45,44 @@ class _ModelOffersScreenState extends State<InfluencerOffersScreen> {
     }
   }
 
-  Future<void> _toggleStatus(ServicePackage pkg) async {
+  // ✅ تمرير l10n
+  Future<void> _toggleStatus(ServicePackage pkg, AppLocalizations l10n) async {
     try {
-      // تحويل الكائن لـ JSON لإرساله
-      // ملاحظة: هنا بسطنا الأمر، في الواقع يجب تحويل الـ ServicePackage لـ Map كامل
-      // سنقوم بعمل تحديث متفائل (Optimistic Update)
       final newStatus = pkg.status == 'active' ? 'paused' : 'active';
       setState(() => pkg.status = newStatus);
-
-      // هنا يجب عليك تحويل الـ Package بالكامل لـ Map لإرسالها للـ PUT
-      // للتسهيل في المثال، نفترض أن الخدمة تعالج ذلك
-      // await _service.toggleStatus(pkg.id, pkg.status == 'active' ? 'paused' : 'active', ...);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            "تم تغيير الحالة إلى ${newStatus == 'active' ? 'نشط' : 'موقوف'}",
+            "${l10n.statusChangedToMsg}${newStatus == 'active' ? l10n.activeStatus : l10n.pausedStatus}", // ✅ مترجم
           ),
         ),
       );
     } catch (e) {
-      _fetchOffers(); // تراجع عند الخطأ
+      _fetchOffers();
     }
   }
 
-  Future<void> _deleteOffer(int id) async {
+  // ✅ تمرير l10n
+  Future<void> _deleteOffer(int id, AppLocalizations l10n) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder:
           (ctx) => AlertDialog(
-            title: const Text("حذف العرض"),
-            content: const Text(
-              "هل أنت متأكد من حذف هذا العرض؟ لا يمكن التراجع عن هذا الإجراء.",
-            ),
+            title: Text(l10n.deleteOfferTitle), // ✅ مترجم
+            content: Text(l10n.deleteOfferConfirmMsg), // ✅ مترجم
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text("إلغاء"),
+                child: Text(l10n.cancelBtn), // ✅ مترجم (ترجمناها سابقاً)
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text("حذف", style: TextStyle(color: Colors.white)),
+                child: Text(
+                  l10n.delete,
+                  style: const TextStyle(color: Colors.white),
+                ), // ✅ مترجم (سابقاً)
               ),
             ],
           ),
@@ -93,13 +92,15 @@ class _ModelOffersScreenState extends State<InfluencerOffersScreen> {
       try {
         await _service.deleteOffer(id);
         _fetchOffers();
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("تم الحذف بنجاح")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.deletedSuccessfullyMsg),
+          ), // ✅ مترجم (سابقاً)
+        );
       } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("فشل الحذف")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.deletionFailedMsg)), // ✅ مترجم (سابقاً)
+        );
       }
     }
   }
@@ -111,18 +112,18 @@ class _ModelOffersScreenState extends State<InfluencerOffersScreen> {
         builder: (_) => ModelOfferFormScreen(packageToEdit: package),
       ),
     ).then((val) {
-      if (val == true) _fetchOffers(); // تحديث إذا تم الحفظ
+      if (val == true) _fetchOffers();
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
-      // القائمة الجانبية (اختياري إذا كانت الصفحة فرعية)
-      // drawer: const ModelDrawer(),
       body: Stack(
         children: [
-          // Background Gradient
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -153,7 +154,6 @@ class _ModelOffersScreenState extends State<InfluencerOffersScreen> {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    // Header Stats & Button
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -167,7 +167,7 @@ class _ModelOffersScreenState extends State<InfluencerOffersScreen> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            "${_packages.length} عرض نشط",
+                            "${_packages.length}${l10n.activeOffersCount}", // ✅ مترجم
                             style: TextStyle(
                               color: _roseColor,
                               fontWeight: FontWeight.bold,
@@ -185,7 +185,7 @@ class _ModelOffersScreenState extends State<InfluencerOffersScreen> {
                             ),
                           ),
                           icon: const Icon(Icons.add_circle_outline, size: 18),
-                          label: const Text("إضافة عرض جديد"),
+                          label: Text(l10n.addNewOfferBtn), // ✅ مترجم
                         ),
                       ],
                     ),
@@ -193,9 +193,11 @@ class _ModelOffersScreenState extends State<InfluencerOffersScreen> {
                     const SizedBox(height: 16),
 
                     if (_packages.isEmpty)
-                      _buildEmptyState()
+                      _buildEmptyState(l10n) // ✅ تمرير l10n
                     else
-                      ..._packages.map((pkg) => _buildOfferCard(pkg)).toList(),
+                      ..._packages
+                          .map((pkg) => _buildOfferCard(pkg, l10n))
+                          .toList(), // ✅ تمرير l10n
 
                     const SizedBox(height: 50),
                   ],
@@ -206,7 +208,7 @@ class _ModelOffersScreenState extends State<InfluencerOffersScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(AppLocalizations l10n) {
     return Center(
       child: Column(
         children: [
@@ -217,20 +219,20 @@ class _ModelOffersScreenState extends State<InfluencerOffersScreen> {
             color: Colors.grey.shade300,
           ),
           const SizedBox(height: 16),
-          const Text(
-            "لا توجد عروض حالياً",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          Text(
+            l10n.noOffersCurrentlyMsg, // ✅ مترجم
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-          const Text(
-            "ابدأ بإضافة باقاتك لجذب العملاء",
-            style: TextStyle(color: Colors.grey),
+          Text(
+            l10n.startAddingPackagesMsg, // ✅ مترجم
+            style: const TextStyle(color: Colors.grey),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildOfferCard(ServicePackage pkg) {
+  Widget _buildOfferCard(ServicePackage pkg, AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -244,7 +246,6 @@ class _ModelOffersScreenState extends State<InfluencerOffersScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Gradient
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -283,7 +284,9 @@ class _ModelOffersScreenState extends State<InfluencerOffersScreen> {
                         spacing: 8,
                         children: [
                           _buildBadge(
-                            pkg.status == 'active' ? "نشط" : "موقوف",
+                            pkg.status == 'active'
+                                ? l10n.activeStatus
+                                : l10n.pausedStatus, // ✅ مترجم
                             Colors.white.withOpacity(0.2),
                             Colors.white,
                           ),
@@ -298,7 +301,6 @@ class _ModelOffersScreenState extends State<InfluencerOffersScreen> {
                     ],
                   ),
                 ),
-                // Actions
                 Row(
                   children: [
                     IconButton(
@@ -317,7 +319,8 @@ class _ModelOffersScreenState extends State<InfluencerOffersScreen> {
                         color: Colors.white,
                         size: 20,
                       ),
-                      onPressed: () => _deleteOffer(pkg.id),
+                      onPressed:
+                          () => _deleteOffer(pkg.id, l10n), // ✅ تمرير l10n
                       constraints: const BoxConstraints(),
                       padding: const EdgeInsets.all(8),
                     ),
@@ -326,8 +329,6 @@ class _ModelOffersScreenState extends State<InfluencerOffersScreen> {
               ],
             ),
           ),
-
-          // Body
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -342,20 +343,20 @@ class _ModelOffersScreenState extends State<InfluencerOffersScreen> {
                     ),
                   ),
 
-                // Tiers Grid
                 Column(
                   children:
-                      pkg.tiers.map((tier) => _buildTierItem(tier)).toList(),
+                      pkg.tiers
+                          .map((tier) => _buildTierItem(tier, l10n))
+                          .toList(), // ✅ تمرير l10n
                 ),
 
                 const Divider(height: 24),
 
-                // Footer Actions
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     OutlinedButton(
-                      onPressed: () => _toggleStatus(pkg),
+                      onPressed: () => _toggleStatus(pkg, l10n), // ✅ تمرير l10n
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(
                           color:
@@ -374,12 +375,16 @@ class _ModelOffersScreenState extends State<InfluencerOffersScreen> {
                         ),
                       ),
                       child: Text(
-                        pkg.status == 'active' ? "تعطيل العرض" : "تفعيل العرض",
+                        pkg.status == 'active'
+                            ? l10n.disableOfferBtn
+                            : l10n.enableOfferBtn, // ✅ مترجم
                         style: const TextStyle(fontSize: 12),
                       ),
                     ),
                     _buildBadge(
-                      pkg.status == 'active' ? "ظاهر للعملاء" : "مخفي",
+                      pkg.status == 'active'
+                          ? l10n.visibleToClientsBadge
+                          : l10n.hiddenBadge, // ✅ مترجم
                       pkg.status == 'active'
                           ? Colors.green.shade50
                           : Colors.amber.shade50,
@@ -397,7 +402,7 @@ class _ModelOffersScreenState extends State<InfluencerOffersScreen> {
     );
   }
 
-  Widget _buildTierItem(PackageTier tier) {
+  Widget _buildTierItem(PackageTier tier, AppLocalizations l10n) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
@@ -420,7 +425,7 @@ class _ModelOffersScreenState extends State<InfluencerOffersScreen> {
                 ),
               ),
               Text(
-                "${tier.price.toStringAsFixed(0)} ر.س",
+                "${tier.price.toStringAsFixed(0)} ${l10n.currencySAR}", // ✅ عملة مترجمة
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: _roseColor,
@@ -451,12 +456,15 @@ class _ModelOffersScreenState extends State<InfluencerOffersScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildIconText(Icons.access_time, "${tier.deliveryDays} أيام"),
+              _buildIconText(
+                Icons.access_time,
+                "${tier.deliveryDays} ${l10n.daysLabel}",
+              ), // ✅ مترجم (daysLabel من الشاشات السابقة)
               _buildIconText(
                 Icons.loop,
                 tier.revisions == -1
-                    ? "تعديلات لانهائية"
-                    : "${tier.revisions} تعديلات",
+                    ? l10n.infiniteRevisions
+                    : "${tier.revisions}${l10n.revisionsCount}", // ✅ مترجم
               ),
             ],
           ),

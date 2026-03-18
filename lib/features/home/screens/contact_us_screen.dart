@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../services/contact_service.dart'; // تأكد من المسار
 // يمكنك استخدام package:url_launcher لفتح الروابط والهاتف
 
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 class ContactUsScreen extends StatefulWidget {
   const ContactUsScreen({Key? key}) : super(key: key);
 
@@ -30,7 +33,8 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
     super.dispose();
   }
 
-  Future<void> _submitForm() async {
+  // ✅ نمرر l10n هنا لترجمة رسائل الـ SnackBar
+  Future<void> _submitForm(AppLocalizations l10n) async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
@@ -47,12 +51,12 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
 
       // نجاح
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.white),
-              SizedBox(width: 10),
-              Text("تم إرسال رسالتك بنجاح!"),
+              const Icon(Icons.check_circle, color: Colors.white),
+              const SizedBox(width: 10),
+              Text(l10n.contactSuccessMsg), // ✅ رسالة نجاح مترجمة
             ],
           ),
           backgroundColor: Colors.green,
@@ -65,12 +69,11 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
       _emailController.clear();
       _subjectController.clear();
       _messageController.clear();
-
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("فشل الإرسال: حاول مرة أخرى لاحقاً"),
+          content: Text(l10n.contactErrorMsg), // ✅ رسالة خطأ مترجمة
           backgroundColor: Colors.red,
         ),
       );
@@ -81,12 +84,18 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف ملف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: Colors.grey[50], // خلفية هادئة
       appBar: AppBar(
-        title: const Text(
-          "تواصل معنا",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        title: Text(
+          l10n.contactUsTitle, // ✅ عنوان مترجم
+          style: const TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
         backgroundColor: Colors.white,
@@ -99,13 +108,13 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 1. مقدمة ترحيبية
-            const Text(
-              "نحن هنا للمساعدة 👋",
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            Text(
+              l10n.contactWelcome, // ✅ مترجم
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
-              "لديك سؤال أو استفسار؟ تواصل معنا عبر النموذج أدناه أو عبر قنوات الاتصال المباشرة.",
+              l10n.contactSubtitle, // ✅ مترجم
               style: TextStyle(color: Colors.grey[600], height: 1.5),
             ),
             const SizedBox(height: 24),
@@ -116,7 +125,7 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
                 Expanded(
                   child: _ContactInfoCard(
                     icon: Icons.phone_in_talk,
-                    title: "خدمة العملاء",
+                    title: l10n.customerService, // ✅ مترجم
                     content: "+966 50 000 0000",
                     onTap: () {
                       // launchUrl(Uri.parse("tel:+966500000000"));
@@ -127,7 +136,7 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
                 Expanded(
                   child: _ContactInfoCard(
                     icon: Icons.email_outlined,
-                    title: "البريد الإلكتروني",
+                    title: l10n.emailLabel, // ✅ مترجم
                     content: "support@linyora.com",
                     onTap: () {
                       // launchUrl(Uri.parse("mailto:support@linyora.com"));
@@ -139,8 +148,8 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
             const SizedBox(height: 16),
             _ContactInfoCard(
               icon: Icons.location_on_outlined,
-              title: "المقر الرئيسي",
-              content: "الرياض، المملكة العربية السعودية",
+              title: l10n.headquarters, // ✅ مترجم
+              content: l10n.hqAddress, // ✅ مترجم
               onTap: () {},
             ),
 
@@ -165,46 +174,67 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      "أرسل لنا رسالة",
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    Text(
+                      l10n.sendMessageTitle, // ✅ مترجم
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 20),
                     _buildTextField(
                       controller: _nameController,
-                      label: "الاسم بالكامل",
+                      label: l10n.fullNameLabel, // ✅ مترجم
                       icon: Icons.person_outline,
-                      validator: (val) => val!.isEmpty ? "الاسم مطلوب" : null,
+                      validator:
+                          (val) =>
+                              val!.isEmpty
+                                  ? l10n.nameRequired
+                                  : null, // ✅ مترجم
                     ),
                     const SizedBox(height: 16),
                     _buildTextField(
                       controller: _emailController,
-                      label: "البريد الإلكتروني",
+                      label: l10n.emailLabel, // ✅ مترجم
                       icon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
-                      validator: (val) =>
-                          val!.isEmpty || !val.contains('@') ? "بريد غير صالح" : null,
+                      validator:
+                          (val) =>
+                              val!.isEmpty || !val.contains('@')
+                                  ? l10n.invalidEmail
+                                  : null, // ✅ مترجم
                     ),
                     const SizedBox(height: 16),
                     _buildTextField(
                       controller: _subjectController,
-                      label: "رقم الهاتف",
+                      label: l10n.phoneNumberLabel, // ✅ مترجم
                       icon: Icons.topic_outlined,
-                      validator: (val) => val!.isEmpty ? "رقم الهاتف مطلوب" : null,
+                      validator:
+                          (val) =>
+                              val!.isEmpty
+                                  ? l10n.phoneRequired
+                                  : null, // ✅ مترجم
                     ),
                     const SizedBox(height: 16),
                     _buildTextField(
                       controller: _messageController,
-                      label: "نص الرسالة",
+                      label: l10n.messageBodyLabel, // ✅ مترجم
                       icon: Icons.message_outlined,
                       maxLines: 4,
-                      validator: (val) => val!.isEmpty ? "الرسالة مطلوبة" : null,
+                      validator:
+                          (val) =>
+                              val!.isEmpty
+                                  ? l10n.messageRequired
+                                  : null, // ✅ مترجم
                     ),
                     const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: _isLoading ? null : _submitForm,
+                        onPressed:
+                            _isLoading
+                                ? null
+                                : () => _submitForm(l10n), // ✅ تمرير l10n
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.black, // لون احترافي
                           foregroundColor: Colors.white,
@@ -214,22 +244,23 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
                           ),
                           elevation: 0,
                         ),
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
+                        child:
+                            _isLoading
+                                ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                                : Text(
+                                  l10n.sendBtn, // ✅ مترجم
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              )
-                            : const Text(
-                                "إرسال الرسالة",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
                       ),
                     ),
                   ],
@@ -240,18 +271,33 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
             const SizedBox(height: 30),
 
             // 4. تذييل التواصل الاجتماعي
-            const Center(
-              child: Text("تابعنا على وسائل التواصل", style: TextStyle(color: Colors.grey)),
+            Center(
+              child: Text(
+                l10n.followUsOnSocialMedia,
+                style: const TextStyle(color: Colors.grey),
+              ), // ✅ مترجم
             ),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _SocialButton(icon: Icons.facebook, color: const Color(0xFF1877F2), onTap: () {}),
+                _SocialButton(
+                  icon: Icons.facebook,
+                  color: const Color(0xFF1877F2),
+                  onTap: () {},
+                ),
                 const SizedBox(width: 16),
-                _SocialButton(icon: Icons.camera_alt, color: const Color(0xFFE4405F), onTap: () {}), // Instagram style
+                _SocialButton(
+                  icon: Icons.camera_alt,
+                  color: const Color(0xFFE4405F),
+                  onTap: () {},
+                ), // Instagram style
                 const SizedBox(width: 16),
-                _SocialButton(icon: Icons.alternate_email, color: const Color(0xFF1DA1F2), onTap: () {}), // Twitter/X style
+                _SocialButton(
+                  icon: Icons.alternate_email,
+                  color: const Color(0xFF1DA1F2),
+                  onTap: () {},
+                ), // Twitter/X style
               ],
             ),
             const SizedBox(height: 20),
@@ -278,7 +324,8 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: Colors.grey),
-        alignLabelWithHint: maxLines > 1, // لضبط الأيقونة مع أول سطر في الـ textarea
+        alignLabelWithHint:
+            maxLines > 1, // لضبط الأيقونة مع أول سطر في الـ textarea
         filled: true,
         fillColor: Colors.grey[50],
         border: OutlineInputBorder(

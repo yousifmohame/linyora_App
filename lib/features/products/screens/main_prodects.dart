@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:linyora_project/features/layout/main_layout_screen.dart';
 import 'package:linyora_project/models/product_details_model.dart';
 import 'package:provider/provider.dart';
+
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import 'package:linyora_project/features/auth/providers/auth_provider.dart';
 import 'package:linyora_project/features/cart/providers/cart_provider.dart';
 import 'package:linyora_project/features/cart/screens/cart_screen.dart';
@@ -27,7 +31,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
   // حالة البيانات
   List<ProductModel> _products = [];
   bool _isLoading = true;
-  String? _error;
+  bool _hasError =
+      false; // ✅ استخدام قيمة منطقية بدلاً من نص ثابت لسهولة الترجمة
 
   // حالة العرض والفلترة
   bool _isGridView = true;
@@ -43,7 +48,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
   Future<void> _fetchProducts() async {
     setState(() {
       _isLoading = true;
-      _error = null;
+      _hasError = false;
     });
 
     try {
@@ -70,7 +75,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = "حدث خطأ أثناء تحميل المنتجات";
+          _hasError = true; // ✅ تفعيل حالة الخطأ هنا
           _isLoading = false;
         });
         debugPrint("Error fetching products screen: $e");
@@ -84,29 +89,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
     double rating = 0.0;
 
-    // ✅ التعديل هنا:
-    // 1. نحاول الحساب من المراجعات إذا كانت موجودة (كما كان سابقاً)
     if (detail.reviews.isNotEmpty) {
       final total = detail.reviews.fold(0.0, (sum, item) => sum + item.rating);
       rating = total / detail.reviews.length;
-    }
-    // 2. إذا كانت المصفوفة فارغة، نحاول أخذ القيمة الجاهزة من المودل
-    // (تأكد أن ProductDetailsModel يحتوي على حقل rating، أو قم بجلبه من الـ JSON مباشرة إذا لم يكن معرفاً)
-    else {
+    } else {
       rating = detail.avgRating ?? 0.0;
-      // محاولة قراءة التقييم مباشرة إذا كان المودل يدعمه أو عبر الـ json
-      // يمكنك استبدال السطر التالي بـ rating = detail.rating; إذا كان الحقل موجوداً في المودل
-      try {
-        // نفترض هنا أنك قد تحتاج للوصول للبيانات الخام إذا لم يكن الحقل معرفاً في الكلاس
-        // أو ببساطة اعتمد على أن القيمة 0 إذا لم تأتِ
-        // rating = detail.rating ?? 0.0;
-      } catch (e) {
-        rating = 0.0;
-      }
     }
-
-    // حل بديل سريع: إذا كان لديك حقل rating في ProductDetailsModel
-    // rating = detail.reviews.isNotEmpty ? (calculated...) : (detail.rating ?? 0.0);
 
     return ProductModel(
       id: detail.id,
@@ -118,12 +106,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
           (firstVariant != null && firstVariant.images.isNotEmpty)
               ? firstVariant.images.first
               : '',
-      rating: rating, // ✅ الآن سيتم تمرير التقييم الصحيح
-      reviewCount:
-          detail.reviews.length, // ملاحظة: قد يكون 0 في القائمة وهذا طبيعي
+      rating: rating,
+      reviewCount: detail.reviews.length,
       merchantName: detail.merchantName,
       isNew: false,
       merchantId: detail.merchantId,
+      variants: detail.variants,
     );
   }
 
@@ -139,8 +127,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
     _fetchProducts();
   }
 
-  // ✅ 1. تم الحفاظ على SliverAppBar كما هو
-  Widget _buildSliverAppBar() {
+  // ✅ تمرير l10n
+  Widget _buildSliverAppBar(AppLocalizations l10n) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final isRealAdmin =
         authProvider.user != null && authProvider.user!.roleId == 1;
@@ -160,15 +148,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
               MaterialPageRoute(builder: (c) => CategoriesScreen()),
             ),
       ),
-
-      // ✅ التعديل هنا: جعل العنوان قابلاً للنقر
       title: GestureDetector(
         onTap: () {
           Navigator.pushAndRemoveUntil(
             context,
-            // ⚠️ تأكد أن HomeScreen هو اسم الكلاس الصحيح لصفحتك الرئيسية
             MaterialPageRoute(builder: (context) => const MainLayoutScreen()),
-            (route) => false, // يحذف كل الصفحات السابقة
+            (route) => false,
           );
         },
         child: Row(
@@ -311,7 +296,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   const Icon(Icons.search, color: Colors.grey),
                   const SizedBox(width: 10),
                   Text(
-                    "عن ماذا تبحث اليوم؟",
+                    l10n.searchHint, // ✅ مترجم (عن ماذا تبحث اليوم؟)
                     style: TextStyle(color: Colors.grey[600], fontSize: 14),
                   ),
                   const Spacer(),
@@ -329,8 +314,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
     );
   }
 
-  // ✅ 2. تم الحفاظ على SliverToBoxAdapter كما هو
-  Widget _buildFilterToolbar() {
+  // ✅ تمرير l10n
+  Widget _buildFilterToolbar(AppLocalizations l10n) {
     return SliverToBoxAdapter(
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -357,9 +342,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   children: [
                     const Icon(Icons.tune, size: 16, color: Colors.black87),
                     const SizedBox(width: 6),
-                    const Text(
-                      "فلتر",
-                      style: TextStyle(
+                    Text(
+                      l10n.filterLabel, // ✅ مترجم
+                      style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -379,12 +364,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Text(
-              "${_products.length} منتج",
+              "${_products.length} ${l10n.productsLabel}", // ✅ مترجم (منتج)
               style: TextStyle(
                 color: Colors.grey[600],
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -402,7 +387,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Container(
               height: 36,
               padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -421,23 +406,26 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   ),
                   style: const TextStyle(
                     color: Colors.black87,
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
                   onChanged: _onSortChanged,
-                  items: const [
-                    DropdownMenuItem(value: 'latest', child: Text("الأحدث")),
+                  items: [
+                    DropdownMenuItem(
+                      value: 'latest',
+                      child: Text(l10n.sortLatest),
+                    ), // ✅ مترجم
                     DropdownMenuItem(
                       value: 'price_asc',
-                      child: Text("السعر: الأقل"),
+                      child: Text(l10n.sortPriceAsc), // ✅ مترجم
                     ),
                     DropdownMenuItem(
                       value: 'price_desc',
-                      child: Text("السعر: الأعلى"),
+                      child: Text(l10n.sortPriceDesc), // ✅ مترجم
                     ),
                     DropdownMenuItem(
                       value: 'rating',
-                      child: Text("الأعلى تقييماً"),
+                      child: Text(l10n.sortRating), // ✅ مترجم
                     ),
                   ],
                 ),
@@ -449,8 +437,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
     );
   }
 
-  // ✅ 3. تم تحويل القائمة لتكون SliverGrid/SliverList لتعمل داخل CustomScrollView
-  // دون المساس ببطاقة المنتج
   Widget _buildProductsGridSliver() {
     final double screenWidth = MediaQuery.of(context).size.width;
     int crossAxisCount = screenWidth > 900 ? 4 : (screenWidth > 600 ? 3 : 2);
@@ -480,7 +466,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
               constraints: const BoxConstraints(maxWidth: 600),
               height: 150,
               margin: const EdgeInsets.only(bottom: 12, left: 12, right: 12),
-              // استخدام بطاقة المنتج كما هي
               child: ProductCard(
                 product: _products[index],
                 width: double.infinity,
@@ -492,8 +477,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
     }
   }
 
-  // دوال الحالات (Error, Empty) يجب أن تكون Slivers أيضاً أو مغلفة بـ SliverFillRemaining
-  Widget _buildSliverError() {
+  // ✅ تمرير l10n
+  Widget _buildSliverError(AppLocalizations l10n) {
     return SliverFillRemaining(
       child: Center(
         child: Column(
@@ -506,7 +491,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
             ),
             const SizedBox(height: 10),
             Text(
-              _error ?? "حدث خطأ غير معروف",
+              l10n.errorLoadingProductsMsg, // ✅ مترجم
               style: const TextStyle(color: Colors.grey),
             ),
             const SizedBox(height: 16),
@@ -519,7 +504,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   borderRadius: BorderRadius.circular(20),
                 ),
               ),
-              child: const Text("إعادة المحاولة"),
+              child: Text(l10n.retryBtn), // ✅ مترجم (إعادة المحاولة)
             ),
           ],
         ),
@@ -527,7 +512,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
     );
   }
 
-  Widget _buildSliverEmpty() {
+  // ✅ تمرير l10n
+  Widget _buildSliverEmpty(AppLocalizations l10n) {
     return SliverFillRemaining(
       child: Center(
         child: Column(
@@ -539,9 +525,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
               color: Colors.grey[200],
             ),
             const SizedBox(height: 16),
-            const Text(
-              "لا توجد منتجات تطابق الفلتر",
-              style: TextStyle(
+            Text(
+              l10n.noProductsMatchFilter, // ✅ مترجم
+              style: const TextStyle(
                 fontSize: 16,
                 color: Colors.grey,
                 fontWeight: FontWeight.bold,
@@ -553,9 +539,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 setState(() => _activeFilters.clear());
                 _fetchProducts();
               },
-              child: const Text(
-                "مسح جميع الفلاتر",
-                style: TextStyle(color: Color(0xFFF105C6)),
+              child: Text(
+                l10n.clearAllFiltersBtn, // ✅ مترجم
+                style: const TextStyle(color: Color(0xFFF105C6)),
               ),
             ),
           ],
@@ -566,6 +552,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: const Color(0xFFF9F9F9),
@@ -573,11 +562,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
         currentFilters: _activeFilters,
         onApplyFilters: _onFiltersApplied,
       ),
-      // ✅ 4. استبدال Column بـ CustomScrollView لحل مشكلة الخطأ
       body: CustomScrollView(
         slivers: [
-          _buildSliverAppBar(),
-          _buildFilterToolbar(),
+          _buildSliverAppBar(l10n), // ✅
+          _buildFilterToolbar(l10n), // ✅
 
           if (_isLoading)
             const SliverFillRemaining(
@@ -585,10 +573,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 child: CircularProgressIndicator(color: Color(0xFFF105C6)),
               ),
             )
-          else if (_error != null)
-            _buildSliverError()
+          else if (_hasError)
+            _buildSliverError(l10n) // ✅
           else if (_products.isEmpty)
-            _buildSliverEmpty()
+            _buildSliverEmpty(l10n) // ✅
           else
             _buildProductsGridSliver(),
 

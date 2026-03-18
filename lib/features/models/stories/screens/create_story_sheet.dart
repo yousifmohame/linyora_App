@@ -2,7 +2,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:linyora_project/features/models/stories/services/stories_service.dart'; // تأكد من إضافتها
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
+import 'package:linyora_project/features/models/stories/services/stories_service.dart';
 
 class CreateStorySheet extends StatefulWidget {
   const CreateStorySheet({Key? key}) : super(key: key);
@@ -17,13 +21,11 @@ class _CreateStorySheetState extends State<CreateStorySheet>
   final StoriesService _service = StoriesService();
   final ImagePicker _picker = ImagePicker();
 
-  // State
   File? _selectedFile;
   String _storyType = 'image';
   final TextEditingController _textController = TextEditingController();
-  String _selectedColor = '#000000'; // Default black
+  String _selectedColor = '#000000';
 
-  // Products Logic
   List<Map<String, dynamic>> _products = [];
   String? _selectedProductId;
   Map<String, dynamic>? _selectedProductData;
@@ -43,7 +45,6 @@ class _CreateStorySheetState extends State<CreateStorySheet>
   @override
   void initState() {
     super.initState();
-    // ✅ 4 تبويبات الآن: صورة، فيديو، نص، منتج
     _tabController = TabController(length: 4, vsync: this);
 
     _tabController.addListener(() {
@@ -79,7 +80,6 @@ class _CreateStorySheetState extends State<CreateStorySheet>
       final products = await _service.getPromotableProducts();
       if (mounted) setState(() => _products = products);
     } catch (e) {
-      // Handle error
     } finally {
       if (mounted) setState(() => _isLoadingProducts = false);
     }
@@ -98,19 +98,18 @@ class _CreateStorySheetState extends State<CreateStorySheet>
     }
   }
 
-  Future<void> _submit() async {
-    // Validation
+  Future<void> _submit(AppLocalizations l10n) async {
     if ((_storyType == 'image' || _storyType == 'video') &&
         _selectedFile == null) {
-      _showError("يرجى اختيار ملف");
+      _showError(l10n.pleaseSelectFileMsg); // ✅ مترجم
       return;
     }
     if (_storyType == 'text' && _textController.text.isEmpty) {
-      _showError("يرجى كتابة نص");
+      _showError(l10n.pleaseWriteTextMsg); // ✅ مترجم
       return;
     }
     if (_storyType == 'product' && _selectedProductId == null) {
-      _showError("يرجى اختيار منتج");
+      _showError(l10n.pleaseSelectProductMsg); // ✅ مترجم
       return;
     }
 
@@ -119,23 +118,22 @@ class _CreateStorySheetState extends State<CreateStorySheet>
       await _service.createStory(
         type: _storyType,
         file: _selectedFile,
-        textContent:
-            _textController.text, // ✅ يتم إرسال النص مع الصورة/الفيديو أيضاً
+        textContent: _textController.text,
         backgroundColor: _selectedColor,
-        productId: _selectedProductId, // ✅ إرسال المنتج
+        productId: _selectedProductId,
       );
 
       if (mounted) {
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("تم نشر القصة بنجاح 🎉"),
+          SnackBar(
+            content: Text(l10n.storyPublishedSuccessMsg), // ✅ مترجم
             backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
-      if (mounted) _showError("خطأ: $e");
+      if (mounted) _showError("${l10n.errorPrefix}$e"); // ✅ مترجم
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -149,6 +147,9 @@ class _CreateStorySheetState extends State<CreateStorySheet>
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Container(
       padding: EdgeInsets.only(
         top: 20,
@@ -164,7 +165,6 @@ class _CreateStorySheetState extends State<CreateStorySheet>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header
             Container(
               width: 40,
               height: 4,
@@ -174,13 +174,12 @@ class _CreateStorySheetState extends State<CreateStorySheet>
               ),
               margin: const EdgeInsets.only(bottom: 20),
             ),
-            const Text(
-              "إضافة قصة جديدة",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            Text(
+              l10n.addNewStoryTitle, // ✅ مترجم
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
 
-            // Tabs
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
@@ -205,42 +204,50 @@ class _CreateStorySheetState extends State<CreateStorySheet>
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                 ),
-                tabs: const [
-                  Tab(icon: Icon(Icons.image, size: 20), text: "صورة"),
-                  Tab(icon: Icon(Icons.videocam, size: 20), text: "فيديو"),
-                  Tab(icon: Icon(Icons.text_fields, size: 20), text: "نص"),
+                tabs: [
                   Tab(
-                    icon: Icon(Icons.shopping_bag, size: 20),
-                    text: "منتج",
-                  ), // ✅ التبويب الجديد
+                    icon: const Icon(Icons.image, size: 20),
+                    text: l10n.imageType,
+                  ), // ✅ مترجم
+                  Tab(
+                    icon: const Icon(Icons.videocam, size: 20),
+                    text: l10n.videoType,
+                  ), // ✅ مترجم
+                  Tab(
+                    icon: const Icon(Icons.text_fields, size: 20),
+                    text: l10n.textType,
+                  ), // ✅ مترجم
+                  Tab(
+                    icon: const Icon(Icons.shopping_bag, size: 20),
+                    text: l10n.productType,
+                  ), // ✅ مترجم
                 ],
               ),
             ),
 
             const SizedBox(height: 20),
 
-            // Content Body
             SizedBox(
-              height: 370, // زيادة الارتفاع لاستيعاب المحتوى
+              height: 370,
               child: TabBarView(
                 controller: _tabController,
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  _buildMediaUploadSection("صورة"),
-                  _buildMediaUploadSection("فيديو"),
-                  _buildTextStorySection(),
-                  _buildProductSection(), // ✅ واجهة المنتجات
+                  _buildMediaUploadSection(l10n.imageType, l10n), // ✅ مترجم
+                  _buildMediaUploadSection(l10n.videoType, l10n), // ✅ مترجم
+                  _buildTextStorySection(l10n), // ✅ تمرير l10n
+                  _buildProductSection(l10n), // ✅ تمرير l10n
                 ],
               ),
             ),
 
             const SizedBox(height: 20),
 
-            // Submit Button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: _isSubmitting ? null : _submit,
+                onPressed:
+                    _isSubmitting ? null : () => _submit(l10n), // ✅ تمرير l10n
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFF105C6),
                   padding: const EdgeInsets.symmetric(vertical: 14),
@@ -259,9 +266,9 @@ class _CreateStorySheetState extends State<CreateStorySheet>
                           ),
                         )
                         : const Icon(Icons.send, color: Colors.white),
-                label: const Text(
-                  "نشر القصة",
-                  style: TextStyle(
+                label: Text(
+                  l10n.publishStoryBtn, // ✅ مترجم
+                  style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                     color: Colors.white,
@@ -275,11 +282,9 @@ class _CreateStorySheetState extends State<CreateStorySheet>
     );
   }
 
-  // ✅ 1. قسم رفع الصور/الفيديو (مع دعم النص)
-  Widget _buildMediaUploadSection(String label) {
+  Widget _buildMediaUploadSection(String label, AppLocalizations l10n) {
     return Column(
       children: [
-        // مساحة الرفع
         Expanded(
           child: InkWell(
             onTap: _pickMedia,
@@ -298,7 +303,6 @@ class _CreateStorySheetState extends State<CreateStorySheet>
                           fit: StackFit.expand,
                           children: [
                             Image.file(_selectedFile!, fit: BoxFit.cover),
-                            // زر تغيير الصورة
                             Positioned(
                               top: 8,
                               right: 8,
@@ -342,7 +346,7 @@ class _CreateStorySheetState extends State<CreateStorySheet>
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            "اضغط لرفع $label",
+                            "${l10n.tapToUploadMsg}$label", // ✅ مترجم
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               color: Colors.blue,
@@ -356,11 +360,10 @@ class _CreateStorySheetState extends State<CreateStorySheet>
 
         const SizedBox(height: 12),
 
-        // ✅ حقل النص المضاف للصورة/الفيديو
         TextField(
           controller: _textController,
           decoration: InputDecoration(
-            hintText: "أضف شرحاً للقصة (اختياري)...",
+            hintText: l10n.addStoryCaptionHint, // ✅ مترجم
             filled: true,
             fillColor: Colors.grey[100],
             border: OutlineInputBorder(
@@ -374,8 +377,7 @@ class _CreateStorySheetState extends State<CreateStorySheet>
     );
   }
 
-  // ✅ 2. قسم النص فقط (مع ألوان الخلفية)
-  Widget _buildTextStorySection() {
+  Widget _buildTextStorySection(AppLocalizations l10n) {
     return Column(
       children: [
         Expanded(
@@ -395,9 +397,9 @@ class _CreateStorySheetState extends State<CreateStorySheet>
                   fontWeight: FontWeight.bold,
                 ),
                 maxLines: null,
-                decoration: const InputDecoration(
-                  hintText: "اكتب قصتك هنا...",
-                  hintStyle: TextStyle(color: Colors.white70),
+                decoration: InputDecoration(
+                  hintText: l10n.writeYourStoryHereHint, // ✅ مترجم
+                  hintStyle: const TextStyle(color: Colors.white70),
                   border: InputBorder.none,
                 ),
               ),
@@ -410,23 +412,25 @@ class _CreateStorySheetState extends State<CreateStorySheet>
     );
   }
 
-  // ✅ 3. قسم المنتجات (الجديد)
-  Widget _buildProductSection() {
-    if (_isLoadingProducts) {
+  Widget _buildProductSection(AppLocalizations l10n) {
+    if (_isLoadingProducts)
       return const Center(child: CircularProgressIndicator());
-    }
 
     if (_products.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(Icons.shopping_bag_outlined, size: 48, color: Colors.grey),
-            SizedBox(height: 8),
-            Text(
-              "لا توجد منتجات متاحة للترويج",
-              style: TextStyle(color: Colors.grey),
+          children: [
+            const Icon(
+              Icons.shopping_bag_outlined,
+              size: 48,
+              color: Colors.grey,
             ),
+            const SizedBox(height: 8),
+            Text(
+              l10n.noProductsToPromoteMsg,
+              style: const TextStyle(color: Colors.grey),
+            ), // ✅ مترجم
           ],
         ),
       );
@@ -434,11 +438,10 @@ class _CreateStorySheetState extends State<CreateStorySheet>
 
     return Column(
       children: [
-        // القائمة المنسدلة لاختيار المنتج
         DropdownButtonFormField<String>(
           value: _selectedProductId,
           decoration: InputDecoration(
-            labelText: "اختر منتجاً للترويج",
+            labelText: l10n.chooseProductToPromoteLabel, // ✅ مترجم
             filled: true,
             fillColor: Colors.white,
             border: OutlineInputBorder(
@@ -451,7 +454,7 @@ class _CreateStorySheetState extends State<CreateStorySheet>
                 return DropdownMenuItem(
                   value: product['id'].toString(),
                   child: Text(
-                    product['name'] ?? 'منتج',
+                    product['name'] ?? l10n.defaultProductLabel, // ✅ مترجم
                     overflow: TextOverflow.ellipsis,
                   ),
                 );
@@ -468,7 +471,6 @@ class _CreateStorySheetState extends State<CreateStorySheet>
 
         const SizedBox(height: 16),
 
-        // معاينة كرت المنتج (Product Card Preview)
         Expanded(
           child: Container(
             width: double.infinity,
@@ -479,10 +481,10 @@ class _CreateStorySheetState extends State<CreateStorySheet>
             child: Center(
               child:
                   _selectedProductData == null
-                      ? const Text(
-                        "اختر منتجاً للمعانية",
-                        style: TextStyle(color: Colors.white),
-                      )
+                      ? Text(
+                        l10n.chooseProductForPreviewMsg,
+                        style: const TextStyle(color: Colors.white),
+                      ) // ✅ مترجم
                       : Container(
                         width: 200,
                         padding: const EdgeInsets.all(12),
@@ -526,7 +528,7 @@ class _CreateStorySheetState extends State<CreateStorySheet>
                               ),
                             ),
                             Text(
-                              "${_selectedProductData!['price']} ر.س",
+                              "${_selectedProductData!['price']} ${l10n.currencySAR}", // ✅ عملة مترجمة
                               style: const TextStyle(
                                 color: Color(0xFFF105C6),
                                 fontWeight: FontWeight.bold,
@@ -540,10 +542,10 @@ class _CreateStorySheetState extends State<CreateStorySheet>
                                 color: Colors.black,
                                 borderRadius: BorderRadius.circular(6),
                               ),
-                              child: const Text(
-                                "اشترِ الآن",
+                              child: Text(
+                                l10n.buyNowBtn, // ✅ مترجم (أضفناها في الشاشة السابقة)
                                 textAlign: TextAlign.center,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 10,
                                 ),
@@ -557,13 +559,11 @@ class _CreateStorySheetState extends State<CreateStorySheet>
         ),
 
         const SizedBox(height: 12),
-        // Color Picker for Product Background
         _buildColorPicker(),
       ],
     );
   }
 
-  // ويدجت اختيار الألوان (مشترك)
   Widget _buildColorPicker() {
     return SizedBox(
       height: 40,

@@ -2,8 +2,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../../auth/services/auth_service.dart'; // تأكد من المسار
+
+// ✅ 1. استيراد ملف الترجمة
 import 'package:linyora_project/l10n/app_localizations.dart';
+
+import '../../auth/services/auth_service.dart'; // تأكد من المسار
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({Key? key}) : super(key: key);
@@ -55,8 +58,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  // دالة الحفظ
-  Future<void> _saveProfile() async {
+  // ✅ تمرير l10n لترجمة رسائل الـ SnackBar
+  Future<void> _saveProfile(AppLocalizations l10n) async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
@@ -71,19 +74,29 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم تحديث البيانات بنجاح')),
+          SnackBar(
+            content: Text(l10n.profileUpdatedSuccessMsg), // ✅ مترجم
+            backgroundColor: Colors.green,
+          ),
         );
         Navigator.pop(context); // العودة للصفحة السابقة
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('فشل التحديث، حاول مرة أخرى')),
+          SnackBar(
+            content: Text(l10n.profileUpdateFailedMsg), // ✅ مترجم
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('حدث خطأ: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            // ✅ نفترض أن errorOccurredMsg موجودة من الشاشات السابقة (مثل "حدث خطأ: ")
+            content: Text('${l10n.errorOccurredMsg ?? "Error: "}$e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -93,13 +106,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final user = _authService.currentUser;
-    // يمكن استبدال النصوص بـ l10n لاحقاً
+
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          "تعديل الملف الشخصي",
-          style: TextStyle(color: Colors.black),
+        title: Text(
+          l10n.editProfileTitle, // ✅ مترجم
+          style: const TextStyle(color: Colors.black),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
@@ -132,10 +147,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             _imageFile != null
                                 ? FileImage(_imageFile!) as ImageProvider
                                 : (user?.avatar != null &&
-                                    user!.avatar!.isNotEmpty) // أضفنا ! للتأكيد
-                                ? CachedNetworkImageProvider(
-                                  user!.avatar!,
-                                ) // أضفنا ! هنا أيضاً
+                                    user!.avatar!.isNotEmpty)
+                                ? CachedNetworkImageProvider(user!.avatar!)
                                 : null,
                         // 2. تحديد الأيقونة (تظهر فقط إذا لم تكن هناك صورة)
                         child:
@@ -178,14 +191,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               TextFormField(
                 controller: _nameController,
                 decoration: InputDecoration(
-                  labelText: "الاسم الكامل",
+                  labelText: l10n.fullNameInputLabel, // ✅ مترجم
                   prefixIcon: const Icon(Icons.person_outline),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
                 validator:
-                    (value) => value!.isEmpty ? "الرجاء إدخال الاسم" : null,
+                    (value) =>
+                        value!.isEmpty
+                            ? l10n.pleaseEnterNameMsg
+                            : null, // ✅ مترجم
               ),
               const SizedBox(height: 20),
 
@@ -193,7 +209,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
                 decoration: InputDecoration(
-                  labelText: "رقم الهاتف",
+                  labelText: l10n.phoneNumberInputLabel, // ✅ مترجم
                   prefixIcon: const Icon(Icons.phone_iphone),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -207,7 +223,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : _saveProfile,
+                  onPressed:
+                      _isLoading
+                          ? null
+                          : () => _saveProfile(l10n), // ✅ تمرير l10n
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFF105C6),
                     foregroundColor: Colors.white,
@@ -218,9 +237,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   child:
                       _isLoading
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                            "حفظ التغييرات",
-                            style: TextStyle(
+                          : Text(
+                            l10n.saveChangesBtn, // ✅ مترجم
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),

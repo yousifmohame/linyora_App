@@ -1,13 +1,15 @@
-import 'dart:convert'; // ✅ ضروري لـ jsonEncode
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'package:dio/dio.dart';
-import 'package:http_parser/http_parser.dart'; // ✅ أضف هذه المكتبة في pubspec.yaml لتحديد نوع الملف بدقة
+import 'package:http_parser/http_parser.dart';
 import 'package:linyora_project/core/api/api_client.dart';
 
-// --- Models ---
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 class ProductSelection {
   final int id;
   final String name;
@@ -38,12 +40,10 @@ class ProductSelection {
     } else {
       String? img;
       if (json['variants'] != null && (json['variants'] as List).isNotEmpty) {
-        // التعامل مع اختلاف هيكلية الصور بين المنتجات المختلفة
         var firstImg = json['variants'][0]['images'];
         if (firstImg is List && firstImg.isNotEmpty) {
           img = firstImg[0];
         } else if (firstImg is String) {
-          // في حال كانت string JSON
           try {
             List parsed = jsonDecode(firstImg);
             if (parsed.isNotEmpty) img = parsed[0];
@@ -130,25 +130,23 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
     }
   }
 
-  Future<void> _pickVideo() async {
-    // التأكد من اختيار فيديو من المعرض
+  // ✅ تمرير الترجمة
+  Future<void> _pickVideo(AppLocalizations l10n) async {
     final XFile? video = await _picker.pickVideo(
       source: ImageSource.gallery,
-      maxDuration: const Duration(minutes: 3), // تقييد المدة (اختياري)
+      maxDuration: const Duration(minutes: 3),
     );
 
     if (video != null) {
       final file = File(video.path);
-      // التحقق من الحجم (مثلاً 100 ميجابايت)
       int sizeInBytes = file.lengthSync();
       double sizeInMb = sizeInBytes / (1024 * 1024);
       if (sizeInMb > 100) {
-        if (mounted)
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('حجم الفيديو يجب أن يكون أقل من 100 ميجابايت'),
-            ),
+            SnackBar(content: Text(l10n.videoSizeExceeds100MBMsg)), // ✅ مترجم
           );
+        }
         return;
       }
 
@@ -173,18 +171,17 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
         _taggedProducts.add(product);
         if (product.agreementId != null) {
           _selectedAgreementId = product.agreementId;
-          // إذا كنت تريد السماح باتفاقية واحدة فقط لكل فيديو:
-          // _taggedProducts.removeWhere((p) => p.id != product.id);
         }
       }
     });
   }
 
-  Future<void> _uploadReel() async {
+  // ✅ تمرير الترجمة
+  Future<void> _uploadReel(AppLocalizations l10n) async {
     if (_selectedVideoFile == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('الرجاء اختيار فيديو')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.pleaseSelectVideoMsg)), // ✅ مترجم
+      );
       return;
     }
 
@@ -193,8 +190,6 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
     try {
       String fileName = _selectedVideoFile!.path.split('/').last;
 
-      // تجهيز البيانات
-      // ملاحظة: تأكد أنك تستخدم jsonEncode كما شرحنا سابقاً
       String taggedProductsJson = jsonEncode(
         _taggedProducts.map((e) => e.id).toList(),
       );
@@ -210,46 +205,39 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
         if (_selectedAgreementId != null) 'agreement_id': _selectedAgreementId,
       });
 
-      // 1️⃣ عملية الرفع (تأخذ وقتاً)
       await _apiClient.post('/reels', data: formData);
 
-      // ✅ 2️⃣ التحقق الحاسم: هل الشاشة لا تزال موجودة؟
       if (!mounted) return;
 
-      // إذا وصلنا هنا، فالشاشة موجودة ويمكن استخدام context بأمان
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تم رفع الفيديو بنجاح!'),
+        SnackBar(
+          content: Text(l10n.videoUploadedSuccessfullyMsg), // ✅ مترجم
           backgroundColor: Colors.green,
         ),
       );
 
-      // العودة للصفحة السابقة مع إرسال نتيجة true
       Navigator.pop(context, true);
     } catch (e) {
       debugPrint("Upload error: $e");
 
-      // ✅ 3️⃣ التحقق الحاسم داخل الـ catch أيضاً
       if (!mounted) return;
 
-      String errorMessage = 'فشل الرفع، حاول مرة أخرى';
+      String errorMessage = l10n.uploadFailedTryAgainMsg; // ✅ مترجم
 
       if (e is DioException) {
         if (e.response?.statusCode == 500) {
-          errorMessage = 'خطأ في السيرفر (500). تأكد من تحديث قاعدة البيانات.';
+          errorMessage = l10n.serverError500Msg; // ✅ مترجم
         } else if (e.response?.statusCode == 413) {
-          errorMessage = 'حجم الفيديو كبير جداً';
+          errorMessage = l10n.videoTooLargeMsg; // ✅ مترجم
         } else {
           errorMessage = e.response?.data['message'] ?? errorMessage;
         }
       }
 
-      // الآن آمن للعرض
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
       );
     } finally {
-      // ✅ 4️⃣ التحقق قبل تحديث الواجهة
       if (mounted) {
         setState(() => _isUploading = false);
       }
@@ -258,12 +246,18 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
       appBar: AppBar(
-        title: const Text(
-          "رفع فيديو جديد",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        title: Text(
+          l10n.uploadNewVideoTitle, // ✅ مترجم
+          style: const TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
@@ -281,7 +275,7 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     GestureDetector(
-                      onTap: _pickVideo,
+                      onTap: () => _pickVideo(l10n), // ✅ تمرير l10n
                       child: Container(
                         height: 250,
                         width: double.infinity,
@@ -302,7 +296,7 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
                                     ),
                                     const SizedBox(height: 12),
                                     Text(
-                                      "اضغط لاختيار فيديو",
+                                      l10n.tapToSelectVideo, // ✅ مترجم
                                       style: TextStyle(
                                         color: Colors.grey[600],
                                         fontWeight: FontWeight.bold,
@@ -310,7 +304,7 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      "MP4, MOV (Max 100MB)",
+                                      l10n.supportedVideoFormats, // ✅ مترجم
                                       style: TextStyle(
                                         color: Colors.grey[400],
                                         fontSize: 12,
@@ -350,9 +344,9 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    const Text(
-                      "الوصف",
-                      style: TextStyle(
+                    Text(
+                      l10n.descriptionLabel, // ✅ مترجم (ترجمناها سابقاً)
+                      style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
@@ -362,7 +356,7 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
                       controller: _captionController,
                       maxLines: 3,
                       decoration: InputDecoration(
-                        hintText: "اكتب وصفاً جذاباً للفيديو...",
+                        hintText: l10n.writeCatchyDescriptionHint, // ✅ مترجم
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(
@@ -376,21 +370,24 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          "المنتجات المتاحة",
-                          style: TextStyle(
+                        Text(
+                          l10n.availableProductsTitle, // ✅ مترجم
+                          style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
                           ),
                         ),
                         TextButton.icon(
-                          onPressed: () => _showProductSelectionSheet(),
+                          onPressed:
+                              () => _showProductSelectionSheet(
+                                l10n,
+                              ), // ✅ تمرير l10n
                           icon: Icon(
                             Icons.add_circle_outline,
                             color: _purpleColor,
                           ),
                           label: Text(
-                            "إضافة منتج",
+                            l10n.addProductBtn, // ✅ مترجم
                             style: TextStyle(color: _purpleColor),
                           ),
                         ),
@@ -427,9 +424,12 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
                                 .toList(),
                       )
                     else
-                      const Text(
-                        "لم يتم تحديد منتجات",
-                        style: TextStyle(color: Colors.grey, fontSize: 12),
+                      Text(
+                        l10n.noProductsSelectedMsg, // ✅ مترجم
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                        ),
                       ),
 
                     if (_selectedAgreementId != null)
@@ -451,7 +451,7 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                "مرتبط باتفاقية رقم #$_selectedAgreementId",
+                                "${l10n.linkedToAgreementPrefix}$_selectedAgreementId", // ✅ مترجم
                                 style: TextStyle(
                                   color: Colors.green.shade800,
                                   fontWeight: FontWeight.bold,
@@ -466,7 +466,10 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
                       width: double.infinity,
                       height: 50,
                       child: ElevatedButton(
-                        onPressed: _isUploading ? null : _uploadReel,
+                        onPressed:
+                            _isUploading
+                                ? null
+                                : () => _uploadReel(l10n), // ✅ تمرير l10n
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _roseColor,
                           foregroundColor: Colors.white,
@@ -480,9 +483,9 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
                                 ? const CircularProgressIndicator(
                                   color: Colors.white,
                                 )
-                                : const Text(
-                                  "نشر الفيديو",
-                                  style: TextStyle(
+                                : Text(
+                                  l10n.publishVideoBtn, // ✅ مترجم
+                                  style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -496,12 +499,11 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
     );
   }
 
-  void _showProductSelectionSheet() {
+  void _showProductSelectionSheet(AppLocalizations l10n) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor:
-          Colors.transparent, // لجعل الخلفية شفافة لرؤية الحواف المدورة
+      backgroundColor: Colors.transparent,
       builder: (context) {
         return DraggableScrollableSheet(
           initialChildSize: 0.6,
@@ -516,7 +518,6 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
               padding: const EdgeInsets.only(top: 20, left: 20, right: 20),
               child: StatefulBuilder(
                 builder: (context, setStateSheet) {
-                  // ✅ التحقق: إذا لم تكن هناك اتفاقيات نشطة
                   if (_activeAgreements.isEmpty) {
                     return Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -527,9 +528,9 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
                           color: Colors.grey[300],
                         ),
                         const SizedBox(height: 16),
-                        const Text(
-                          "لا توجد اتفاقيات نشطة حالياً",
-                          style: TextStyle(
+                        Text(
+                          l10n.noActiveAgreementsMsg, // ✅ مترجم
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: Colors.grey,
@@ -537,7 +538,7 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          "يجب عليك قبول اتفاقية تعاون مع تاجر أولاً",
+                          l10n.mustAcceptAgreementFirstMsg, // ✅ مترجم
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey[500],
@@ -557,16 +558,14 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: const Text("حسناً"),
+                          child: Text(l10n.okBtn), // ✅ مترجم
                         ),
                       ],
                     );
                   }
 
-                  // ✅ العرض الطبيعي: قائمة منتجات الاتفاقيات فقط
                   return Column(
                     children: [
-                      // Header
                       Container(
                         width: 40,
                         height: 4,
@@ -576,21 +575,20 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
-                      const Text(
-                        "اختر منتجاً للترويج",
-                        style: TextStyle(
+                      Text(
+                        l10n.chooseProductToPromoteTitle, // ✅ مترجم
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        "يتم عرض المنتجات المرتبطة باتفاقياتك فقط",
+                        l10n.onlyAgreementProductsShownMsg, // ✅ مترجم
                         style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                       const SizedBox(height: 20),
 
-                      // List
                       Expanded(
                         child: ListView.separated(
                           controller: scrollController,
@@ -606,9 +604,7 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
                             return InkWell(
                               onTap: () {
                                 setStateSheet(() {
-                                  _toggleProductTag(
-                                    product,
-                                  ); // استخدام نفس دالة التبديل القديمة
+                                  _toggleProductTag(product);
                                 });
                               },
                               borderRadius: BorderRadius.circular(12),
@@ -630,7 +626,6 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
                                 ),
                                 child: Row(
                                   children: [
-                                    // صورة المنتج
                                     Container(
                                       width: 50,
                                       height: 50,
@@ -657,7 +652,6 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
                                     ),
                                     const SizedBox(width: 12),
 
-                                    // التفاصيل
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment:
@@ -684,7 +678,6 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
                                       ),
                                     ),
 
-                                    // Checkbox
                                     Container(
                                       width: 24,
                                       height: 24,
@@ -718,7 +711,6 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
                         ),
                       ),
 
-                      // زر التأكيد
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         child: SizedBox(
@@ -733,7 +725,7 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            child: const Text("تأكيد الاختيار"),
+                            child: Text(l10n.confirmSelectionBtn), // ✅ مترجم
                           ),
                         ),
                       ),
@@ -745,42 +737,6 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
           },
         );
       },
-    ).then((_) => setState(() {})); // تحديث الشاشة الرئيسية عند الإغلاق
-  }
-
-  Widget _buildProductCheckbox(
-    ProductSelection product,
-    Function setStateSheet,
-  ) {
-    final bool isSelected = _taggedProducts.any((p) => p.id == product.id);
-    return CheckboxListTile(
-      value: isSelected,
-      onChanged:
-          (bool? value) => setStateSheet(() => _toggleProductTag(product)),
-      title: Text(product.name, style: const TextStyle(fontSize: 14)),
-      subtitle:
-          product.storeName != null
-              ? Text(
-                product.storeName!,
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-              )
-              : null,
-      secondary:
-          product.imageUrl != null
-              ? Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  image: DecorationImage(
-                    image: NetworkImage(product.imageUrl!),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              )
-              : const Icon(Icons.image, color: Colors.grey),
-      activeColor: _purpleColor,
-      contentPadding: EdgeInsets.zero,
-    );
+    ).then((_) => setState(() {}));
   }
 }

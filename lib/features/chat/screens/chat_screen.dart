@@ -9,6 +9,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:linyora_project/features/auth/services/auth_service.dart';
 
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../models/conversation_model.dart';
 import '../models/message_model.dart';
 import '../services/chat_service.dart';
@@ -16,10 +19,10 @@ import '../services/chat_service.dart';
 // ==========================================
 // 🎨 Constants & Theme (Blue Identity)
 // ==========================================
-const Color kPrimaryBlue = Color(0xFF2563EB); // Royal Blue
-const Color kLightBlue = Color(0xFFEFF6FF); // Very Light Blue Background
-const Color kAccentBlue = Color(0xFF3B82F6); // Buttons
-const Color kChatBackground = Color(0xFFF1F5F9); // Slate 100
+const Color kPrimaryBlue = Color(0xFF2563EB);
+const Color kLightBlue = Color(0xFFEFF6FF);
+const Color kAccentBlue = Color(0xFF3B82F6);
+const Color kChatBackground = Color(0xFFF1F5F9);
 const Color kMyBubbleColor = Color(0xFF2563EB);
 const Color kOtherBubbleColor = Colors.white;
 const Color kTextColor = Color(0xFF1E293B);
@@ -56,7 +59,6 @@ class _ChatListScreenState extends State<ChatListScreen>
     WidgetsBinding.instance.addObserver(this);
     _initSocket();
 
-    // التعامل الذكي مع الفتح المباشر لمحادثة
     _fetchConversations().then((_) {
       if (widget.initialActiveConversationId != null &&
           _conversations.isNotEmpty) {
@@ -65,9 +67,7 @@ class _ChatListScreenState extends State<ChatListScreen>
             (c) => c.id == widget.initialActiveConversationId,
           );
           _openChat(convo);
-        } catch (e) {
-          // إذا لم نجد المحادثة (ربما جديدة)، يمكن تجاهل الأمر أو فتح الأولى
-        }
+        } catch (e) {}
       }
     });
   }
@@ -88,7 +88,6 @@ class _ChatListScreenState extends State<ChatListScreen>
     }
   }
 
-  // --- Socket Logic ---
   void _initSocket() async {
     const String socketUrl = 'https://linyora.cloud/';
     String? token = await AuthService.instance.getToken();
@@ -149,13 +148,17 @@ class _ChatListScreenState extends State<ChatListScreen>
 
   void _updateConversationList(Message msg) {
     if (!mounted) return;
+
+    // استدعاء الترجمة (نحتاجها لكلمة "مرفق")
+    final l10n = AppLocalizations.of(context)!;
+
     setState(() {
       final index = _conversations.indexWhere(
         (c) => c.id == msg.conversationId,
       );
       if (index != -1) {
         var convo = _conversations[index];
-        convo.lastMessage = msg.body ?? 'مرفق 📎';
+        convo.lastMessage = msg.body ?? l10n.attachmentMsg; // ✅ مترجم
         convo.unreadCount += 1;
         _conversations.removeAt(index);
         _conversations.insert(0, convo);
@@ -201,19 +204,21 @@ class _ChatListScreenState extends State<ChatListScreen>
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: false,
-        title: const Text(
-          "المحادثات",
-          style: TextStyle(
+        title: Text(
+          l10n.conversationsTitle, // ✅ مترجم
+          style: const TextStyle(
             color: kTextColor,
             fontSize: 24,
             fontWeight: FontWeight.w800,
-            fontFamily: 'Cairo', // يفضل استخدام خط عربي
           ),
         ),
         actions: [
@@ -250,7 +255,7 @@ class _ChatListScreenState extends State<ChatListScreen>
                 child: CircularProgressIndicator(color: kPrimaryBlue),
               )
               : _conversations.isEmpty
-              ? _buildEmptyState()
+              ? _buildEmptyState(l10n) // ✅ تمرير l10n
               : ListView.separated(
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 itemCount: _conversations.length,
@@ -260,20 +265,21 @@ class _ChatListScreenState extends State<ChatListScreen>
                       child: Divider(height: 1, color: Color(0xFFF1F5F9)),
                     ),
                 itemBuilder:
-                    (context, index) =>
-                        _buildConversationTile(_conversations[index]),
+                    (context, index) => _buildConversationTile(
+                      _conversations[index],
+                      l10n,
+                    ), // ✅ تمرير l10n
               ),
     );
   }
 
-  Widget _buildConversationTile(Conversation convo) {
+  Widget _buildConversationTile(Conversation convo, AppLocalizations l10n) {
     return InkWell(
       onTap: () => _openChat(convo),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Row(
           children: [
-            // Avatar
             Hero(
               tag: 'avatar_${convo.participantId}',
               child: Stack(
@@ -319,7 +325,7 @@ class _ChatListScreenState extends State<ChatListScreen>
                         width: 14,
                         height: 14,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF22C55E), // Bright Green
+                          color: const Color(0xFF22C55E),
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 2.5),
                         ),
@@ -329,13 +335,13 @@ class _ChatListScreenState extends State<ChatListScreen>
               ),
             ),
             const SizedBox(width: 16),
-            // Info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    convo.participantName ?? "مستخدم",
+                    convo.participantName ??
+                        l10n.defaultInfluencerName, // يمكن استخدام مترجم عام مثل "مستخدم"
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 16,
@@ -360,7 +366,6 @@ class _ChatListScreenState extends State<ChatListScreen>
                 ],
               ),
             ),
-            // Time & Badge
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -388,14 +393,14 @@ class _ChatListScreenState extends State<ChatListScreen>
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(AppLocalizations l10n) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
             padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: kLightBlue,
               shape: BoxShape.circle,
             ),
@@ -406,9 +411,9 @@ class _ChatListScreenState extends State<ChatListScreen>
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
-            "ابدأ محادثة جديدة",
-            style: TextStyle(color: Colors.grey, fontSize: 16),
+          Text(
+            l10n.startNewConversationMsg, // ✅ مترجم
+            style: const TextStyle(color: Colors.grey, fontSize: 16),
           ),
         ],
       ),
@@ -417,7 +422,7 @@ class _ChatListScreenState extends State<ChatListScreen>
 }
 
 // ==========================================
-// 2. شاشة المحادثة (Details) - The Blue UX
+// 2. شاشة المحادثة (Details)
 // ==========================================
 class ChatDetailScreen extends StatefulWidget {
   final Conversation conversation;
@@ -439,7 +444,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final ChatService _chatService = ChatService();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final List<Message> _messages = []; // Reverse Order
+  final List<Message> _messages = [];
 
   bool _isLoading = true;
   bool _isUploading = false;
@@ -468,7 +473,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       final msg = Message.fromJson(data);
       if (msg.conversationId == widget.conversation.id) {
         setState(() => _messages.insert(0, msg));
-        // ✅ تشغيل النزول الذكي إذا كان المستخدم يرى آخر رسالة
         if (_scrollController.hasClients && _scrollController.offset < 100) {
           _scrollToBottom(isImage: msg.attachmentUrl != null);
         }
@@ -524,13 +528,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
   }
 
-  // ✅ الدالة السحرية للنزول السلس
   void _scrollToBottom({bool isImage = false}) {
     if (!_scrollController.hasClients) return;
-    // لأن القائمة معكوسة، النزول للأسفل يعني الذهاب إلى offset 0
-    // ولكن في بعض الحالات نريد التأكد من العرض
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // للقائمة المعكوسة (reverse: true)، الـ bottom هو 0.0
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           0.0,
@@ -541,7 +541,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     });
   }
 
-  Future<void> _sendMessage({
+  Future<void> _sendMessage(
+    AppLocalizations l10n, {
     String? body,
     String? attachmentUrl,
     String? type,
@@ -564,7 +565,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       _messageController.clear();
     });
 
-    // ✅ النزول دائماً عند الإرسال
     _scrollToBottom(isImage: attachmentUrl != null);
 
     try {
@@ -578,11 +578,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       setState(() => _messages.remove(tempMsg));
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('فشل الإرسال')));
+      ).showSnackBar(SnackBar(content: Text(l10n.sendFailedMsg))); // ✅ مترجم
     }
   }
 
-  Future<void> _handleAttachment(String type) async {
+  Future<void> _handleAttachment(String type, AppLocalizations l10n) async {
     File? file;
     String attachmentType = type == 'image' ? 'image' : 'file';
 
@@ -603,6 +603,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         setState(() => _isUploading = false);
         if (res != null) {
           _sendMessage(
+            l10n, // ✅ تمرير l10n
             attachmentUrl: res['attachment_url'],
             type: res['attachment_type'] ?? attachmentType,
           );
@@ -613,20 +614,25 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
   }
 
-  String _formatLastSeen(String? lastSeen) {
-    if (lastSeen == null) return "غير متصل";
+  // ✅ تمرير l10n
+  String _formatLastSeen(String? lastSeen, AppLocalizations l10n) {
+    if (lastSeen == null) return l10n.offlineStatus; // ✅ مترجم
     try {
       final date = DateTime.parse(lastSeen).toLocal();
-      return "آخر ظهور ${DateFormat('hh:mm a').format(date)}";
+      String langCode = Localizations.localeOf(context).languageCode;
+      return "${l10n.lastSeenPrefix}${DateFormat('hh:mm a', langCode).format(date)}"; // ✅ مترجم وديناميكي
     } catch (e) {
-      return "غير متصل";
+      return l10n.offlineStatus; // ✅ مترجم
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
-      backgroundColor: kChatBackground, // خلفية رمادية فاتحة جداً
+      backgroundColor: kChatBackground,
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
@@ -661,7 +667,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.conversation.participantName ?? "مستخدم",
+                  widget.conversation.participantName ??
+                      l10n.defaultInfluencerName, // مترجم
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -669,8 +676,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 ),
                 Text(
                   widget.conversation.isOnline
-                      ? "متصل الآن"
-                      : _formatLastSeen(widget.conversation.lastSeen),
+                      ? l10n
+                          .onlineNow // ✅ مترجم
+                      : _formatLastSeen(
+                        widget.conversation.lastSeen,
+                        l10n,
+                      ), // ✅ تمرير l10n
                   style: TextStyle(
                     fontSize: 12,
                     color:
@@ -697,7 +708,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       ),
       body: Column(
         children: [
-          // 1. Messages Area
           Expanded(
             child:
                 _isLoading
@@ -706,7 +716,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     )
                     : ListView.builder(
                       controller: _scrollController,
-                      reverse: true, // ✅ القائمة تبدأ من الأسفل
+                      reverse: true,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 20,
@@ -715,7 +725,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       itemBuilder: (context, index) {
                         final msg = _messages[index];
                         final isMe = msg.senderId == widget.currentUserId;
-                        // فحص لتجميع الرسائل المتتالية (تقليل المسافات)
                         final bool isNextSame =
                             index > 0 &&
                             _messages[index - 1].senderId == msg.senderId;
@@ -723,16 +732,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       },
                     ),
           ),
-
-          // 2. Modern Input Area
-          _buildBlueInputArea(),
+          _buildBlueInputArea(l10n), // ✅ تمرير l10n
         ],
       ),
     );
   }
 
-  // 💎 The Blue Bubble Design
   Widget _buildBlueBubble(Message msg, bool isMe, bool isNextSame) {
+    String langCode = Localizations.localeOf(context).languageCode;
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -777,7 +784,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             ),
                           ),
-                      // ✅ عند تحميل الصورة، اطلب النزول للأسفل إذا لزم الأمر
                       imageBuilder: (ctx, provider) {
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           if (_scrollController.hasClients &&
@@ -806,9 +812,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   Text(
-                    DateFormat(
-                      'hh:mm a',
-                    ).format(DateTime.parse(msg.createdAt).toLocal()),
+                    DateFormat('hh:mm a', langCode).format(
+                      DateTime.parse(msg.createdAt).toLocal(),
+                    ), // ✅ تاريخ مترجم
                     style: TextStyle(
                       fontSize: 10,
                       color:
@@ -837,15 +843,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
-  // 💎 Modern Input
-  Widget _buildBlueInputArea() {
+  Widget _buildBlueInputArea(AppLocalizations l10n) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(
-        16,
-        12,
-        16,
-        30,
-      ), // Extra bottom padding for iOS home bar
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 30),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
@@ -875,7 +875,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       maxLines: 5,
                       style: const TextStyle(color: kTextColor),
                       decoration: InputDecoration(
-                        hintText: "اكتب رسالة...",
+                        hintText: l10n.typeMessageHint, // ✅ مترجم
                         hintStyle: TextStyle(color: Colors.grey[400]),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(
@@ -890,14 +890,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       Icons.attach_file_rounded,
                       color: Colors.grey[500],
                     ),
-                    onPressed: () => _handleAttachment('file'),
+                    onPressed:
+                        () => _handleAttachment('file', l10n), // ✅ تمرير l10n
                   ),
                   IconButton(
                     icon: Icon(
                       Icons.camera_alt_outlined,
                       color: Colors.grey[500],
                     ),
-                    onPressed: () => _handleAttachment('image'),
+                    onPressed:
+                        () => _handleAttachment('image', l10n), // ✅ تمرير l10n
                   ),
                 ],
               ),
@@ -905,7 +907,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           ),
           const SizedBox(width: 12),
           GestureDetector(
-            onTap: () => _sendMessage(body: _messageController.text),
+            onTap:
+                () => _sendMessage(
+                  l10n,
+                  body: _messageController.text,
+                ), // ✅ تمرير l10n
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(

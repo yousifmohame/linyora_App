@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:url_launcher/url_launcher.dart'; // ✅ 1. استيراد المكتبة
+import 'package:url_launcher/url_launcher.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import 'package:linyora_project/features/auth/providers/auth_provider.dart';
 import 'package:linyora_project/features/auth/services/auth_service.dart';
 import 'package:linyora_project/features/chat/screens/chat_screen.dart';
@@ -21,25 +25,21 @@ class ModelProfileScreen extends StatefulWidget {
 
 class _ModelProfileScreenState extends State<ModelProfileScreen>
     with SingleTickerProviderStateMixin {
-  // Services
   final BrowseService _service = BrowseService();
   final ChatService _chatService = ChatService();
   final AuthService _authService = AuthService.instance;
   final PaymentService _paymentService = PaymentService();
 
-  // Controllers
   late TabController _tabController;
   final ScrollController _scrollController = ScrollController();
 
-  // Data
   ModelFullProfile? _profile;
   List<Offer> _offers = [];
   List<ServicePackage> _packages = [];
   List<MerchantProduct> _merchantProducts = [];
   bool _isLoading = true;
 
-  // Modern Color Palette
-  final Color _accentColor = const Color(0xFFE11D48); // Rose-600
+  final Color _accentColor = const Color(0xFFE11D48);
   final Color _darkText = const Color(0xFF1F2937);
   final Color _lightText = const Color(0xFF6B7280);
 
@@ -77,30 +77,28 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
     }
   }
 
-  // ✅ 2. دالة فتح الروابط الخارجية
-  Future<void> _launchSocialLink(String? url) async {
+  // ✅ تمرير l10n لترجمة السناك بار
+  Future<void> _launchSocialLink(String? url, AppLocalizations l10n) async {
     if (url == null || url.isEmpty) {
-      _showSnack('الرابط غير متوفر', isError: true);
+      _showSnack(l10n.linkNotAvailableMsg, isError: true); // ✅ مترجم
       return;
     }
 
-    // التأكد من أن الرابط يبدأ بـ http/https
     final Uri uri = Uri.parse(url.startsWith('http') ? url : 'https://$url');
 
     try {
       if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-        _showSnack('تعذر فتح الرابط', isError: true);
+        _showSnack(l10n.couldNotOpenLinkMsg, isError: true); // ✅ مترجم
       }
     } catch (e) {
-      _showSnack('حدث خطأ أثناء فتح الرابط', isError: true);
+      _showSnack(l10n.errorOpeningLinkMsg, isError: true); // ✅ مترجم
     }
   }
 
-  // --- Logic Methods ---
-  Future<void> _startConversation() async {
+  Future<void> _startConversation(AppLocalizations l10n) async {
     final user = _authService.currentUser;
     if (user == null) {
-      _showSnack('يجب تسجيل الدخول أولاً', isError: true);
+      _showSnack(l10n.loginRequiredMsg, isError: true); // ✅ مترجم
       return;
     }
     _showLoadingDialog();
@@ -123,13 +121,17 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
       }
     } catch (e) {
       Navigator.pop(context);
-      _showSnack('حدث خطأ، حاول مرة أخرى', isError: true);
+      _showSnack(l10n.errorTryAgainMsg, isError: true); // ✅ مترجم
     }
   }
 
-  Future<void> _handleRequest({Offer? offer, PackageTier? tier}) async {
+  Future<void> _handleRequest(
+    AppLocalizations l10n, {
+    Offer? offer,
+    PackageTier? tier,
+  }) async {
     if (_merchantProducts.isEmpty) {
-      _showSnack('يجب أن يكون لديك منتجات لتتمكن من الطلب', isError: true);
+      _showSnack(l10n.mustHaveProductsToOrderMsg, isError: true); // ✅ مترجم
       return;
     }
     MerchantProduct? selectedProduct;
@@ -143,7 +145,7 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
           (context) => _buildProductSelector((p) {
             selectedProduct = p;
             Navigator.pop(context);
-          }),
+          }, l10n), // ✅ تمرير l10n
     );
 
     if (selectedProduct == null) return;
@@ -154,7 +156,11 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
       productId: selectedProduct!.id,
       packageTierId: tier?.id,
       offerId: offer?.id,
-      onSuccess: () => _showSnack('✅ تم إرسال الطلب بنجاح!', isError: false),
+      onSuccess:
+          () => _showSnack(
+            l10n.orderSentSuccessfullyMsg,
+            isError: false,
+          ), // ✅ مترجم
     );
   }
 
@@ -176,13 +182,15 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
     );
   }
 
-  // --- Main Build ---
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     if (_isLoading)
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     if (_profile == null)
-      return const Scaffold(body: Center(child: Text("غير موجود")));
+      return Scaffold(body: Center(child: Text(l10n.notFoundMsg))); // ✅ مترجم
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -190,8 +198,10 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
         controller: _scrollController,
         headerSliverBuilder: (context, innerBoxIsScrolled) {
           return [
-            _buildSliverAppBar(),
-            SliverToBoxAdapter(child: _buildHeaderContent()),
+            _buildSliverAppBar(l10n), // ✅ تمرير l10n للرول
+            SliverToBoxAdapter(
+              child: _buildHeaderContent(l10n),
+            ), // ✅ تمرير l10n للإحصائيات
             SliverPersistentHeader(
               delegate: _ModernTabBarDelegate(
                 TabBar(
@@ -205,10 +215,10 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
                     fontWeight: FontWeight.bold,
                     fontSize: 15,
                   ),
-                  tabs: const [
-                    Tab(text: "المعرض"),
-                    Tab(text: "الباقات"),
-                    Tab(text: "العروض"),
+                  tabs: [
+                    Tab(text: l10n.galleryTab), // ✅ مترجم
+                    Tab(text: l10n.packagesTab), // ✅ مترجم
+                    Tab(text: l10n.offersTab), // ✅ مترجم
                   ],
                 ),
               ),
@@ -219,17 +229,17 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
         body: TabBarView(
           controller: _tabController,
           children: [
-            _buildPortfolioTab(),
-            _buildPackagesTab(),
-            _buildOffersTab(),
+            _buildPortfolioTab(l10n), // ✅ تمرير l10n
+            _buildPackagesTab(l10n), // ✅ تمرير l10n
+            _buildOffersTab(l10n), // ✅ تمرير l10n
           ],
         ),
       ),
-      bottomNavigationBar: _buildBottomBar(),
+      bottomNavigationBar: _buildBottomBar(l10n), // ✅ تمرير l10n
     );
   }
 
-  Widget _buildSliverAppBar() {
+  Widget _buildSliverAppBar(AppLocalizations l10n) {
     return SliverAppBar(
       expandedHeight: 280,
       pinned: true,
@@ -330,7 +340,9 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          _profile!.roleId == 3 ? "عارضة ازياء" : "منشئة محتوي",
+                          _profile!.roleId == 3
+                              ? l10n.fashionModelRole
+                              : l10n.contentCreatorRole, // ✅ مترجم
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.9),
                             fontSize: 14,
@@ -348,8 +360,7 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
     );
   }
 
-  // ✅ 3. تحديث قسم الهيدر لعرض الأزرار الحقيقية
-  Widget _buildHeaderContent() {
+  Widget _buildHeaderContent(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -363,7 +374,6 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
           ),
           const SizedBox(height: 16),
 
-          // عرض أزرار التواصل فقط إذا كانت الروابط موجودة
           if (_profile!.socialLinks != null)
             Wrap(
               spacing: 10,
@@ -375,46 +385,54 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
                     icon: FontAwesomeIcons.instagram,
                     label: "Instagram",
                     onTap:
-                        () =>
-                            _launchSocialLink(_profile!.socialLinks!.instagram),
+                        () => _launchSocialLink(
+                          _profile!.socialLinks!.instagram,
+                          l10n,
+                        ),
                   ),
-
                 if (_profile!.socialLinks!.twitter != null &&
                     _profile!.socialLinks!.twitter!.isNotEmpty)
                   _buildSocialChip(
                     icon: FontAwesomeIcons.twitter,
                     label: "Twitter",
                     onTap:
-                        () => _launchSocialLink(_profile!.socialLinks!.twitter),
+                        () => _launchSocialLink(
+                          _profile!.socialLinks!.twitter,
+                          l10n,
+                        ),
                   ),
-
                 if (_profile!.socialLinks!.facebook != null &&
                     _profile!.socialLinks!.facebook!.isNotEmpty)
                   _buildSocialChip(
                     icon: FontAwesomeIcons.facebook,
                     label: "Facebook",
                     onTap:
-                        () =>
-                            _launchSocialLink(_profile!.socialLinks!.facebook),
+                        () => _launchSocialLink(
+                          _profile!.socialLinks!.facebook,
+                          l10n,
+                        ),
                   ),
-
                 if (_profile!.socialLinks!.tiktok != null &&
                     _profile!.socialLinks!.tiktok!.isNotEmpty)
                   _buildSocialChip(
                     icon: FontAwesomeIcons.tiktok,
                     label: "TikTok",
                     onTap:
-                        () => _launchSocialLink(_profile!.socialLinks!.tiktok),
+                        () => _launchSocialLink(
+                          _profile!.socialLinks!.tiktok,
+                          l10n,
+                        ),
                   ),
-
                 if (_profile!.socialLinks!.snapchat != null &&
                     _profile!.socialLinks!.snapchat!.isNotEmpty)
                   _buildSocialChip(
                     icon: FontAwesomeIcons.snapchat,
                     label: "Snapchat",
                     onTap:
-                        () =>
-                            _launchSocialLink(_profile!.socialLinks!.snapchat),
+                        () => _launchSocialLink(
+                          _profile!.socialLinks!.snapchat,
+                          l10n,
+                        ),
                   ),
               ],
             ),
@@ -431,14 +449,20 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildModernStat(_profile!.stats.followers, "المتابعون"),
+                _buildModernStat(
+                  _profile!.stats.followers,
+                  l10n.followersStat,
+                ), // ✅ مترجم
                 Container(height: 30, width: 1, color: Colors.grey.shade300),
                 _buildModernStat(
                   _profile!.stats.rating.toString(),
-                  "التقييم ⭐",
-                ),
+                  l10n.ratingStat,
+                ), // ✅ مترجم
                 Container(height: 30, width: 1, color: Colors.grey.shade300),
-                _buildModernStat(_profile!.stats.engagement, "التفاعل"),
+                _buildModernStat(
+                  _profile!.stats.engagement,
+                  l10n.engagementStat,
+                ), // ✅ مترجم
               ],
             ),
           ),
@@ -464,7 +488,6 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
     );
   }
 
-  // ✅ 4. تحديث الزر ليقبل أمر الضغط (onTap)
   Widget _buildSocialChip({
     required IconData icon,
     required String label,
@@ -506,12 +529,12 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
     );
   }
 
-  Widget _buildPortfolioTab() {
+  Widget _buildPortfolioTab(AppLocalizations l10n) {
     if (_profile!.portfolio.isEmpty) {
       return _buildEmptyState(
-        "لا توجد صور في المعرض",
+        l10n.noImagesInGalleryMsg,
         Icons.photo_library_outlined,
-      );
+      ); // ✅ مترجم
     }
     return GridView.builder(
       padding: const EdgeInsets.all(2),
@@ -553,9 +576,12 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
     );
   }
 
-  Widget _buildPackagesTab() {
+  Widget _buildPackagesTab(AppLocalizations l10n) {
     if (_packages.isEmpty)
-      return _buildEmptyState("لا توجد باقات", Icons.inventory_2_outlined);
+      return _buildEmptyState(
+        l10n.noPackagesMsg,
+        Icons.inventory_2_outlined,
+      ); // ✅ مترجم
 
     return ListView.separated(
       padding: const EdgeInsets.all(20),
@@ -621,7 +647,7 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
                                 ),
                               ),
                               Text(
-                                "${tier.price} ر.س",
+                                "${tier.price} ${l10n.currencySAR}", // ✅ عملة
                                 style: TextStyle(
                                   color: _accentColor,
                                   fontWeight: FontWeight.w900,
@@ -664,7 +690,11 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
                                 width: double.infinity,
                                 height: 48,
                                 child: ElevatedButton(
-                                  onPressed: () => _handleRequest(tier: tier),
+                                  onPressed:
+                                      () => _handleRequest(
+                                        l10n,
+                                        tier: tier,
+                                      ), // ✅ تمرير l10n
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.black,
                                     foregroundColor: Colors.white,
@@ -673,12 +703,12 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
                                     ),
                                     elevation: 0,
                                   ),
-                                  child: const Text(
-                                    "اختيار الباقة",
-                                    style: TextStyle(
+                                  child: Text(
+                                    l10n.choosePackageBtn,
+                                    style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                     ),
-                                  ),
+                                  ), // ✅ مترجم
                                 ),
                               ),
                             ],
@@ -695,12 +725,12 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
     );
   }
 
-  Widget _buildOffersTab() {
+  Widget _buildOffersTab(AppLocalizations l10n) {
     if (_offers.isEmpty)
       return _buildEmptyState(
-        "لا توجد عروض حالياً",
+        l10n.noOffersCurrentlyMsg,
         Icons.local_offer_outlined,
-      );
+      ); // ✅ مترجم
 
     return ListView.separated(
       padding: const EdgeInsets.all(20),
@@ -748,7 +778,7 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
                       ),
                     ),
                     Text(
-                      "${offer.price} ر.س",
+                      "${offer.price} ${l10n.currencySAR}", // ✅ عملة
                       style: TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 18,
@@ -775,7 +805,9 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: () => _handleRequest(offer: offer),
+                    onPressed:
+                        () =>
+                            _handleRequest(l10n, offer: offer), // ✅ تمرير l10n
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(color: _accentColor),
                       foregroundColor: _accentColor,
@@ -784,7 +816,7 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    child: const Text("طلب العرض"),
+                    child: Text(l10n.requestOfferBtn), // ✅ مترجم
                   ),
                 ),
               ],
@@ -808,7 +840,7 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
     );
   }
 
-  Widget _buildBottomBar() {
+  Widget _buildBottomBar(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
       decoration: BoxDecoration(
@@ -825,9 +857,9 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
         children: [
           Expanded(
             child: ElevatedButton.icon(
-              onPressed: _startConversation,
+              onPressed: () => _startConversation(l10n), // ✅ تمرير l10n
               icon: const Icon(Icons.chat_bubble_outline_rounded, size: 20),
-              label: const Text("محادثة"),
+              label: Text(l10n.chatBtn), // ✅ مترجم
               style: ElevatedButton.styleFrom(
                 backgroundColor: _accentColor,
                 foregroundColor: Colors.white,
@@ -844,15 +876,18 @@ class _ModelProfileScreenState extends State<ModelProfileScreen>
     );
   }
 
-  Widget _buildProductSelector(Function(MerchantProduct) onSelect) {
+  Widget _buildProductSelector(
+    Function(MerchantProduct) onSelect,
+    AppLocalizations l10n,
+  ) {
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            "اختر منتج",
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          Text(
+            l10n.selectProductTitle, // ✅ مترجم
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
           ),
           const SizedBox(height: 16),
           Expanded(

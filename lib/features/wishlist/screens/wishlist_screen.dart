@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../providers/wishlist_provider.dart';
 import '../../shared/widgets/product_card.dart';
 
@@ -8,22 +12,19 @@ class WishlistScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // --- 1. حسابات التجاوب (Responsive Calculations) ---
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     final double screenWidth = MediaQuery.of(context).size.width;
-
-    // عدد الأعمدة: 2 للموبايل، 3 للتابلت، 4 للشاشات العريضة
     int crossAxisCount = screenWidth > 900 ? 4 : (screenWidth > 600 ? 4 : 2);
-
-    // نسبة الأبعاد: في التابلت نزيد العرض قليلاً لأن البطاقة تكون أعرض
-    // 0.48 للموبايل (كما اخترت أنت)، و 0.58 للتابلت لتكون متناسقة
     double childAspectRatio = screenWidth > 600 ? 0.55 : 0.48;
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text(
-          "المفضلة",
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          l10n.favorites, // ✅ نص مترجم (استخدمناه مسبقاً في الملف الشخصي)
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         backgroundColor: Colors.white,
@@ -44,7 +45,7 @@ class WishlistScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    "قائمة المفضلة فارغة",
+                    l10n.emptyWishlistMsg, // ✅ نص مترجم
                     style: TextStyle(fontSize: 18, color: Colors.grey[600]),
                   ),
                 ],
@@ -55,7 +56,6 @@ class WishlistScreen extends StatelessWidget {
           return GridView.builder(
             padding: const EdgeInsets.all(16),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              // ✅ استخدام القيم الديناميكية هنا
               crossAxisCount: crossAxisCount,
               childAspectRatio: childAspectRatio,
               mainAxisSpacing: 12,
@@ -67,7 +67,6 @@ class WishlistScreen extends StatelessWidget {
                 builder: (context, constraints) {
                   return ProductCard(
                     product: provider.items[index],
-                    // تمرير العرض الفعلي بناءً على حجم العمود
                     width: constraints.maxWidth,
                   );
                 },

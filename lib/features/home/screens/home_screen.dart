@@ -2,9 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:linyora_project/features/layout/main_layout_screen.dart';
-import 'package:linyora_project/features/products/screens/main_prodects.dart';
 import 'package:provider/provider.dart';
+
+// ✅ 1. الاستيراد الصحيح لملف الترجمة الخاص بمشروعك
+import 'package:linyora_project/l10n/app_localizations.dart';
 
 // --- Providers & Screens ---
 import 'package:linyora_project/features/cart/providers/cart_provider.dart';
@@ -13,11 +14,12 @@ import 'package:linyora_project/features/cart/screens/cart_screen.dart';
 import 'package:linyora_project/features/categories/screens/categories_screen.dart';
 import 'package:linyora_project/features/categories/screens/category_products_screen.dart';
 import 'package:linyora_project/features/home/screens/notifications_screen.dart';
+import 'package:linyora_project/features/layout/main_layout_screen.dart';
 
 // --- Services & Models ---
 import 'package:linyora_project/features/home/services/section_service.dart';
 import 'package:linyora_project/features/home/services/home_service.dart';
-import 'package:linyora_project/features/home/services/layout_service.dart'; // ✅ تأكد من وجود هذا الملف
+import 'package:linyora_project/features/home/services/layout_service.dart';
 import 'package:linyora_project/features/home/widgets/marquee_widget.dart';
 import 'package:linyora_project/features/home/widgets/search_screen.dart';
 import 'package:linyora_project/models/product_model.dart';
@@ -43,14 +45,12 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // 1. Services
   final HomeService _homeService = HomeService();
   final SectionService _sectionService = SectionService();
-  final LayoutService _layoutService = LayoutService(); // ✅ خدمة التخطيط
+  final LayoutService _layoutService = LayoutService();
   final CarouselSliderController _carouselController =
       CarouselSliderController();
 
-  // 2. Data Lists
   List<BannerModel> _banners = [];
   List<CategoryModel> _categories = [];
   List<SectionModel> _sections = [];
@@ -59,20 +59,17 @@ class _HomeScreenState extends State<HomeScreen> {
   List<ProductModel> _newArrivals = [];
   List<ProductModel> _bestSellers = [];
   List<ProductModel> _topRated = [];
-  List<ProductModel> _linyoraPicks = []; // مختارات لينيورا
+  List<ProductModel> _linyoraPicks = [];
   List<ProductModel> _seasonStyle = [];
 
-  // ✅ القائمة الرئيسية التي تتحكم في ترتيب الصفحة بالكامل
   List<HomeLayoutItem> _layoutItems = [];
 
-  // 3. State Variables
   bool _isLoading = true;
   int _currentBannerIndex = 0;
   Timer? _sliderTimer;
   int _unreadNotificationsCount = 0;
   bool _isReorderingMode = false;
 
-  // ✅ التحقق من الأدمن (تأكد أن roleId 1 هو الأدمن في الداتابيز لديك)
   bool get _isAdmin {
     final user = Provider.of<AuthProvider>(context, listen: false).user;
     return user != null && user.roleId == 1;
@@ -105,7 +102,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _fetchData() async {
     try {
-      // 1. جلب البيانات الخام أولاً
       final results = await Future.wait([
         _homeService.getBanners(),
         _homeService.getCategories(),
@@ -115,7 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _homeService.getProductsByType('new'),
         _homeService.getProductsByType('best'),
         _homeService.getProductsByType('top'),
-        _homeService.getProductsByType('best'), // 8 (مختارات لينيورا)
+        _homeService.getProductsByType('best'),
         _homeService.getProductsByType('new'),
       ]);
 
@@ -133,7 +129,6 @@ class _HomeScreenState extends State<HomeScreen> {
           _seasonStyle = results[9] as List<ProductModel>;
         });
 
-        // 2. بعد توفر البيانات، نجلب الترتيب من السيرفر ونبني القائمة
         final layout = await _layoutService.getHomeLayout(_sections);
 
         setState(() {
@@ -158,8 +153,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // --- Logic for Reordering ---
-
   void _moveItemUp(int index) {
     if (index > 0) {
       setState(() {
@@ -178,27 +171,29 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _saveLayout() async {
+  // ✅ 2. تمرير l10n للرسائل
+  Future<void> _saveLayout(BuildContext context, AppLocalizations l10n) async {
     try {
       await _layoutService.saveLayoutOrder(_layoutItems);
       setState(() => _isReorderingMode = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ تم حفظ ترتيب الصفحة الرئيسية بنجاح!'),
+        SnackBar(
+          content: Text(l10n.layoutSavedSuccess),
           backgroundColor: Colors.green,
         ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('فشل الحفظ: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('${l10n.layoutSaveFailed}$e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
 
-  // --- UI Builder Methods ---
-
-  // ✅ المصنع الذي يحول العنصر (Item) إلى ويدجت (Widget)
-  Widget _mapLayoutItemToWidget(HomeLayoutItem item) {
+  // ✅ 3. تمرير l10n للدوال التي ترسم الواجهة
+  Widget _mapLayoutItemToWidget(HomeLayoutItem item, AppLocalizations l10n) {
     switch (item.type) {
       case HomeItemType.marquee:
         return const MarqueeWidget();
@@ -212,11 +207,11 @@ class _HomeScreenState extends State<HomeScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: Text(
-                'تسوق حسب الفئة',
-                style: TextStyle(
+                l10n.shopByCategory,
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.2,
@@ -233,40 +228,33 @@ class _HomeScreenState extends State<HomeScreen> {
         return Column(
           children: [
             HorizontalProductList(
-              title: "وصل حديثاً 🆕",
+              title: "${l10n.newArrivals} 🆕",
               products: _newArrivals,
-              // ✅ تفعيل زر عرض الكل
-              onSeeAll: () => _navigateToViewAll("وصل حديثاً", "new"),
+              onSeeAll: () => _navigateToViewAll(l10n.newArrivals, "new"),
             ),
             _buildDivider(),
           ],
         );
       case HomeItemType.linyoraPicks:
-        // إذا كانت القائمة فارغة نخفي القسم
         if (_linyoraPicks.isEmpty) return const SizedBox.shrink();
-
         return Column(
           children: [
             HorizontalProductList(
-              title: "مختارات لينيورا ✨",
+              title: "${l10n.linyoraPicks} ✨",
               products: _linyoraPicks,
-              // ✅ تفعيل زر عرض الكل (نمرر النوع picks)
-              onSeeAll: () => _navigateToViewAll("مختارات لينيورا", "picks"),
+              onSeeAll: () => _navigateToViewAll(l10n.linyoraPicks, "picks"),
             ),
             _buildDivider(),
           ],
         );
-
       case HomeItemType.seasonStyle:
         if (_seasonStyle.isEmpty) return const SizedBox.shrink();
-
         return Column(
           children: [
             HorizontalProductList(
-              title: "ستايل الموسم 🍂",
+              title: "${l10n.seasonStyle} 🍂",
               products: _seasonStyle,
-              // ✅ تفعيل زر عرض الكل (نمرر النوع season)
-              onSeeAll: () => _navigateToViewAll("ستايل الموسم", "season"),
+              onSeeAll: () => _navigateToViewAll(l10n.seasonStyle, "season"),
             ),
             _buildDivider(),
           ],
@@ -275,10 +263,9 @@ class _HomeScreenState extends State<HomeScreen> {
         return Column(
           children: [
             HorizontalProductList(
-              title: "الأكثر مبيعاً 🔥",
+              title: "${l10n.bestSellers} 🔥",
               products: _bestSellers,
-              // ✅ تفعيل زر عرض الكل
-              onSeeAll: () => _navigateToViewAll("الأكثر مبيعاً", "best"),
+              onSeeAll: () => _navigateToViewAll(l10n.bestSellers, "best"),
             ),
             _buildDivider(),
           ],
@@ -287,10 +274,9 @@ class _HomeScreenState extends State<HomeScreen> {
         return Column(
           children: [
             HorizontalProductList(
-              title: "الأعلى تقييماً ⭐",
+              title: "${l10n.topRated} ⭐",
               products: _topRated,
-              // ✅ تفعيل زر عرض الكل
-              onSeeAll: () => _navigateToViewAll("الأعلى تقييماً", "top"),
+              onSeeAll: () => _navigateToViewAll(l10n.topRated, "top"),
             ),
             _buildDivider(),
           ],
@@ -299,8 +285,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (_topModels.isEmpty) return const SizedBox.shrink();
         return Column(
           children: [
-            // يمكنك توجيه هذا لصفحة العارضات
-            _buildSectionTitleWrapper("أشهر العارضات ✨", () {}),
+            _buildSectionTitleWrapper("${l10n.topModelsTitle} ✨", () {}),
             _buildTopUsersList(_topModels, isModel: true),
             _buildDivider(),
           ],
@@ -309,7 +294,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (_topMerchants.isEmpty) return const SizedBox.shrink();
         return Column(
           children: [
-            _buildSectionTitleWrapper("متاجر مميزة 🛍️", () {}),
+            _buildSectionTitleWrapper("${l10n.topMerchantsTitle} 🛍️", () {}),
             _buildTopUsersList(_topMerchants, isModel: false),
             _buildDivider(),
           ],
@@ -329,40 +314,31 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // ✅ دالة مساعدة للانتقال (عليك إنشاء هذه الشاشة أو استخدام شاشة المنتجات الموجودة لديك)
   void _navigateToViewAll(String title, String apiType) {
-    // ✅ الطريقة الصحيحة (تفتح الهيكل الرئيسي وتحدد صفحة المنتجات)
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
-        builder:
-            (context) => const MainLayoutScreen(
-              initialIndex: 1,
-            ), // رقم 1 هو ترتيب المنتجات
+        builder: (context) => const MainLayoutScreen(initialIndex: 1),
       ),
-      (route) =>
-          false, // هذا يمنع الرجوع للصفحة السابقة (اجعلها true إذا أردت السماح بالرجوع)
+      (route) => false,
     );
   }
 
-  // ✅ ودجت التغليف: تضيف أدوات التحكم فوق العنصر إذا كان وضع التعديل مفعلاً
-  Widget _buildReorderableWrapper(int index, Widget child) {
-    // إذا لم يكن أدمن أو الوضع غير مفعل، ارجع العنصر كما هو
+  Widget _buildReorderableWrapper(
+    int index,
+    Widget child,
+    AppLocalizations l10n,
+  ) {
     if (!_isReorderingMode || !_isAdmin) return child;
 
-    // تحديد اسم العنصر للعرض
-    String label = itemTypeToLabel(_layoutItems[index]);
+    String label = itemTypeToLabel(_layoutItems[index], l10n);
 
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(
-          color: Colors.amber.shade300,
-          width: 2,
-        ), // حدود لتمييز العنصر
+        border: Border.all(color: Colors.amber.shade300, width: 2),
       ),
       child: Column(
         children: [
-          // شريط التحكم العلوي
           Container(
             color: Colors.amber.shade100,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -405,49 +381,46 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
-          // المحتوى
           child,
         ],
       ),
     );
   }
 
-  String itemTypeToLabel(HomeLayoutItem item) {
+  String itemTypeToLabel(HomeLayoutItem item, AppLocalizations l10n) {
     switch (item.type) {
       case HomeItemType.marquee:
-        return "شريط الأخبار";
+        return l10n.labelMarquee;
       case HomeItemType.stories:
-        return "القصص (Stories)";
+        return l10n.labelStories;
       case HomeItemType.banners:
-        return "البنرات الإعلانية";
+        return l10n.labelBanners;
       case HomeItemType.flashSale:
-        return "فلاش سيل";
+        return l10n.labelFlashSale;
       case HomeItemType.categories:
-        return "الأقسام (Categories)";
+        return l10n.labelCategories;
       case HomeItemType.newArrivals:
-        return "وصل حديثاً";
+        return l10n.newArrivals;
       case HomeItemType.bestSellers:
-        return "الأكثر مبيعاً";
+        return l10n.bestSellers;
       case HomeItemType.topRated:
-        return "الأعلى تقييماً";
+        return l10n.topRated;
       case HomeItemType.linyoraPicks:
-        return "مختارات لينيورا";
+        return l10n.linyoraPicks;
       case HomeItemType.seasonStyle:
-        return "ستايل الموسم";
+        return l10n.seasonStyle;
       case HomeItemType.topModels:
-        return "أشهر العارضات";
+        return l10n.topModelsTitle;
       case HomeItemType.topMerchants:
-        return "متاجر مميزة";
+        return l10n.topMerchantsTitle;
       case HomeItemType.dynamicSection:
-        return "قسم خاص: ${(item.data as SectionModel).title}";
+        return "${l10n.labelDynamicSection}${(item.data as SectionModel).title}";
       default:
         return item.id;
     }
   }
 
-  // --- Standard Widgets Implementation ---
-
-  Widget _buildAppBar() {
+  Widget _buildAppBar(AppLocalizations l10n) {
     final authProvider = Provider.of<AuthProvider>(context);
     final isRealAdmin =
         authProvider.user != null && authProvider.user!.roleId == 1;
@@ -511,10 +484,9 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       centerTitle: true,
       actions: [
-        // ✅ زر التعديل للأدمن
         if (isRealAdmin)
           IconButton(
-            tooltip: _isReorderingMode ? "حفظ الترتيب" : "تعديل ترتيب الصفحة",
+            tooltip: _isReorderingMode ? l10n.saveLayout : l10n.editLayout,
             icon: CircleAvatar(
               radius: 18,
               backgroundColor:
@@ -527,7 +499,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             onPressed: () {
               if (_isReorderingMode) {
-                _saveLayout();
+                _saveLayout(context, l10n); // تمرير context و l10n
               } else {
                 setState(() => _isReorderingMode = true);
               }
@@ -661,7 +633,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const Icon(Icons.search, color: Colors.grey),
                   const SizedBox(width: 10),
                   Text(
-                    "عن ماذا تبحث اليوم؟",
+                    l10n.searchHint,
                     style: TextStyle(color: Colors.grey[600], fontSize: 14),
                   ),
                   const Spacer(),
@@ -678,6 +650,9 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  // .. باقي أدوات الواجهة كما هي (Scrollers, Banners, Cards) ..
+  // لن تتغير لأنها لا تحتوي على نصوص ثابتة بحاجة لترجمة
 
   Widget _buildCategoriesScroller() {
     if (_categories.isEmpty) return const SizedBox.shrink();
@@ -871,7 +846,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 SizedBox(
                   height: 36,
                   child: ElevatedButton(
-                    // ✅ هنا التغيير لفتح الرابط الخارجي
                     onPressed: () => _launchExternalUrl(banner.link),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
@@ -908,12 +882,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _launchExternalUrl(String url) async {
     if (url.isEmpty) return;
-
     final Uri uri = Uri.parse(url);
-
     try {
       if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-        // يمكنك إظهار رسالة خطأ هنا للمستخدم
         print('Could not launch $url');
       }
     } catch (e) {
@@ -939,16 +910,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildTopUsersList(List<TopUserModel> users, {required bool isModel}) {
     if (users.isEmpty) return const SizedBox.shrink();
 
-    // 1. حساب عرض الشاشة
     final double screenWidth = MediaQuery.of(context).size.width;
-
-    // 2. عرض البطاقة الثابت + الهوامش (160 width + 20 margin horizontal)
     const double cardWidth = 180.0;
-
-    // 3. حساب النسبة المطلوبة بدقة لتناسب حجم البطاقة
     double fraction = cardWidth / screenWidth;
-
-    // تأكد أن النسبة لا تزيد عن 1 (لشاشات الهواتف الصغيرة جداً)
     if (fraction > 1.0) fraction = 1.0;
 
     return CarouselSlider.builder(
@@ -962,14 +926,9 @@ class _HomeScreenState extends State<HomeScreen> {
         autoPlayInterval: const Duration(seconds: 4),
         autoPlayAnimationDuration: const Duration(milliseconds: 800),
         autoPlayCurve: Curves.fastOutSlowIn,
-
-        // ✅ التعديل هنا: استخدام النسبة المحسوبة ديناميكياً
         viewportFraction: fraction,
-
-        // ✅ إضافة هذا السطر: لمنع توسيط البطاقة الأولى (يجعلها تبدأ من اليمين/اليسار)
         padEnds: false,
-
-        enlargeCenterPage: false, // يفضل إلغاؤها في التابلت لتقليل الفراغات
+        enlargeCenterPage: false,
         enableInfiniteScroll: true,
       ),
     );
@@ -984,21 +943,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 4. تعريف l10n مرة واحدة فقط داخل دالة build الرئيسية
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       body:
           _isLoading
               ? const Center(child: CircularProgressIndicator())
               : CustomScrollView(
                 slivers: [
-                  _buildAppBar(),
-                  // ✅ بناء القائمة ديناميكياً باستخدام SliverList
+                  _buildAppBar(l10n), // ✅ تمرير l10n هنا
                   SliverList(
                     delegate: SliverChildBuilderDelegate((context, index) {
                       final item = _layoutItems[index];
-                      // تغليف كل عنصر بأدوات التحكم (للأدمن)
                       return _buildReorderableWrapper(
                         index,
-                        _mapLayoutItemToWidget(item),
+                        _mapLayoutItemToWidget(
+                          item,
+                          l10n,
+                        ), // ✅ وتمريره هنا أيضاً
+                        l10n, // ✅ وتمريره لغلاف التعديل
                       );
                     }, childCount: _layoutItems.length),
                   ),

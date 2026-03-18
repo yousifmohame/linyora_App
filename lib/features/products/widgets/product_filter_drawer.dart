@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:linyora_project/features/products/services/product_service.dart';
 import 'package:linyora_project/models/filter_options_model.dart';
 
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 class ProductFilterDrawer extends StatefulWidget {
   final Function(Map<String, dynamic>) onApplyFilters;
   final Map<String, dynamic> currentFilters;
@@ -126,7 +129,7 @@ class _ProductFilterDrawerState extends State<ProductFilterDrawer> {
     }
   }
 
-  // ✅ الدالة الذكية الجديدة لتحليل الألوان
+  // ✅ الدالة الذكية لتحليل الألوان
   Color _parseColor(String input) {
     if (input.isEmpty) return Colors.transparent;
 
@@ -149,21 +152,11 @@ class _ProductFilterDrawerState extends State<ProductFilterDrawer> {
       return _smartColorMap[cleanInput]!;
     }
 
-    // 3. Fallback ذكي: توليد لون من النص (Hash) إذا لم يكن معروفاً
-    // هذا مفيد للألوان الغريبة التي لا توجد في القائمة
-    /*
-    int hash = cleanInput.codeUnits.fold(0, (p, c) => p + c);
-    return Colors.primaries[hash % Colors.primaries.length];
-    */
-
     return Colors.grey.shade200; // لون افتراضي للمجهول
   }
 
-  // ✅ دالة ذكية لتحديد لون علامة الصح (أبيض أو أسود) بناءً على سطوع الخلفية
+  // ✅ دالة ذكية لتحديد لون علامة الصح
   Color _getContrastColor(Color color) {
-    // حساب السطوع (Luminance)
-    // 0.0 = أسود حالك، 1.0 = أبيض ناصع
-    // العتبة 0.5 جيدة، لكن 0.6 تعطي نتائج أفضل للعين البشرية
     return color.computeLuminance() > 0.6 ? Colors.black87 : Colors.white;
   }
 
@@ -190,10 +183,13 @@ class _ProductFilterDrawerState extends State<ProductFilterDrawer> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Drawer(
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.white,
-      width: MediaQuery.of(context).size.width * 0.85, // عرض مناسب
+      width: MediaQuery.of(context).size.width * 0.85,
       child: SafeArea(
         child: Column(
           children: [
@@ -206,9 +202,12 @@ class _ProductFilterDrawerState extends State<ProductFilterDrawer> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    "تصفية النتائج",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  Text(
+                    l10n.filterResults, // ✅ مترجم
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   if (_isLoading)
                     const SizedBox(
@@ -224,9 +223,12 @@ class _ProductFilterDrawerState extends State<ProductFilterDrawer> {
                         size: 16,
                         color: Colors.redAccent,
                       ),
-                      label: const Text(
-                        "إعادة تعيين",
-                        style: TextStyle(color: Colors.redAccent, fontSize: 13),
+                      label: Text(
+                        l10n.resetBtn, // ✅ مترجم
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 13,
+                        ),
                       ),
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -241,14 +243,14 @@ class _ProductFilterDrawerState extends State<ProductFilterDrawer> {
             Expanded(
               child:
                   _isLoading
-                      ? const Center(child: Text("جاري تحميل الخيارات..."))
+                      ? Center(child: Text(l10n.loadingOptions)) // ✅ مترجم
                       : ListView(
                         padding: const EdgeInsets.all(20),
                         children: [
                           // 1. السعر
                           _buildSectionHeader(
-                            "السعر",
-                            "${_priceRange.start.toInt()} - ${_priceRange.end.toInt()} ر.س",
+                            l10n.priceLabel, // ✅ مترجم
+                            "${_priceRange.start.toInt()} - ${_priceRange.end.toInt()} ${l10n.currencySAR}", // ✅ ديناميكي ومترجم
                           ),
                           const SizedBox(height: 10),
                           SliderTheme(
@@ -283,9 +285,9 @@ class _ProductFilterDrawerState extends State<ProductFilterDrawer> {
                           // 2. الماركات
                           if (_filterOptions.brands.isNotEmpty) ...[
                             _buildSectionHeader(
-                              "الماركات",
+                              l10n.brandsLabel, // ✅ مترجم
                               _selectedBrands.isNotEmpty
-                                  ? "${_selectedBrands.length} محدد"
+                                  ? "${_selectedBrands.length} ${l10n.selectedLabel}" // ✅ مترجم
                                   : null,
                             ),
                             const SizedBox(height: 12),
@@ -340,7 +342,10 @@ class _ProductFilterDrawerState extends State<ProductFilterDrawer> {
                           ],
 
                           // 3. التقييم
-                          _buildSectionHeader("التقييم", null),
+                          _buildSectionHeader(
+                            l10n.ratingLabel,
+                            null,
+                          ), // ✅ مترجم
                           const SizedBox(height: 12),
                           SizedBox(
                             height: 50,
@@ -411,9 +416,12 @@ class _ProductFilterDrawerState extends State<ProductFilterDrawer> {
                           ),
                           const SizedBox(height: 30),
 
-                          // 4. الألوان (الذكية)
+                          // 4. الألوان
                           if (_filterOptions.colors.isNotEmpty) ...[
-                            _buildSectionHeader("اللون", _selectedColor),
+                            _buildSectionHeader(
+                              l10n.colorLabel,
+                              _selectedColor,
+                            ), // ✅ مترجم
                             const SizedBox(height: 12),
                             Wrap(
                               spacing: 12,
@@ -495,7 +503,7 @@ class _ProductFilterDrawerState extends State<ProductFilterDrawer> {
                                   }).toList(),
                             ),
                           ],
-                          const SizedBox(height: 50), // مساحة إضافية في الأسفل
+                          const SizedBox(height: 50),
                         ],
                       ),
             ),
@@ -516,7 +524,7 @@ class _ProductFilterDrawerState extends State<ProductFilterDrawer> {
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _apply,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black, // لون أسود فخم
+                  backgroundColor: Colors.black,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
@@ -524,18 +532,18 @@ class _ProductFilterDrawerState extends State<ProductFilterDrawer> {
                   ),
                   elevation: 0,
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      "تطبيق الفلتر",
-                      style: TextStyle(
+                      l10n.applyFilterBtn, // ✅ مترجم
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(width: 8),
-                    Icon(Icons.check_circle_outline, size: 20),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.check_circle_outline, size: 20),
                   ],
                 ),
               ),

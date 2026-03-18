@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+// ✅ 1. استيراد ملف الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 // تأكد من صحة مسارات الملفات التالية حسب مشروعك
 import 'package:linyora_project/features/shared/widgets/background_video_player.dart';
 import 'package:linyora_project/features/shared/widgets/product_card.dart';
@@ -124,6 +127,9 @@ class _SectionDetailsScreenState extends State<SectionDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة مرة واحدة في دالة البناء
+    final l10n = AppLocalizations.of(context)!;
+
     if (_isLoading) {
       return const Scaffold(
         body: Center(
@@ -139,7 +145,7 @@ class _SectionDetailsScreenState extends State<SectionDetailsScreen> {
           backgroundColor: Colors.white,
           elevation: 0,
         ),
-        body: const Center(child: Text("القسم غير متاح حالياً")),
+        body: Center(child: Text(l10n.sectionUnavailable)), // ✅ مترجم
       );
     }
 
@@ -156,7 +162,7 @@ class _SectionDetailsScreenState extends State<SectionDetailsScreen> {
             toolbarHeight: 60,
             leading: const BackButton(color: Colors.white),
             title: Text(
-              _section!.title,
+              _section!.title, // هذا النص يأتي من قاعدة البيانات
               style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
@@ -222,7 +228,7 @@ class _SectionDetailsScreenState extends State<SectionDetailsScreen> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
-                                    slide.title,
+                                    slide.title, // هذا النص يأتي من قاعدة البيانات
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(
                                       color: Colors.white,
@@ -239,7 +245,7 @@ class _SectionDetailsScreenState extends State<SectionDetailsScreen> {
                                   const SizedBox(height: 10),
                                   if (slide.description.isNotEmpty)
                                     Text(
-                                      slide.description,
+                                      slide.description, // هذا النص يأتي من قاعدة البيانات
                                       textAlign: TextAlign.center,
                                       style: const TextStyle(
                                         color: Colors.white,
@@ -273,7 +279,7 @@ class _SectionDetailsScreenState extends State<SectionDetailsScreen> {
                                           ),
                                         ),
                                       ),
-                                      child: Text(slide.buttonText),
+                                      child: Text(slide.buttonText), // زر يأتي نصه من قاعدة البيانات
                                     ),
                                   ],
                                 ],
@@ -344,19 +350,19 @@ class _SectionDetailsScreenState extends State<SectionDetailsScreen> {
 
           // 4. شبكة المنتجات
           _products.isEmpty
-              ? const SliverToBoxAdapter(
+              ? SliverToBoxAdapter(
                 child: Center(
                   child: Padding(
-                    padding: EdgeInsets.all(40.0),
+                    padding: const EdgeInsets.all(40.0),
                     child: Column(
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.inventory_2_outlined,
                           size: 50,
                           color: Colors.grey,
                         ),
-                        SizedBox(height: 10),
-                        Text("لا توجد منتجات متاحة حالياً"),
+                        const SizedBox(height: 10),
+                        Text(l10n.noProductsAvailable), // ✅ مترجم
                       ],
                     ),
                   ),

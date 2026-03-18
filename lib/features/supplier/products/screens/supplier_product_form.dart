@@ -2,7 +2,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter_colorpicker/flutter_colorpicker.dart'; // 🎨 مكتبة الألوان
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import 'package:linyora_project/features/supplier/products/models/supplier_models.dart';
 import 'package:linyora_project/features/supplier/products/services/supplier_products_service.dart';
 
@@ -25,11 +29,10 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
   List<Category> _categories = [];
   bool _isLoading = false;
   bool _isCategoriesLoading = true;
-  int? _uploadingVariantIndex; // لتتبع الرفع
+  int? _uploadingVariantIndex;
 
-  // 🎨 تعريف التدرج اللوني (أزرق - بنفسجي)
   final LinearGradient _mainGradient = const LinearGradient(
-    colors: [Color(0xFF2563EB), Color(0xFF9333EA)], // Blue to Purple
+    colors: [Color(0xFF2563EB), Color(0xFF9333EA)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -82,15 +85,19 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
 
   Future<void> _loadCategories() async {
     final cats = await _service.getCategories();
-    if (mounted)
+    if (mounted) {
       setState(() {
         _categories = cats;
         _isCategoriesLoading = false;
       });
+    }
   }
 
-  // --- منطق الصور ---
-  Future<void> _pickAndUploadImage(int variantIndex) async {
+  // ✅ تمرير l10n
+  Future<void> _pickAndUploadImage(
+    int variantIndex,
+    AppLocalizations l10n,
+  ) async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image == null) return;
 
@@ -104,7 +111,8 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
       });
     } catch (e) {
       setState(() => _uploadingVariantIndex = null);
-      _showErrorSnackBar("فشل رفع الصورة: $e");
+      // ✅ استخدام الدالة المولدة بدلاً من replaceAll
+      _showErrorSnackBar(l10n.uploadFailedWithErrorMsg(e.toString()));
     }
   }
 
@@ -114,8 +122,8 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
     });
   }
 
-  // --- منطق الحفظ ---
-  Future<void> _submit() async {
+  // ✅ تمرير l10n
+  Future<void> _submit(AppLocalizations l10n) async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
@@ -124,7 +132,7 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text("تم الحفظ بنجاح ✅"),
+            content: Text("${l10n.savedSuccessfullyMsg} ✅"), // ✅ مترجم
             backgroundColor: Colors.green.shade600,
             behavior: SnackBarBehavior.floating,
           ),
@@ -133,7 +141,8 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
       }
     } catch (e) {
       if (mounted) {
-        _showErrorSnackBar("خطأ: $e");
+        // ✅ استخدام الدالة المولدة بدلاً من replaceAll
+        _showErrorSnackBar(l10n.errorOccurredWithErrorMsg(e.toString()));
         setState(() => _isLoading = false);
       }
     }
@@ -149,7 +158,6 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
     );
   }
 
-  // 🎨 تحويل Hex String إلى Color
   Color _getColorFromHex(String hexColor) {
     try {
       hexColor = hexColor.replaceAll("#", "");
@@ -160,19 +168,23 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
     }
   }
 
-  // 🎨 تحويل Color إلى Hex String
   String _getHexFromColor(Color color) {
     return '#${color.value.toRadixString(16).substring(2).toUpperCase()}';
   }
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(
-          widget.product == null ? "إضافة منتج جديد" : "تعديل المنتج",
+          widget.product == null
+              ? l10n.addNewProductTitle
+              : l10n.editProductTitle, // ✅ مترجم
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -191,42 +203,43 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // 1. المعلومات الأساسية (Accordion 1)
               _buildAccordionSection(
-                title: "المعلومات الأساسية",
+                title: l10n.basicInformationLabel, // ✅ مترجم
                 icon: Icons.info_outline,
                 isExpanded: true,
                 children: [
                   _buildTextField(
-                    "اسم المنتج",
+                    l10n.productNameLabel,
                     (v) => _formData.name = v,
+                    l10n,
                     initial: _formData.name,
-                  ),
+                  ), // ✅ مترجم
                   const SizedBox(height: 16),
                   _buildTextField(
-                    "الماركة",
+                    l10n.brandLabel,
                     (v) => _formData.brand = v,
+                    l10n,
                     initial: _formData.brand,
-                  ),
+                  ), // ✅ مترجم
                   const SizedBox(height: 16),
                   _buildTextField(
-                    "الوصف",
+                    l10n.descriptionLabel,
                     (v) => _formData.description = v,
+                    l10n,
                     initial: _formData.description,
                     maxLines: 4,
-                  ),
+                  ), // ✅ مترجم
                 ],
               ),
 
               const SizedBox(height: 16),
 
-              // 2. التصنيفات (Accordion 2)
               _buildAccordionSection(
-                title: "التصنيفات",
+                title: l10n.categoriesLabel, // ✅ مترجم
                 icon: Icons.category_outlined,
                 children: [
                   InkWell(
-                    onTap: _showCategoryDialog,
+                    onTap: () => _showCategoryDialog(l10n), // ✅ تمرير l10n
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -244,8 +257,12 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
                           Expanded(
                             child: Text(
                               _formData.categoryIds.isEmpty
-                                  ? "اضغط لاختيار التصنيفات..."
-                                  : "تم اختيار ${_formData.categoryIds.length} تصنيف",
+                                  ? l10n
+                                      .tapToSelectCategoriesMsg // ✅ مترجم
+                                  // ✅ استخدام الدالة المولدة (بدون replaceAll)
+                                  : l10n.categoriesSelectedMsg(
+                                    _formData.categoryIds.length.toString(),
+                                  ),
                               style: TextStyle(color: Colors.grey.shade800),
                             ),
                           ),
@@ -263,9 +280,8 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
 
               const SizedBox(height: 16),
 
-              // 3. المتغيرات والألوان (Accordion 3 - Dynamic)
               _buildAccordionSection(
-                title: "الأصناف والألوان (Variants)",
+                title: l10n.variantsAndColorsLabel, // ✅ مترجم
                 icon: Icons.palette_outlined,
                 isExpanded: true,
                 trailing: TextButton.icon(
@@ -282,9 +298,9 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
                     });
                   },
                   icon: const Icon(Icons.add, size: 16, color: Colors.white),
-                  label: const Text(
-                    "إضافة لون",
-                    style: TextStyle(
+                  label: Text(
+                    l10n.addColorBtn, // ✅ مترجم
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                     ),
@@ -295,11 +311,15 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
                 ),
                 children:
                     _formData.variants.asMap().entries.map((entry) {
-                      return _buildVariantCard(entry.key, entry.value);
+                      return _buildVariantCard(
+                        entry.key,
+                        entry.value,
+                        l10n,
+                      ); // ✅ تمرير l10n
                     }).toList(),
               ),
 
-              const SizedBox(height: 100), // مساحة للزر العائم
+              const SizedBox(height: 100),
             ],
           ),
         ),
@@ -317,16 +337,15 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
           ],
         ),
         child: ElevatedButton(
-          onPressed: _isLoading ? null : _submit,
+          onPressed: _isLoading ? null : () => _submit(l10n), // ✅ تمرير l10n
           style: ElevatedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            backgroundColor: Colors.transparent, // شفاف لاستخدام التدرج
+            backgroundColor: Colors.transparent,
             shadowColor: Colors.transparent,
           ).copyWith(
-            // خدعة لتطبيق التدرج على الزر
             backgroundBuilder:
                 (ctx, states, child) => Container(
                   decoration: BoxDecoration(
@@ -353,9 +372,9 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
                       strokeWidth: 2,
                     ),
                   )
-                  : const Text(
-                    "حفظ ونشر المنتج",
-                    style: TextStyle(
+                  : Text(
+                    l10n.saveAndPublishProductBtn, // ✅ مترجم
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -366,9 +385,6 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
     );
   }
 
-  // --- Widgets ---
-
-  // 📦 Accordion Wrapper
   Widget _buildAccordionSection({
     required String title,
     required IconData icon,
@@ -404,7 +420,7 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
             title,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
-          trailing: trailing, // زر مخصص في الرأس
+          trailing: trailing,
           childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
           children: children,
         ),
@@ -412,8 +428,11 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
     );
   }
 
-  // 🎨 بطاقة المتغير (Variant Card)
-  Widget _buildVariantCard(int index, SupplierVariant variant) {
+  Widget _buildVariantCard(
+    int index,
+    SupplierVariant variant,
+    AppLocalizations l10n,
+  ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -432,10 +451,14 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
         children: [
           Row(
             children: [
-              // 🌈 Color Picker
               Expanded(
                 child: InkWell(
-                  onTap: () => _showColorPickerDialog(index, variant.color),
+                  onTap:
+                      () => _showColorPickerDialog(
+                        index,
+                        variant.color,
+                        l10n,
+                      ), // ✅ تمرير l10n
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -458,9 +481,9 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
                           ),
                         ),
                         const SizedBox(width: 10),
-                        const Text(
-                          "اختر اللون",
-                          style: TextStyle(
+                        Text(
+                          l10n.chooseColorLabel, // ✅ مترجم
+                          style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: Colors.grey,
@@ -472,7 +495,6 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              // زر الحذف
               if (_formData.variants.length > 1)
                 IconButton(
                   onPressed:
@@ -487,8 +509,9 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
             children: [
               Expanded(
                 child: _buildTextField(
-                  "التكلفة (ر.س)",
+                  l10n.costPriceLabel, // ✅ مترجم
                   (v) => variant.costPrice = double.tryParse(v) ?? 0,
+                  l10n,
                   initial: variant.costPrice.toString(),
                   isNum: true,
                   isSmall: true,
@@ -497,8 +520,9 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: _buildTextField(
-                  "الكمية",
+                  l10n.quantityLabel, // ✅ مترجم
                   (v) => variant.stockQuantity = int.tryParse(v) ?? 0,
+                  l10n,
                   initial: variant.stockQuantity.toString(),
                   isNum: true,
                   isSmall: true,
@@ -508,7 +532,6 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
           ),
           const SizedBox(height: 16),
 
-          // منطقة الصور
           Container(
             height: 90,
             decoration: BoxDecoration(
@@ -519,9 +542,8 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.all(8),
               children: [
-                // زر إضافة صورة
                 InkWell(
-                  onTap: () => _pickAndUploadImage(index),
+                  onTap: () => _pickAndUploadImage(index, l10n), // ✅ تمرير l10n
                   child: Container(
                     width: 74,
                     height: 74,
@@ -546,7 +568,7 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
                                   color: Colors.blue.shade600,
                                 ),
                                 Text(
-                                  "إضافة",
+                                  l10n.addImageBtn, // ✅ مترجم
                                   style: TextStyle(
                                     fontSize: 10,
                                     color: Colors.blue.shade800,
@@ -556,7 +578,6 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
                             ),
                   ),
                 ),
-                // عرض الصور
                 ...variant.images
                     .map(
                       (imgUrl) => Stack(
@@ -581,7 +602,7 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
                             top: 2,
                             right: 10,
                             child: InkWell(
-                              // onTap: () => _removeImage(index, imgUrl),
+                              onTap: () => _removeImage(index, imgUrl),
                               child: Container(
                                 padding: const EdgeInsets.all(2),
                                 decoration: const BoxDecoration(
@@ -608,14 +629,17 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
     );
   }
 
-  // نافذة اختيار اللون
-  void _showColorPickerDialog(int index, String currentColor) {
+  void _showColorPickerDialog(
+    int index,
+    String currentColor,
+    AppLocalizations l10n,
+  ) {
     Color pickerColor = _getColorFromHex(currentColor);
     showDialog(
       context: context,
       builder:
           (ctx) => AlertDialog(
-            title: const Text('اختر لون المنتج'),
+            title: Text(l10n.selectProductColorTitle), // ✅ مترجم
             content: SingleChildScrollView(
               child: BlockPicker(
                 pickerColor: pickerColor,
@@ -633,7 +657,8 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
 
   Widget _buildTextField(
     String label,
-    Function(String) onChanged, {
+    Function(String) onChanged,
+    AppLocalizations l10n, {
     String? initial,
     int maxLines = 1,
     bool isNum = false,
@@ -644,7 +669,8 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
       onChanged: onChanged,
       maxLines: maxLines,
       keyboardType: isNum ? TextInputType.number : TextInputType.text,
-      validator: (v) => v!.isEmpty ? "هذا الحقل مطلوب" : null,
+      validator:
+          (v) => v!.isEmpty ? l10n.thisFieldIsRequiredMsg : null, // ✅ مترجم
       style: TextStyle(fontSize: isSmall ? 14 : 16),
       decoration: InputDecoration(
         labelText: label,
@@ -674,8 +700,7 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
     );
   }
 
-  // نفس نافذة التصنيفات السابقة...
-  void _showCategoryDialog() {
+  void _showCategoryDialog(AppLocalizations l10n) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -691,9 +716,9 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
                   controller: scrollController,
                   padding: const EdgeInsets.all(20),
                   children: [
-                    const Text(
-                      "اختر التصنيفات",
-                      style: TextStyle(
+                    Text(
+                      l10n.selectCategoriesTitle, // ✅ مترجم
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -702,14 +727,16 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
                     if (_isCategoriesLoading)
                       const Center(child: CircularProgressIndicator())
                     else
-                      ..._categories.map((c) => _buildCategoryNode(c)).toList(),
+                      ..._categories
+                          .map((c) => _buildCategoryNode(c, l10n))
+                          .toList(), // ✅ تمرير l10n
                   ],
                 ),
           ),
     );
   }
 
-  Widget _buildCategoryNode(Category cat) {
+  Widget _buildCategoryNode(Category cat, AppLocalizations l10n) {
     bool isSelected = _formData.categoryIds.contains(cat.id);
     return Column(
       children: [
@@ -730,9 +757,10 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
                 _formData.categoryIds.remove(cat.id);
               }
             });
-            // إذا كان تصنيف رئيسي، قد ترغب في تحديث الواجهة لإعادة رسم النافذة
             Navigator.pop(context);
-            _showCategoryDialog();
+            _showCategoryDialog(
+              l10n,
+            ); // ✅ إبقاء النافذة مفتوحة بشكل مجدد مع تمرير l10n
           },
           activeColor: const Color(0xFFF105C6),
         ),
@@ -740,174 +768,10 @@ class _SupplierProductFormScreenState extends State<SupplierProductFormScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 20),
             child: Column(
-              children: cat.children.map((c) => _buildCategoryNode(c)).toList(),
+              children:
+                  cat.children.map((c) => _buildCategoryNode(c, l10n)).toList(),
             ),
           ),
-      ],
-    );
-  }
-
-  Widget _buildVariantsSection() {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              "الأصناف (Variants)",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            TextButton.icon(
-              onPressed: () {
-                setState(() {
-                  _formData.variants.add(
-                    SupplierVariant(
-                      color: '',
-                      costPrice: 0,
-                      stockQuantity: 0,
-                      images: [],
-                    ),
-                  );
-                });
-              },
-              icon: const Icon(Icons.add_circle, color: Color(0xFFF105C6)),
-              label: const Text(
-                "إضافة لون",
-                style: TextStyle(color: Color(0xFFF105C6)),
-              ),
-            ),
-          ],
-        ),
-        ..._formData.variants.asMap().entries.map((entry) {
-          int i = entry.key;
-          SupplierVariant v = entry.value;
-          return Container(
-            margin: const EdgeInsets.only(top: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.blue.shade100),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildTextField(
-                        "اللون",
-                        (val) => v.color = val,
-                        initial: v.color,
-                      ),
-                    ),
-                    if (_formData.variants.length > 1)
-                      IconButton(
-                        onPressed:
-                            () =>
-                                setState(() => _formData.variants.removeAt(i)),
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildTextField(
-                        "التكلفة",
-                        (val) => v.costPrice = double.tryParse(val) ?? 0,
-                        initial: v.costPrice.toString(),
-                        isNum: true,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildTextField(
-                        "الكمية",
-                        (val) => v.stockQuantity = int.tryParse(val) ?? 0,
-                        initial: v.stockQuantity.toString(),
-                        isNum: true,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // صور المتغير
-                SizedBox(
-                  height: 80,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      // زر الرفع
-                      InkWell(
-                        onTap: () => _pickAndUploadImage(i),
-                        child: Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.grey.shade300,
-                              style: BorderStyle.solid,
-                            ),
-                          ),
-                          child:
-                              _uploadingVariantIndex == i
-                                  ? const Center(
-                                    child: CircularProgressIndicator(),
-                                  )
-                                  : const Icon(
-                                    Icons.add_a_photo,
-                                    color: Colors.grey,
-                                  ),
-                        ),
-                      ),
-                      // الصور المرفوعة
-                      ...v.images
-                          .map(
-                            (imgUrl) => Stack(
-                              children: [
-                                Container(
-                                  width: 80,
-                                  height: 80,
-                                  margin: const EdgeInsets.only(right: 8),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: CachedNetworkImage(
-                                      imageUrl: imgUrl,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                ),
-                                Positioned(
-                                  top: 0,
-                                  left: 0,
-                                  child: InkWell(
-                                    onTap: () => _removeImage(i, imgUrl),
-                                    child: const CircleAvatar(
-                                      radius: 10,
-                                      backgroundColor: Colors.red,
-                                      child: Icon(
-                                        Icons.close,
-                                        size: 12,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                          .toList(),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        }).toList(),
       ],
     );
   }

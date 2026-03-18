@@ -61,4 +61,4 @@ flutter:
   uses-material-design: true
   generate: true # 👈 هذا السطر ضروري جداً لتوليد ملفات الترجمة
   assets:
-    - assets/images/story_placeholder.png
+    - assets/images/

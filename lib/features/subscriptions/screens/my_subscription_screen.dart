@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:linyora_project/features/subscriptions/screens/subscription_cancelled_success_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart'; // لتنسيق التاريخ (تأكد من إضافتها في pubspec.yaml)
+import 'package:intl/intl.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../../auth/providers/auth_provider.dart';
 import '../services/subscription_service.dart';
-import 'subscription_plans_screen.dart'; // للانتقال في حال أراد الترقية
+import 'subscription_plans_screen.dart';
 
 class MySubscriptionScreen extends StatefulWidget {
   const MySubscriptionScreen({Key? key}) : super(key: key);
@@ -17,33 +21,30 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
   final SubscriptionService _service = SubscriptionService();
   bool _isLoading = false;
 
-  // دالة لتنسيق التاريخ
-  String _formatDate(String? dateStr) {
-    if (dateStr == null) return "غير محدد";
+  // ✅ تم إضافة l10n لتحديد اللغة للتاريخ (ar / en) ولترجمة "غير محدد"
+  String _formatDate(String? dateStr, AppLocalizations l10n) {
+    if (dateStr == null) return l10n.unspecifiedDate; // ✅ مترجم
     try {
       final date = DateTime.parse(dateStr);
-      return DateFormat('d MMM yyyy', 'ar').format(date); // يحتاج intl
-      // أو بدون intl: return "${date.day}/${date.month}/${date.year}";
+      // اختيار اللغة للتنسيق بناءً على اختيار المستخدم
+      String langCode = Localizations.localeOf(context).languageCode;
+      return DateFormat('d MMM yyyy', langCode).format(date);
     } catch (e) {
       return dateStr;
     }
   }
 
-  // معالجة إلغاء الاشتراك
-  Future<void> _handleCancelSubscription() async {
-    // 1. عرض نافذة التأكيد (كما هي في كودك)
+  Future<void> _handleCancelSubscription(AppLocalizations l10n) async {
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text("إلغاء الاشتراك؟"),
-            content: const Text(
-              "هل أنت متأكد أنك تريد إلغاء اشتراكك؟ ستفقد الوصول للميزات المدفوعة بنهاية الفترة الحالية.",
-            ),
+            title: Text(l10n.cancelSubscriptionDialogTitle), // ✅ مترجم
+            content: Text(l10n.cancelSubscriptionDialogDesc), // ✅ مترجم
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text("تراجع"),
+                child: Text(l10n.undoBtn), // ✅ مترجم
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, true),
@@ -51,30 +52,22 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
                   backgroundColor: Colors.red,
                   foregroundColor: Colors.white,
                 ),
-                child: const Text("نعم، إلغاء"),
+                child: Text(l10n.yesCancelBtn), // ✅ مترجم
               ),
             ],
           ),
     );
 
-    // إذا لم يوافق، نخرج
     if (confirm != true) return;
 
-    // بدء التحميل
     setState(() => _isLoading = true);
 
     try {
-      // 2. استدعاء API الإلغاء
       await _service.cancelSubscription();
 
       if (mounted) {
-        // 3. تحديث بيانات المستخدم في الخلفية
-        // هذا مهم لكي تظهر حالة الاشتراك كـ "ملغى" أو "غير متجدد" عند العودة
         await Provider.of<AuthProvider>(context, listen: false).refreshUser();
 
-        // 4. ✅ التوجيه لصفحة النجاح بدلاً من عرض SnackBar
-        // نستخدم pushReplacement لإغلاق صفحة "اشتراكي" واستبدالها بصفحة النجاح
-        // حتى لا يعود المستخدم لصفحة الاشتراك بزر الرجوع
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -85,7 +78,10 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('${l10n.errorPrefix}$e'),
+            backgroundColor: Colors.red,
+          ), // ✅ مترجم
         );
       }
     } finally {
@@ -97,16 +93,14 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
     await Provider.of<AuthProvider>(context, listen: false).refreshUser();
   }
 
-  Widget _buildNoSubscriptionView() {
+  Widget _buildNoSubscriptionView(AppLocalizations l10n) {
     return Center(
       child: SingleChildScrollView(
-        // AlwaysScrollableScrollPhysics ضرورية لكي يعمل السحب للتحديث حتى لو كانت الصفحة فارغة
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 50),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // أيقونة توضيحية جذابة
             Container(
               padding: const EdgeInsets.all(30),
               decoration: BoxDecoration(
@@ -121,10 +115,9 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
             ),
             const SizedBox(height: 30),
 
-            // نصوص توضيحية
-            const Text(
-              "لا يوجد اشتراك نشط",
-              style: TextStyle(
+            Text(
+              l10n.noActiveSubscriptionTitle, // ✅ مترجم
+              style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF1E293B),
@@ -132,7 +125,7 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              "اشتركي الآن في إحدى باقات لينيورا للحصول على صلاحيات الدروب شيبينج ومميزات حصرية لتنمية أعمالك.",
+              l10n.noActiveSubscriptionDesc, // ✅ مترجم
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 15,
@@ -142,7 +135,6 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
             ),
             const SizedBox(height: 40),
 
-            // زر التوجه لصفحة الخطط
             SizedBox(
               width: double.infinity,
               height: 55,
@@ -156,23 +148,25 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF43F5E), // Primary Color
+                  backgroundColor: const Color(0xFFF43F5E),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(15),
                   ),
                   elevation: 2,
                 ),
-                child: const Text(
-                  "استعراض خطط الاشتراك",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                child: Text(
+                  l10n.browseSubscriptionPlansBtn, // ✅ مترجم
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
 
             const SizedBox(height: 20),
 
-            // نص مساعد للسحب للتحديث
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -183,7 +177,7 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
                 ),
                 const SizedBox(width: 5),
                 Text(
-                  "اسحبي للأسفل للتحديث إذا كنتِ قد اشتركتِ للتو",
+                  l10n.swipeDownToRefreshMsg, // ✅ مترجم
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
                 ),
               ],
@@ -196,25 +190,24 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // جلب بيانات الاشتراك من المستخدم الحالي
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     final user = Provider.of<AuthProvider>(context).user;
     final sub = user?.subscription;
 
-    // إذا لم يكن هناك بيانات (نظرياً لا يجب أن يحدث إذا دخلنا هنا)
     if (sub == null)
-      return const Scaffold(body: Center(child: Text("لا يوجد اشتراك نشط")));
+      return Scaffold(
+        body: Center(child: Text(l10n.noActiveSubscriptionTitle)),
+      ); // ✅ مترجم
 
-    // استخراج البيانات من الـ JSON الذي ظهر في اللوج
-    // ملاحظة: sub.planName قد يكون null إذا لم نحدث المودل ليقرأ الـ nested object
-    // لذا سنقرأه بحذر أو نفترض أنك حدثت المودل
-    final String planName = sub.planName ?? "باقة غير معروفة";
-    // إذا كنت لم تحدث SubscriptionState ليقرأ السعر، يمكنك عرضه كنص ثابت أو تعديل المودل
-    // سنفترض هنا تصميماً جميلاً
+    final String planName = sub.planName ?? l10n.unknownPackage; // ✅ مترجم
 
     final bool isActive = sub.status == 'active';
     final String endDate = _formatDate(
       user?.subscription?.endDate,
-    ); // نفترض أنك أضفت endDate للمودل
+      l10n,
+    ); // ✅ تمرير l10n للتنسيق
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9FAFB),
@@ -229,14 +222,12 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
         color: Colors.purple,
         child:
             sub == null
-                ? _buildNoSubscriptionView() // ويدجت يعرض رسالة لا يوجد اشتراك
+                ? _buildNoSubscriptionView(l10n)
                 : SingleChildScrollView(
-                  physics:
-                      const AlwaysScrollableScrollPhysics(), // ضروري لعمل الـ Refresh
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     children: [
-                      // 1. بطاقة الحالة (Active Badge)
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -259,7 +250,9 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              isActive ? "اشتراك نشط" : "اشتراك غير نشط",
+                              isActive
+                                  ? l10n.activeSubscriptionBadge
+                                  : l10n.inactiveSubscriptionBadge, // ✅ مترجم
                               style: TextStyle(
                                 color:
                                     isActive
@@ -273,15 +266,11 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // 2. بطاقة تفاصيل الباقة (VIP Card Design)
                       Container(
                         width: double.infinity,
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [
-                              Color(0xFFF43F5E),
-                              Color(0xFF9333EA),
-                            ], // Rose to Purple
+                            colors: [Color(0xFFF43F5E), Color(0xFF9333EA)],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
@@ -310,16 +299,16 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                    "الباقة الحالية",
-                                    style: TextStyle(
+                                  Text(
+                                    l10n.currentPackageTitle, // ✅ مترجم
+                                    style: const TextStyle(
                                       color: Colors.white70,
                                       fontSize: 14,
                                     ),
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    planName.toUpperCase(), // اسم الباقة
+                                    planName.toUpperCase(),
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 28,
@@ -336,9 +325,9 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          const Text(
-                                            "تاريخ البدء",
-                                            style: TextStyle(
+                                          Text(
+                                            l10n.startDateLabel, // ✅ مترجم
+                                            style: const TextStyle(
                                               color: Colors.white70,
                                               fontSize: 12,
                                             ),
@@ -347,7 +336,8 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
                                           Text(
                                             _formatDate(
                                               user?.subscription?.startDate,
-                                            ),
+                                              l10n,
+                                            ), // ✅ تمرير l10n
                                             style: const TextStyle(
                                               color: Colors.white,
                                               fontWeight: FontWeight.bold,
@@ -359,9 +349,9 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.end,
                                         children: [
-                                          const Text(
-                                            "تاريخ التجديد",
-                                            style: TextStyle(
+                                          Text(
+                                            l10n.renewalDateLabel, // ✅ مترجم
+                                            style: const TextStyle(
                                               color: Colors.white70,
                                               fontSize: 12,
                                             ),
@@ -387,7 +377,6 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
 
                       const SizedBox(height: 24),
 
-                      // 3. الصلاحيات (Permissions)
                       if (sub.hasDropshippingAccess)
                         Container(
                           margin: const EdgeInsets.only(bottom: 16),
@@ -399,19 +388,23 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
                               color: Colors.purple.withOpacity(0.2),
                             ),
                           ),
-                          child: const Row(
+                          child: Row(
                             children: [
-                              Icon(Icons.cloud_download, color: Colors.purple),
-                              SizedBox(width: 12),
+                              const Icon(
+                                Icons.cloud_download,
+                                color: Colors.purple,
+                              ),
+                              const SizedBox(width: 12),
                               Text(
-                                "صلاحية الدروب شيبينج مفعلة ✅",
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                                l10n.dropshippingEnabledMsg, // ✅ مترجم
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ],
                           ),
                         ),
 
-                      // 4. أزرار التحكم
                       const SizedBox(height: 20),
                       if (isActive) ...[
                         SizedBox(
@@ -419,7 +412,6 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
                           height: 50,
                           child: ElevatedButton.icon(
                             onPressed: () {
-                              // توجيه لصفحة الخطط للترقية
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -429,7 +421,7 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
                               );
                             },
                             icon: const Icon(Icons.upgrade),
-                            label: const Text("ترقية الباقة"),
+                            label: Text(l10n.upgradePackageBtn), // ✅ مترجم
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
                               foregroundColor: Colors.black,
@@ -444,7 +436,11 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
                           height: 50,
                           child: TextButton.icon(
                             onPressed:
-                                _isLoading ? null : _handleCancelSubscription,
+                                _isLoading
+                                    ? null
+                                    : () => _handleCancelSubscription(
+                                      l10n,
+                                    ), // ✅ تمرير l10n
                             icon:
                                 _isLoading
                                     ? const SizedBox(
@@ -460,8 +456,9 @@ class _MySubscriptionScreenState extends State<MySubscriptionScreen> {
                                     ),
                             label: Text(
                               _isLoading
-                                  ? "جاري المعالجة..."
-                                  : "إلغاء تجديد الاشتراك",
+                                  ? l10n.processingMsg
+                                  : l10n
+                                      .cancelSubscriptionRenewalBtn, // ✅ مترجم
                               style: const TextStyle(color: Colors.red),
                             ),
                           ),

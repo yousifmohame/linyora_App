@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // للنسخ
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
+
+// ✅ 1. استيراد الترجمة
+import 'package:linyora_project/l10n/app_localizations.dart';
+
 import '../models/merchant_order_details_model.dart';
 import '../services/merchant_order_service.dart';
 
@@ -23,7 +27,6 @@ class _MerchantOrderDetailsScreenState
   bool _isLoading = true;
   String? _error;
 
-  // حالات الطلب المتاحة للتغيير
   final List<String> _statuses = [
     'pending',
     'processing',
@@ -58,8 +61,8 @@ class _MerchantOrderDetailsScreenState
     }
   }
 
-  Future<void> _changeStatus(String newStatus) async {
-    // تأكيد التغيير
+  // ✅ تمرير l10n
+  Future<void> _changeStatus(String newStatus, AppLocalizations l10n) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder:
@@ -67,17 +70,17 @@ class _MerchantOrderDetailsScreenState
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(15),
             ),
-            title: const Text('تغيير حالة الطلب'),
+            title: Text(l10n.changeOrderStatusTitle), // ✅ مترجم
             content: Text(
-              'هل أنت متأكد من تغيير الحالة إلى ${_translateStatus(newStatus)}؟',
-            ),
+              '${l10n.confirmChangeStatusPrefix}${_translateStatus(newStatus, l10n)}؟',
+            ), // ✅ مترجم ومدمج
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text(
-                  'إلغاء',
-                  style: TextStyle(color: Colors.grey),
-                ),
+                child: Text(
+                  l10n.cancelBtn,
+                  style: const TextStyle(color: Colors.grey),
+                ), // ✅ مترجم
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(ctx, true),
@@ -87,10 +90,10 @@ class _MerchantOrderDetailsScreenState
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                child: const Text(
-                  'تأكيد',
-                  style: TextStyle(color: Colors.white),
-                ),
+                child: Text(
+                  l10n.confirmBtn,
+                  style: const TextStyle(color: Colors.white),
+                ), // ✅ مترجم
               ),
             ],
           ),
@@ -99,7 +102,6 @@ class _MerchantOrderDetailsScreenState
     if (confirm != true) return;
 
     try {
-      // إظهار Loading
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -112,11 +114,11 @@ class _MerchantOrderDetailsScreenState
       await _orderService.updateOrderStatus(widget.orderId, newStatus);
 
       if (mounted) {
-        Navigator.pop(context); // إغلاق Loading
-        _fetchDetails(); // تحديث البيانات
+        Navigator.pop(context);
+        _fetchDetails();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم تحديث الحالة بنجاح ✅'),
+          SnackBar(
+            content: Text(l10n.statusUpdatedSuccessMsg), // ✅ مترجم
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
           ),
@@ -124,11 +126,10 @@ class _MerchantOrderDetailsScreenState
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context); // إغلاق Loading
-        String errorMsg = 'فشل التحديث';
-        // معالجة خطأ 403 القادم من السيرفر كاحتياط
+        Navigator.pop(context);
+        String errorMsg = l10n.updateFailedMsg; // ✅ مترجم (سابقاً)
         if (e.toString().contains('403')) {
-          errorMsg = 'غير مسموح بتعديل هذا الطلب (دروب شيبينج)';
+          errorMsg = l10n.notAllowedToEditDropshippingOrderMsg; // ✅ مترجم
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(errorMsg), backgroundColor: Colors.red),
@@ -137,7 +138,7 @@ class _MerchantOrderDetailsScreenState
     }
   }
 
-  void _showErrorDialog(String title, String message) {
+  void _showErrorDialog(String title, String message, AppLocalizations l10n) {
     showDialog(
       context: context,
       builder:
@@ -156,33 +157,36 @@ class _MerchantOrderDetailsScreenState
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text(
-                  'حسناً',
-                  style: TextStyle(color: Colors.black),
-                ),
+                child: Text(
+                  l10n.okBtn,
+                  style: const TextStyle(color: Colors.black),
+                ), // ✅ مترجم
               ),
             ],
           ),
     );
   }
 
-  void _copyToClipboard(String text) {
+  void _copyToClipboard(String text, AppLocalizations l10n) {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('تم النسخ للحافظة'),
-        duration: Duration(seconds: 1),
+      SnackBar(
+        content: Text(l10n.copiedToClipboardMsg), // ✅ مترجم
+        duration: const Duration(seconds: 1),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    // ✅ 2. تعريف الترجمة
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6), // خلفية هادئة وعصرية
+      backgroundColor: const Color(0xFFF3F4F6),
       appBar: AppBar(
         title: Text(
-          'طلب #${widget.orderId}',
+          '${l10n.orderHashPrefix}${widget.orderId}', // ✅ مترجم
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
@@ -206,10 +210,10 @@ class _MerchantOrderDetailsScreenState
                       color: Colors.grey,
                     ),
                     const SizedBox(height: 16),
-                    Text('حدث خطأ: $_error'),
+                    Text('${l10n.errorOccurredMsg} $_error'), // ✅ مترجم
                     TextButton(
                       onPressed: _fetchDetails,
-                      child: const Text('إعادة المحاولة'),
+                      child: Text(l10n.retryBtn), // ✅ مترجم
                     ),
                   ],
                 ),
@@ -219,20 +223,13 @@ class _MerchantOrderDetailsScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 1. بطاقة الحالة والإجراءات
-                    _buildHeaderCard(),
+                    _buildHeaderCard(l10n), // ✅ تمرير l10n
                     const SizedBox(height: 16),
-
-                    // 2. قائمة المنتجات
-                    _buildItemsCard(),
+                    _buildItemsCard(l10n), // ✅ تمرير l10n
                     const SizedBox(height: 16),
-
-                    // 3. معلومات العميل
-                    _buildCustomerCard(),
+                    _buildCustomerCard(l10n), // ✅ تمرير l10n
                     const SizedBox(height: 16),
-
-                    // 4. ملخص الدفع والشحن
-                    _buildPaymentAndShippingCard(),
+                    _buildPaymentAndShippingCard(l10n), // ✅ تمرير l10n
                     const SizedBox(height: 30),
                   ],
                 ),
@@ -240,9 +237,7 @@ class _MerchantOrderDetailsScreenState
     );
   }
 
-  // --- البطاقات ---
-
-  Widget _buildHeaderCard() {
+  Widget _buildHeaderCard(AppLocalizations l10n) {
     final status = _orderDetails!.info.status;
 
     return Container(
@@ -265,7 +260,7 @@ class _MerchantOrderDetailsScreenState
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'تاريخ الطلب: ${_orderDetails!.info.createdAt}', // تنسيق التاريخ
+                '${l10n.orderDatePrefix}${_orderDetails!.info.createdAt}', // ✅ مترجم
                 style: TextStyle(color: Colors.grey[600], fontSize: 12),
               ),
             ],
@@ -286,7 +281,7 @@ class _MerchantOrderDetailsScreenState
                   ),
                 ),
                 child: Text(
-                  _translateStatus(status),
+                  _translateStatus(status, l10n), // ✅ مترجم
                   style: TextStyle(
                     color: _getStatusColor(status),
                     fontWeight: FontWeight.bold,
@@ -296,9 +291,9 @@ class _MerchantOrderDetailsScreenState
             ],
           ),
           const SizedBox(height: 20),
-          const Text(
-            'تحديث الحالة:',
-            style: TextStyle(
+          Text(
+            l10n.updateStatusLabel, // ✅ مترجم
+            style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
               color: Colors.black87,
@@ -306,7 +301,6 @@ class _MerchantOrderDetailsScreenState
           ),
           const SizedBox(height: 10),
 
-          // إذا كان دروب شيبينج، نخفي أزرار التحديث أو نظهر رسالة
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -314,12 +308,18 @@ class _MerchantOrderDetailsScreenState
                   _statuses.map((s) {
                     bool isSelected = s == status;
                     return Padding(
-                      padding: const EdgeInsets.only(left: 8),
+                      padding: const EdgeInsets.only(
+                        left: 8,
+                        right: 8,
+                      ), // لدعم اللغتين (توسيع الـ padding)
                       child: ChoiceChip(
-                        label: Text(_translateStatus(s)),
+                        label: Text(_translateStatus(s, l10n)), // ✅ مترجم
                         selected: isSelected,
                         onSelected:
-                            isSelected ? null : (selected) => _changeStatus(s),
+                            isSelected
+                                ? null
+                                : (selected) =>
+                                    _changeStatus(s, l10n), // ✅ تمرير l10n
                         backgroundColor: Colors.grey[50],
                         selectedColor: _getStatusColor(s).withOpacity(0.2),
                         labelStyle: TextStyle(
@@ -343,7 +343,7 @@ class _MerchantOrderDetailsScreenState
     );
   }
 
-  Widget _buildCustomerCard() {
+  Widget _buildCustomerCard(AppLocalizations l10n) {
     final info = _orderDetails!.info;
     return Container(
       padding: const EdgeInsets.all(20),
@@ -361,13 +361,16 @@ class _MerchantOrderDetailsScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.person_outline, color: Colors.black54),
-              SizedBox(width: 8),
+              const Icon(Icons.person_outline, color: Colors.black54),
+              const SizedBox(width: 8),
               Text(
-                'معلومات العميل',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                l10n.customerInfoLabel, // ✅ مترجم
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
             ],
           ),
@@ -400,8 +403,9 @@ class _MerchantOrderDetailsScreenState
           const SizedBox(height: 16),
           _buildInfoRow(
             Icons.phone_outlined,
-            'رقم الهاتف',
-            info.customerPhone ?? 'غير متوفر',
+            l10n.phoneNumberLabel, // ✅ مترجم
+            info.customerPhone ?? l10n.notAvailable, // ✅ مترجم
+            l10n,
             isCopyable: true,
           ),
         ],
@@ -409,7 +413,7 @@ class _MerchantOrderDetailsScreenState
     );
   }
 
-  Widget _buildItemsCard() {
+  Widget _buildItemsCard(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -431,7 +435,7 @@ class _MerchantOrderDetailsScreenState
               const Icon(Icons.inventory_2_outlined, color: Colors.black54),
               const SizedBox(width: 8),
               Text(
-                'المنتجات (${_orderDetails!.items.length})',
+                '${l10n.productsLabelWithCountPrefix}${_orderDetails!.items.length}${l10n.productsLabelWithCountSuffix}', // ✅ مترجم
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
@@ -485,7 +489,6 @@ class _MerchantOrderDetailsScreenState
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-
                         const SizedBox(height: 4),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -497,7 +500,7 @@ class _MerchantOrderDetailsScreenState
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            'الكمية: ${item.quantity}',
+                            '${l10n.quantityPrefix}${item.quantity}', // ✅ مترجم
                             style: TextStyle(
                               fontSize: 11,
                               color: Colors.grey[700],
@@ -508,7 +511,7 @@ class _MerchantOrderDetailsScreenState
                     ),
                   ),
                   Text(
-                    '${(item.price * item.quantity).toStringAsFixed(2)} ر.س',
+                    '${(item.price * item.quantity).toStringAsFixed(2)} ${l10n.currencySAR}', // ✅ عملة مترجمة
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
@@ -523,7 +526,7 @@ class _MerchantOrderDetailsScreenState
     );
   }
 
-  Widget _buildPaymentAndShippingCard() {
+  Widget _buildPaymentAndShippingCard(AppLocalizations l10n) {
     final info = _orderDetails!.info;
     return Container(
       padding: const EdgeInsets.all(20),
@@ -541,22 +544,25 @@ class _MerchantOrderDetailsScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.local_shipping_outlined, color: Colors.black54),
-              SizedBox(width: 8),
+              const Icon(Icons.local_shipping_outlined, color: Colors.black54),
+              const SizedBox(width: 8),
               Text(
-                'الشحن والدفع',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                l10n.shippingAndPaymentLabel, // ✅ مترجم
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
             ],
           ),
           const Divider(height: 24),
 
           if (info.shippingAddress != null) ...[
-            const Text(
-              "عنوان الشحن",
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+            Text(
+              l10n.shippingAddressLabel, // ✅ مترجم
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
             const SizedBox(height: 4),
             Text(info.shippingAddress!, style: const TextStyle(height: 1.4)),
@@ -569,9 +575,9 @@ class _MerchantOrderDetailsScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      "طريقة الدفع",
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    Text(
+                      l10n.paymentMethodLabel, // ✅ مترجم
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                     const SizedBox(height: 4),
                     Row(
@@ -595,9 +601,9 @@ class _MerchantOrderDetailsScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      "حالة الدفع",
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    Text(
+                      l10n.paymentStatusLabel, // ✅ مترجم
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                     const SizedBox(height: 4),
                     Container(
@@ -613,7 +619,9 @@ class _MerchantOrderDetailsScreenState
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        info.paymentStatus == 'paid' ? 'مدفوع' : 'غير مدفوع',
+                        info.paymentStatus == 'paid'
+                            ? l10n.paidStatus
+                            : l10n.unpaidStatus, // ✅ مترجم
                         style: TextStyle(
                           color:
                               info.paymentStatus == 'paid'
@@ -634,12 +642,15 @@ class _MerchantOrderDetailsScreenState
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'الإجمالي الكلي',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              Text(
+                l10n.grandTotalLabel, // ✅ مترجم
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
               Text(
-                '${info.totalAmount.toStringAsFixed(2)} ر.س',
+                '${info.totalAmount.toStringAsFixed(2)} ${l10n.currencySAR}', // ✅ عملة مترجمة
                 style: const TextStyle(
                   fontWeight: FontWeight.w900,
                   fontSize: 20,
@@ -656,7 +667,8 @@ class _MerchantOrderDetailsScreenState
   Widget _buildInfoRow(
     IconData icon,
     String label,
-    String value, {
+    String value,
+    AppLocalizations l10n, {
     bool isCopyable = false,
   }) {
     return Row(
@@ -691,25 +703,26 @@ class _MerchantOrderDetailsScreenState
         if (isCopyable)
           IconButton(
             icon: const Icon(Icons.copy, size: 18, color: Colors.grey),
-            onPressed: () => _copyToClipboard(value),
-            tooltip: "نسخ",
+            onPressed: () => _copyToClipboard(value, l10n), // ✅ تمرير l10n
+            tooltip: l10n.copyBtn, // ✅ مترجم
           ),
       ],
     );
   }
 
-  String _translateStatus(String status) {
+  // ✅ تمرير l10n واستخدام الترجمة
+  String _translateStatus(String status, AppLocalizations l10n) {
     switch (status.toLowerCase()) {
       case 'pending':
-        return 'قيد الانتظار';
+        return l10n.pending;
       case 'processing':
-        return 'قيد التجهيز';
+        return l10n.processingOrder;
       case 'shipped':
-        return 'تم الشحن';
+        return l10n.shipped;
       case 'completed':
-        return 'مكتمل';
+        return l10n.completed;
       case 'cancelled':
-        return 'ملغي';
+        return l10n.cancelled;
       default:
         return status;
     }
